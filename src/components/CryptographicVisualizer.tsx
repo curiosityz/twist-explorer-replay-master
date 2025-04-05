@@ -20,6 +20,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   const [error, setError] = useState<string | null>(null);
   const [verificationResult, setVerificationResult] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
+  const [privateKey, setPrivateKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (txid && startAnalysis) {
@@ -27,12 +28,29 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
     }
   }, [txid, startAnalysis]);
 
+  // Calculate and set the private key whenever analysis result changes
+  useEffect(() => {
+    if (analysisResult?.privateKeyModulo && Object.keys(analysisResult.privateKeyModulo).length >= 6) {
+      const calculatedKey = combinePrivateKeyFragments(analysisResult.privateKeyModulo);
+      setPrivateKey(calculatedKey);
+      
+      // Also verify the key
+      if (calculatedKey && analysisResult.publicKey) {
+        const isValid = verifyPrivateKey(calculatedKey, analysisResult.publicKey.x, analysisResult.publicKey.y);
+        setVerificationResult(isValid);
+      }
+    } else {
+      setPrivateKey(null);
+    }
+  }, [analysisResult]);
+
   const handleAnalyzeTransaction = async () => {
     if (!txid) return;
 
     setIsAnalyzing(true);
     setError(null);
     setVerificationResult(null);
+    setPrivateKey(null);
 
     try {
       const { data: txData, error: txError } = await supabase
@@ -134,6 +152,17 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           }
         }
         
+        // Calculate the combined private key
+        const combinedFragment = combinePrivateKeyFragments(mockPrivateKeyModulo);
+        const isComplete = Object.keys(mockPrivateKeyModulo).length >= 6;
+        
+        let isKeyVerified = false;
+        if (combinedFragment && isComplete) {
+          isKeyVerified = verifyPrivateKey(combinedFragment, mockPublicKey.x, mockPublicKey.y);
+          setVerificationResult(isKeyVerified);
+          setPrivateKey(combinedFragment);
+        }
+        
         const publicKeyHex = mockPublicKey.x + mockPublicKey.y;
         
         const { data: existingFragment, error: fragmentCheckError } = await supabase
@@ -144,15 +173,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           
         if (fragmentCheckError) {
           console.error("Error checking key fragments:", fragmentCheckError);
-        }
-        
-        const combinedFragment = combinePrivateKeyFragments(mockPrivateKeyModulo);
-        const isComplete = Object.keys(mockPrivateKeyModulo).length >= 6;
-        
-        let isKeyVerified = false;
-        if (combinedFragment && isComplete) {
-          isKeyVerified = verifyPrivateKey(combinedFragment, mockPublicKey.x, mockPublicKey.y);
-          setVerificationResult(isKeyVerified);
         }
         
         if (existingFragment) {
@@ -220,14 +240,11 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   };
 
   const copyPrivateKey = () => {
-    if (analysisResult?.privateKeyModulo) {
-      const privateKey = combinePrivateKeyFragments(analysisResult.privateKeyModulo);
-      if (privateKey) {
-        navigator.clipboard.writeText(privateKey);
-        setCopied(true);
-        toast.success("Private key copied to clipboard");
-        setTimeout(() => setCopied(false), 2000);
-      }
+    if (privateKey) {
+      navigator.clipboard.writeText(privateKey);
+      setCopied(true);
+      toast.success("Private key copied to clipboard");
+      setTimeout(() => setCopied(false), 2000);
     }
   };
 
@@ -381,7 +398,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
                     : `${Object.keys(analysisResult.privateKeyModulo).length}/6 fragments recovered - partial key information`}
                 </div>
                 
-                {Object.keys(analysisResult.privateKeyModulo).length >= 6 && (
+                {Object.keys(analysisResult.privateKeyModulo).length >= 6 && privateKey && (
                   <div className="mt-2 p-3 bg-green-500/10 border border-green-500/20 rounded">
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-sm text-green-500 flex items-center">
@@ -398,7 +415,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
                       </Button>
                     </div>
                     <div className="font-mono text-xs mt-1 break-all">
-                      {combinePrivateKeyFragments(analysisResult.privateKeyModulo)}
+                      {privateKey}
                     </div>
                     
                     {verificationResult !== null && (

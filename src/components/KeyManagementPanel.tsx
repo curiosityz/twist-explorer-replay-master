@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +29,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
   const [isExporting, setIsExporting] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const { toast: useToastHook } = useToast();
+  const { toast: showToast } = useToast();
 
   useEffect(() => {
     if (privateKey) {
@@ -45,7 +46,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       console.error("Error normalizing private key:", error.message);
       setWalletData(null);
       setAddress('');
-      useToastHook({
+      showToast({
         title: "Invalid Private Key",
         description: "The entered private key is not valid.",
         variant: "destructive"
@@ -79,7 +80,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       console.error("Error deriving wallet data:", error.message);
       setWalletData(null);
       setAddress('');
-      useToastHook({
+      showToast({
         title: "Key Derivation Error",
         description: "Could not derive wallet data from the private key.",
         variant: "destructive"
@@ -102,7 +103,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       const isValid = verifyPrivateKey(normalizedKey, walletData.publicKey.x, walletData.publicKey.y);
       setIsKeyVerified(isValid);
       setVerificationMessage(isValid ? 'Private key successfully verified!' : 'Private key verification failed.');
-      useToastHook({
+      showToast({
         title: isValid ? "Key Verified" : "Key Verification Failed",
         description: verificationMessage,
         variant: isValid ? "default" : "destructive"
@@ -111,7 +112,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       console.error("Error verifying private key:", error.message);
       setIsKeyVerified(false);
       setVerificationMessage(`Verification Error: ${error.message}`);
-      useToastHook({
+      showToast({
         title: "Key Verification Error",
         description: "An error occurred during key verification.",
         variant: "destructive"
@@ -126,13 +127,13 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Mock successful import
-      useToastHook({
+      showToast({
         title: "Key Imported",
         description: "Private key has been successfully imported.",
       });
     } catch (error: any) {
       console.error("Key import error:", error.message);
-      useToastHook({
+      showToast({
         title: "Key Import Failed",
         description: "Failed to import the private key.",
         variant: "destructive"
@@ -156,19 +157,18 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      useToastHook({
+      showToast({
         title: "Key Exported",
         description: "Private key has been successfully exported.",
       });
     } catch (error: any) {
       console.error("Key export error:", error.message);
-      useToastHook({
+      showToast({
         title: "Key Export Failed",
         description: "Failed to export the private key.",
         variant: "destructive"
       });
     } finally {
-      setIsExporting(false);
       setIsExporting(false);
     }
   };
@@ -187,13 +187,13 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       setIsKeyVerified(false);
       setVerificationMessage('');
 
-      useToastHook({
+      showToast({
         title: "Key Deleted",
         description: "Private key has been successfully deleted.",
       });
     } catch (error: any) {
       console.error("Key deletion error:", error.message);
-      useToastHook({
+      showToast({
         title: "Key Deletion Failed",
         description: "Failed to delete the private key.",
         variant: "destructive"
@@ -208,12 +208,12 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
     try {
       if (normalizedKey) {
         deriveWalletData(normalizedKey);
-        useToastHook({
+        showToast({
           title: "Address Refreshed",
           description: "Bitcoin address has been refreshed.",
         });
       } else {
-        useToastHook({
+        showToast({
           title: "No Key Available",
           description: "Please enter a private key to derive the address.",
           variant: "destructive"
@@ -221,7 +221,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
       }
     } catch (error: any) {
       console.error("Address refresh error:", error.message);
-      useToastHook({
+      showToast({
         title: "Address Refresh Failed",
         description: "Failed to refresh the Bitcoin address.",
         variant: "destructive"
@@ -272,9 +272,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
               className="h-8 w-8 p-0 text-crypto-foreground/70 hover:text-crypto-foreground"
               onClick={() => {
                 navigator.clipboard.writeText(normalizedKey);
-                toast({
-                  description: "Normalized key copied to clipboard.",
-                });
+                toast.success("Normalized key copied to clipboard.");
               }}
               disabled={!normalizedKey}
             >
@@ -312,9 +310,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
               className="h-8 w-8 p-0 text-crypto-foreground/70 hover:text-crypto-foreground"
               onClick={() => {
                 navigator.clipboard.writeText(address);
-                toast({
-                  description: "Bitcoin address copied to clipboard.",
-                });
+                toast.success("Bitcoin address copied to clipboard.");
               }}
               disabled={!address}
             >
@@ -376,7 +372,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
           <Button
             variant="outline"
             onClick={handleExportKey}
-            disabled={isExporting}
+            disabled={isExporting || !normalizedKey}
           >
             {isExporting ? (
               <>
@@ -393,7 +389,7 @@ const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPan
           <Button
             variant="destructive"
             onClick={handleDeleteKey}
-            disabled={isDeleting}
+            disabled={isDeleting || !normalizedKey}
           >
             {isDeleting ? (
               <>
