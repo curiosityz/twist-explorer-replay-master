@@ -7,7 +7,7 @@ import TransactionFetcher from '@/components/TransactionFetcher';
 import TransactionViewer from '@/components/TransactionViewer';
 import CryptographicVisualizer from '@/components/CryptographicVisualizer';
 import { SAMPLE_TRANSACTION } from '@/lib/mockVulnerabilities';
-import { useToast } from '@/components/ui/toast';
+import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
