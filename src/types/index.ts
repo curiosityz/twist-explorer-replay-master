@@ -1,4 +1,3 @@
-
 // Transaction related types
 export interface Transaction {
   txid: string;
@@ -74,7 +73,7 @@ export interface AnalysisResult {
 export interface NodeConfiguration {
   name: string;
   rpcUrl: string;
-  chain: string;
+  chain: ChainType;
   apiKey?: string;
   connected: boolean;
 }

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,12 +30,10 @@ const WalletInterface = () => {
   const [loadingUtxos, setLoadingUtxos] = useState(false);
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   
-  // Load recovered keys from database on mount
   useEffect(() => {
     loadRecoveredKeys();
   }, []);
   
-  // Load UTXOs when selected key changes
   useEffect(() => {
     if (selectedKeyIndex >= 0 && walletKeys[selectedKeyIndex]) {
       loadUtxosForAddress(walletKeys[selectedKeyIndex].address);
@@ -48,7 +45,6 @@ const WalletInterface = () => {
   const loadRecoveredKeys = async () => {
     setLoadingKeys(true);
     try {
-      // Fetch private key fragments that are completed
       const { data, error } = await supabase
         .from(Tables.private_key_fragments)
         .select('*')
@@ -66,23 +62,18 @@ const WalletInterface = () => {
         return;
       }
       
-      // Process the keys to derive addresses
       const processedKeys: WalletKey[] = [];
       
       for (const fragment of data) {
         if (fragment.combined_fragments) {
           try {
-            // Parse public key from public_key_hex
             const pubKeyX = fragment.public_key_hex.substring(0, 66);
             const pubKeyY = fragment.public_key_hex.substring(66);
             
-            // Normalize the private key
             const normalizedKey = normalizePrivateKey(fragment.combined_fragments);
             
-            // Verify the private key
             const isVerified = verifyPrivateKey(normalizedKey, pubKeyX, pubKeyY);
             
-            // Derive Bitcoin address
             const address = deriveAddress(normalizedKey, selectedNetwork);
             
             processedKeys.push({
@@ -91,7 +82,7 @@ const WalletInterface = () => {
               address,
               network: selectedNetwork,
               verified: isVerified,
-              balance: 0 // Will be updated when selected
+              balance: 0
             });
           } catch (err) {
             console.error('Error processing key:', fragment.id, err);
@@ -101,7 +92,6 @@ const WalletInterface = () => {
       
       setWalletKeys(processedKeys);
       
-      // Select the first key if available
       if (processedKeys.length > 0) {
         setSelectedKeyIndex(0);
         toast.success(`${processedKeys.length} private key(s) loaded`);
@@ -121,26 +111,22 @@ const WalletInterface = () => {
     }
     
     try {
-      // Normalize the key
       const normalizedKey = normalizePrivateKey(importedKey.trim());
       
-      // Check if already imported
       const exists = walletKeys.some(k => k.privateKey === normalizedKey);
       if (exists) {
         toast.error('This key has already been imported');
         return;
       }
       
-      // Derive address
       const address = deriveAddress(normalizedKey, selectedNetwork);
       
-      // Add to wallet keys
       const newKey: WalletKey = {
         privateKey: normalizedKey,
-        publicKey: { x: '0x0', y: '0x0' }, // We don't have the public key for imported keys
+        publicKey: { x: '0x0', y: '0x0' },
         address,
         network: selectedNetwork,
-        verified: false, // Can't verify without pubkey
+        verified: false,
         balance: 0
       };
       
@@ -149,7 +135,6 @@ const WalletInterface = () => {
       setImportedKey('');
       toast.success('Private key imported successfully');
       
-      // Load UTXOs for the new address
       loadUtxosForAddress(address);
     } catch (err) {
       console.error('Error importing key:', err);
@@ -165,7 +150,6 @@ const WalletInterface = () => {
       const addressUtxos = await chainstackService.getAddressUtxos(address);
       setUtxos(addressUtxos);
       
-      // Update the balance in wallet keys
       const balance = addressUtxos.reduce((sum, utxo) => sum + utxo.value, 0) / 100000000;
       setWalletKeys(prev => 
         prev.map((key, index) => 
@@ -216,11 +200,9 @@ const WalletInterface = () => {
       return;
     }
     
-    // Calculate total input value
     const totalInputSatoshis = availableUtxos.reduce((sum, utxo) => sum + utxo.value, 0);
     
-    // Estimate transaction size and fee
-    const estimatedSize = 150 + availableUtxos.length * 150; // Rough estimate: 150 + inputs*150 bytes
+    const estimatedSize = 150 + availableUtxos.length * 150;
     const estimatedFee = estimatedSize * feeRate;
     
     if (totalInputSatoshis < amountSatoshis + estimatedFee) {
@@ -228,17 +210,14 @@ const WalletInterface = () => {
       return;
     }
     
-    // Calculate change amount
     const changeSatoshis = totalInputSatoshis - amountSatoshis - estimatedFee;
     
     try {
-      // Format inputs
       const inputs = availableUtxos.map(utxo => ({
         txid: utxo.txid,
         vout: utxo.vout
       }));
       
-      // Format outputs
       const outputs = [
         {
           address: recipientAddress,
@@ -246,20 +225,13 @@ const WalletInterface = () => {
         }
       ];
       
-      // Add change output if needed
-      if (changeSatoshis > 546) { // Dust threshold
+      if (changeSatoshis > 546) {
         outputs.push({
           address: selectedKey.address,
           value: changeSatoshis
         });
       }
       
-      // In a real implementation, we would:
-      // 1. Create raw transaction
-      // 2. Sign it with the private key
-      // 3. Broadcast to network
-      
-      // For this demo, we'll just display the transaction details
       toast.success('Transaction created successfully (demo)');
       
       const txDetails = {
@@ -272,7 +244,6 @@ const WalletInterface = () => {
       
       console.log('Transaction details:', txDetails);
       
-      // Reset form
       setRecipientAddress('');
       setSendAmount('');
       setSelectedUTXOs([]);
@@ -605,7 +576,7 @@ const WalletInterface = () => {
                 </Select>
               </div>
               
-              <Alert variant="warning">
+              <Alert>
                 <AlertCircle className="h-4 w-4" />
                 <AlertTitle>Security Notice</AlertTitle>
                 <AlertDescription>

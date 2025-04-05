@@ -77,7 +77,7 @@ export const formatBtcValue = (value: number): string => {
  */
 export const formatUsdValue = (btcValue: number, exchangeRate: number = 60000): string => {
   const usdValue = btcValue * exchangeRate;
-  return new Intl.NumberFormatter('en-US', {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD'
   }).format(usdValue);

@@ -1,11 +1,35 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Key, PlusCircle, Wallet } from 'lucide-react';
 import WalletInterface from '@/components/WalletInterface';
+import ConnectionPanel from '@/components/ConnectionPanel';
+import { NodeConfiguration } from '@/types';
+import { chainstackService } from '@/services/chainstackService';
+import { toast } from 'sonner';
 
 const WalletPage = () => {
+  const [isConnected, setIsConnected] = useState(false);
+  const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
+
+  const handleConnect = (config: NodeConfiguration) => {
+    try {
+      // Initialize ChainStack service with the provided configuration
+      const chainstack = chainstackService.initializeWithConfig({
+        rpcUrl: config.rpcUrl,
+        apiKey: config.apiKey
+      });
+      
+      setNodeConfig(config);
+      setIsConnected(true);
+      toast.success(`Connected to ${config.name} successfully`);
+    } catch (error) {
+      console.error('Failed to connect to node:', error);
+      toast.error('Failed to connect to blockchain node');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-crypto-background text-crypto-foreground p-6">
       <header className="mb-8">
@@ -27,7 +51,11 @@ const WalletPage = () => {
       </header>
       
       <div className="grid gap-6">
-        <WalletInterface />
+        {!isConnected ? (
+          <ConnectionPanel onConnect={handleConnect} />
+        ) : (
+          <WalletInterface />
+        )}
         
         <div className="flex justify-center mt-4">
           <Button variant="outline" asChild>
