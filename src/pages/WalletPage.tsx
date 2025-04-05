@@ -5,16 +5,23 @@ import { Link } from 'react-router-dom';
 import KeyManagementPanel from '@/components/KeyManagementPanel';
 import WalletInterface from '@/components/WalletInterface';
 import WalletKeyImport from '@/components/WalletKeyImport';
+import TransactionBatchUploader from '@/components/TransactionBatchUploader';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const WalletPage = () => {
   const [showImport, setShowImport] = useState(false);
   const [importedKey, setImportedKey] = useState<string | null>(null);
+  const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
   
   const handleImportKey = (key: string) => {
     setImportedKey(key);
     setShowImport(false);
+  };
+  
+  const handleTransactionSelected = (txid: string) => {
+    setSelectedTransaction(txid);
+    console.log(`Selected transaction: ${txid}`);
   };
   
   return (
@@ -74,6 +81,10 @@ const WalletPage = () => {
                     </div>
                   </CardContent>
                 </Card>
+                
+                <TransactionBatchUploader
+                  onTransactionSelected={handleTransactionSelected}
+                />
                 
                 <KeyManagementPanel 
                   initialPrivateKey={importedKey || undefined}
