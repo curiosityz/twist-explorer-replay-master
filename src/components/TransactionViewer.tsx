@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Transaction } from '@/types';
 import { SAMPLE_TRANSACTION } from '@/lib/mockVulnerabilities';
-import { ExternalLink, FileCode, FileSearch, Play } from 'lucide-react';
+import { ExternalLink, FileCode, FileSearch, Play, Bitcoin, DollarSign } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface TransactionViewerProps {
   transaction?: Transaction;
@@ -14,6 +15,19 @@ interface TransactionViewerProps {
 
 const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: TransactionViewerProps) => {
   const [activeView, setActiveView] = useState('decoded');
+  const [totalInputValue, setTotalInputValue] = useState(0);
+  
+  // Calculate total value of inputs when transaction changes
+  useEffect(() => {
+    if (transaction && transaction.vin) {
+      // For a real app, we would fetch the UTXO values from a blockchain API
+      // For demo purposes, we'll estimate based on output values + a mock fee
+      const outputSum = transaction.vout.reduce((sum, output) => sum + output.value, 0);
+      // Assume a slightly higher input value to account for fees
+      const estimatedInputValue = outputSum * 1.003; // 0.3% fee estimate
+      setTotalInputValue(estimatedInputValue);
+    }
+  }, [transaction]);
 
   const handleAnalyze = () => {
     onAnalyze(transaction.txid);
@@ -22,6 +36,12 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
   // Format Bitcoin value to display properly
   const formatBtcValue = (value: number) => {
     return value.toFixed(8);
+  };
+  
+  // Format USD value (mock conversion rate of $60,000 per BTC)
+  const formatUsdValue = (btcValue: number) => {
+    const usdValue = btcValue * 60000;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdValue);
   };
 
   return (
@@ -44,6 +64,27 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
           TXID: {transaction.txid}
         </CardDescription>
       </CardHeader>
+      
+      {/* Add UTXO Value Information */}
+      <div className="px-6 pb-4">
+        <div className="bg-crypto-background/50 border border-crypto-border/40 rounded-md p-3 flex flex-col sm:flex-row justify-between">
+          <div className="flex items-center">
+            <Bitcoin className="h-5 w-5 text-amber-400 mr-2" />
+            <div>
+              <div className="text-sm font-medium">Total UTXO Value</div>
+              <div className="font-mono">{formatBtcValue(totalInputValue)} BTC</div>
+            </div>
+          </div>
+          <div className="flex items-center mt-2 sm:mt-0">
+            <DollarSign className="h-5 w-5 text-green-500 mr-2" />
+            <div>
+              <div className="text-sm font-medium">Estimated Value</div>
+              <div className="font-mono">{formatUsdValue(totalInputValue)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <Tabs
         defaultValue={activeView}
         value={activeView}
@@ -96,6 +137,15 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
                       <div>{input.vout}</div>
                       <div className="text-crypto-foreground/70">Sequence:</div>
                       <div>{input.sequence}</div>
+                      {/* Estimate UTXO value based on position */}
+                      <div className="text-crypto-foreground/70">Est. Value:</div>
+                      <div className="flex items-center">
+                        <Bitcoin className="h-3 w-3 text-amber-400 mr-1" />
+                        {formatBtcValue(totalInputValue / transaction.vin.length)} BTC
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          ~{formatUsdValue(totalInputValue / transaction.vin.length).slice(0, -3)}
+                        </Badge>
+                      </div>
                     </div>
                     {input.scriptSig && (
                       <div className="mt-1 pt-1 border-t border-crypto-border">
@@ -128,7 +178,12 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
                   <div key={index} className="mb-2 ml-4 p-2 rounded bg-crypto-background">
                     <div className="grid grid-cols-2 gap-x-4 gap-y-1">
                       <div className="text-crypto-foreground/70">Value:</div>
-                      <div>{formatBtcValue(output.value)} BTC</div>
+                      <div className="flex items-center">
+                        {formatBtcValue(output.value)} BTC
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          ~{formatUsdValue(output.value).slice(0, -3)}
+                        </Badge>
+                      </div>
                       <div className="text-crypto-foreground/70">n:</div>
                       <div>{output.n}</div>
                       <div className="text-crypto-foreground/70">Type:</div>
@@ -175,7 +230,7 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
             className="w-full bg-crypto-accent hover:bg-crypto-accent/80"
           >
             <Play className="mr-2 h-4 w-4" />
-            Analyze Vulnerability
+            Analyze Vulnerability & Recover Key
           </Button>
         </CardFooter>
       </Tabs>

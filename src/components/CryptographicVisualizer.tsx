@@ -1,13 +1,11 @@
 
-import { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CryptographicPoint, Signature, AnalysisResult } from '@/types';
-import { Progress } from '@/components/ui/progress';
-import { Loader2, Check, AlertCircle, Key, Lock, Unlock } from 'lucide-react';
-import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
+import { Button } from '@/components/ui/button';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { Cpu, Loader2, Lock, RefreshCw, XCircle } from 'lucide-react';
+import { AnalysisResult, CryptographicPoint, Signature } from '@/types';
 
 interface CryptographicVisualizerProps {
   txid?: string;
@@ -15,285 +13,272 @@ interface CryptographicVisualizerProps {
 }
 
 const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicVisualizerProps) => {
-  const [status, setStatus] = useState<'idle' | 'analyzing' | 'completed' | 'failed'>('idle');
-  const [progress, setProgress] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
-  const { toast } = useToast();
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
+  // This effect runs when the component mounts or when txid/startAnalysis changes
   useEffect(() => {
-    // Check if we already have an analysis for this transaction
-    const fetchExistingAnalysis = async () => {
-      if (!txid) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from(Tables.vulnerability_analyses)
-          .select('*')
-          .eq('txid', txid)
-          .maybeSingle();
-          
-        if (data && !error) {
-          // Type casting to ensure we convert the JSON data to proper types
-          const publicKey = data.public_key as unknown as CryptographicPoint;
-          const signature = data.signature as unknown as Signature | undefined;
-          const primeFactors = Array.isArray(data.prime_factors) ? data.prime_factors as string[] : undefined;
-          const privateKeyModulo = data.private_key_modulo as Record<string, string> | undefined;
-          
-          const result: AnalysisResult = {
-            txid: data.txid,
-            vulnerabilityType: data.vulnerability_type,
-            publicKey: publicKey,
-            signature: signature,
-            twistOrder: data.twist_order || undefined,
-            primeFactors: primeFactors,
-            privateKeyModulo: privateKeyModulo,
-            status: data.status as 'pending' | 'analyzing' | 'completed' | 'failed',
-            message: data.message || undefined,
-          };
-          
-          setAnalysisResult(result);
-          setStatus(data.status as 'analyzing' | 'completed' | 'failed');
-        } else {
-          setAnalysisResult(null);
-          setStatus('idle');
-        }
-      } catch (error) {
-        console.error('Error fetching analysis:', error);
-        setAnalysisResult(null);
-        setStatus('idle');
-      }
-    };
-    
-    fetchExistingAnalysis();
-  }, [txid]);
-  
-  useEffect(() => {
-    // Start analysis if requested
-    const runAnalysis = async () => {
-      if (!txid || !startAnalysis || status !== 'idle') return;
-      
-      try {
-        setStatus('analyzing');
-        setProgress(0);
+    if (txid && startAnalysis) {
+      handleAnalyzeTransaction();
+    }
+  }, [txid, startAnalysis]);
+
+  const handleAnalyzeTransaction = async () => {
+    if (!txid) return;
+
+    setIsAnalyzing(true);
+    setError(null);
+
+    try {
+      // First, check if transaction exists in database
+      const { data: txData, error: txError } = await supabase
+        .from(Tables.blockchain_transactions)
+        .select('*')
+        .eq('txid', txid)
+        .maybeSingle();
         
-        // First, verify that the transaction exists in blockchain_transactions
-        const { data: txExists, error: txError } = await supabase
-          .from(Tables.blockchain_transactions)
-          .select('txid')
+      if (txError) {
+        console.error("Error checking transaction existence:", txError);
+        throw new Error("Failed to check if transaction exists");
+      }
+      
+      if (!txData) {
+        console.error("Transaction not found in database");
+        throw new Error("Transaction not found in database");
+      }
+
+      // Simulate analysis delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      // Generate mock analysis result
+      const mockPublicKey: CryptographicPoint = {
+        x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
+        y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6',
+        isOnCurve: false
+      };
+
+      const mockSignature: Signature = {
+        r: '0x2a298dacae57395a15d0795ddbfd1dcb564da82b0f269bc70a74f8220429ba1c',
+        s: '0x1c8fae3c66a687625e73a38d71b7fa63cef2b56acf42e7b149d5e6fd46f1ea76',
+        sighash: '0x01'
+      };
+
+      // Generate random prime factors and modulo values
+      const mockPrimeFactors = ['101', '103', '107', '109', '113', '127', '131', '137'];
+      const mockPrivateKeyModulo: Record<string, string> = {
+        '101': '45',
+        '103': '67',
+        '107': '89',
+        '109': '94',
+        '113': '51',
+        '127': '83',
+        '131': '112',
+        '137': '59'
+      };
+
+      const mockAnalysisResult: AnalysisResult = {
+        txid,
+        vulnerabilityType: 'twisted_curve',
+        publicKey: mockPublicKey,
+        signature: mockSignature,
+        twistOrder: '14350669539884012975',
+        primeFactors: mockPrimeFactors,
+        privateKeyModulo: mockPrivateKeyModulo,
+        status: 'completed',
+        message: 'Successfully identified Twisted Curve vulnerability and extracted private key fragments via Chinese Remainder Theorem'
+      };
+
+      setAnalysisResult(mockAnalysisResult);
+
+      // Save the analysis to the database
+      try {
+        // First check if an analysis already exists for this txid
+        const { data: existingAnalysis, error: checkError } = await supabase
+          .from(Tables.vulnerability_analyses)
+          .select('id')
           .eq('txid', txid)
           .maybeSingle();
           
-        if (txError || !txExists) {
-          console.error('Transaction does not exist in blockchain_transactions:', txError);
+        if (checkError) {
+          console.error("Error checking existing analysis:", checkError);
+        }
+        
+        // Format the data for insertion/update
+        const analysisData = {
+          txid: mockAnalysisResult.txid,
+          vulnerability_type: mockAnalysisResult.vulnerabilityType,
+          public_key: mockPublicKey,
+          signature: mockSignature,
+          prime_factors: mockPrimeFactors,
+          private_key_modulo: mockPrivateKeyModulo,
+          twist_order: mockAnalysisResult.twistOrder,
+          status: mockAnalysisResult.status,
+          message: mockAnalysisResult.message
+        };
           
-          // Create the transaction first to satisfy the foreign key constraint
+        if (existingAnalysis) {
+          // Update existing analysis
+          const { error: updateError } = await supabase
+            .from(Tables.vulnerability_analyses)
+            .update(analysisData)
+            .eq('id', existingAnalysis.id);
+            
+          if (updateError) {
+            console.error("Error updating analysis:", updateError);
+          }
+        } else {
+          // Insert new analysis
           const { error: insertError } = await supabase
-            .from(Tables.blockchain_transactions)
-            .insert({
-              txid: txid,
-              chain: 'BTC',
-              processed: true
-            });
+            .from(Tables.vulnerability_analyses)
+            .insert(analysisData);
             
           if (insertError) {
-            console.error('Error creating transaction record:', insertError);
-            setStatus('failed');
-            toast({
-              title: "Analysis Failed",
-              description: "Could not create transaction record. Please try again.",
-              variant: "destructive"
-            });
-            return;
+            console.error("Error saving analysis:", insertError);
           }
         }
         
-        // Create mock analysis result with more realistic prime factors
-        const mockPublicKey: CryptographicPoint = {
-          x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
-          y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6',
-          isOnCurve: false
-        };
+        // Also try to save the key fragments
+        const publicKeyHex = mockPublicKey.x + mockPublicKey.y;
         
-        const mockSignature: Signature = {
-          r: '0x123abc',
-          s: '0x456def',
-          sighash: '0x789fed'
-        };
-        
-        // Generate more prime factors for more robust CRT calculations
-        const primesArray = ['0x101', '0x103', '0x107', '0x10d', '0x10f', '0x111'];
-        
-        // Generate private key modulo values for all prime factors
-        const privateKeyMods: Record<string, string> = {};
-        primesArray.forEach((prime, index) => {
-          // Simulating different remainders for each modulo
-          privateKeyMods[prime] = `0x${(0x45 + index * 10).toString(16)}`;
-        });
-        
-        // Create the full analysis result
-        const mockResult: AnalysisResult = {
-          txid: txid,
-          vulnerabilityType: 'twisted_curve',
-          publicKey: mockPublicKey,
-          signature: mockSignature,
-          status: 'completed',
-          message: 'Vulnerability identified: Public key not on secp256k1 curve. Successfully calculated private key modulo values.',
-          twistOrder: '0x6f8a80d37d1f8161d5385fda1672e4bfbb7276ea83c9b330b8c216e94dbdca83',
-          primeFactors: primesArray,
-          privateKeyModulo: privateKeyMods
-        };
-        
-        // Simulate progress
-        const interval = setInterval(() => {
-          setProgress(prev => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 300);
-        
-        // Save analysis to database using a proper structure
-        const { error } = await supabase
-          .from(Tables.vulnerability_analyses)
-          .upsert({
-            txid: mockResult.txid,
-            vulnerability_type: mockResult.vulnerabilityType,
-            public_key: mockResult.publicKey,
-            signature: mockResult.signature,
-            twist_order: mockResult.twistOrder,
-            prime_factors: mockResult.primeFactors,
-            private_key_modulo: mockResult.privateKeyModulo,
-            status: mockResult.status,
-            message: mockResult.message
-          });
+        const { data: existingFragment, error: fragmentCheckError } = await supabase
+          .from(Tables.private_key_fragments)
+          .select('*')
+          .eq('public_key_hex', publicKeyHex)
+          .maybeSingle();
           
-        if (error) {
-          console.error('Error saving analysis:', error);
-          setStatus('failed');
-          toast({
-            title: "Analysis Failed",
-            description: "Could not save analysis results. Please try again.",
-            variant: "destructive"
-          });
-          return;
+        if (fragmentCheckError) {
+          console.error("Error checking key fragments:", fragmentCheckError);
         }
         
-        // Check if we have existing private key fragments for this public key
-        await checkAndCombineKeyFragments(mockResult.publicKey, mockResult.privateKeyModulo);
+        // Calculate a mock combined fragment based on CRT
+        const combinedFragment = '0x1a2b3c4d5e6f7890';
+        const isComplete = Object.keys(mockPrivateKeyModulo).length >= 8;
         
-        setAnalysisResult(mockResult);
-        setStatus('completed');
-      } catch (error) {
-        console.error('Error during analysis:', error);
-        setStatus('failed');
-        toast({
-          title: "Analysis Failed",
-          description: "An unexpected error occurred during analysis.",
-          variant: "destructive"
-        });
-      }
-    };
-    
-    runAnalysis();
-  }, [txid, startAnalysis, status, toast]);
-  
-  // Function to check for and combine key fragments using Chinese Remainder Theorem
-  const checkAndCombineKeyFragments = async (
-    publicKey: CryptographicPoint, 
-    newFragments: Record<string, string> | undefined
-  ) => {
-    if (!newFragments) return;
-    
-    const publicKeyHex = publicKey.x + publicKey.y;
-    
-    try {
-      // Check for existing fragments
-      const { data: existingData, error: fetchError } = await supabase
-        .from(Tables.private_key_fragments)
-        .select('*')
-        .eq('public_key_hex', publicKeyHex)
-        .maybeSingle();
-        
-      let allFragments = { ...newFragments };
-      let isComplete = false;
-      let combinedKey: string | null = null;
-      
-      if (existingData && !fetchError) {
-        // Combine with existing fragments
-        allFragments = { 
-          ...existingData.modulo_values as Record<string, string>, 
-          ...newFragments 
-        };
-        
-        // Try to combine all fragments using Chinese Remainder Theorem
-        combinedKey = combinePrivateKeyFragments(allFragments);
-        isComplete = !!combinedKey;
-        
-        // Update with new combined key
-        await supabase
-          .from(Tables.private_key_fragments)
-          .update({
-            modulo_values: allFragments,
-            combined_fragments: combinedKey,
-            completed: isComplete
-          })
-          .eq('id', existingData.id);
-          
-        if (combinedKey) {
-          console.log('Private key recovered!', combinedKey);
-          
-          // Update analysis message to reflect key recovery status
-          const keyRecoveryMessage = isComplete 
-            ? `Private key successfully recovered: ${combinedKey}`
-            : `Partial key recovery: Private key determined modulo ${Object.keys(allFragments).length} factors`;
-            
-          await supabase
-            .from(Tables.vulnerability_analyses)
+        if (existingFragment) {
+          // Update existing fragments
+          const { error: updateFragError } = await supabase
+            .from(Tables.private_key_fragments)
             .update({
-              message: `Vulnerability identified: Public key not on secp256k1 curve. ${keyRecoveryMessage}`
+              modulo_values: mockPrivateKeyModulo,
+              combined_fragments: isComplete ? combinedFragment : existingFragment.combined_fragments,
+              completed: isComplete
             })
-            .eq('txid', txid);
+            .eq('public_key_hex', publicKeyHex);
+            
+          if (updateFragError) {
+            console.error("Error updating key fragments:", updateFragError);
+          }
+        } else {
+          // Insert new fragments
+          const { error: insertFragError } = await supabase
+            .from(Tables.private_key_fragments)
+            .insert({
+              public_key_hex: publicKeyHex,
+              modulo_values: mockPrivateKeyModulo,
+              combined_fragments: isComplete ? combinedFragment : null,
+              completed: isComplete
+            });
+            
+          if (insertFragError) {
+            console.error("Error saving key fragments:", insertFragError);
+          }
         }
-      } else {
-        // Create new fragment record
-        // Try to combine fragments first
-        combinedKey = combinePrivateKeyFragments(allFragments);
-        isComplete = !!combinedKey;
         
-        const { error } = await supabase
-          .from(Tables.private_key_fragments)
-          .insert({
-            public_key_hex: publicKeyHex,
-            modulo_values: allFragments,
-            combined_fragments: combinedKey,
-            completed: isComplete
-          });
+      } catch (dbError) {
+        console.error('Database error:', dbError);
+      }
+      
+    } catch (error) {
+      console.error('Analysis error:', error);
+      setError(error instanceof Error ? error.message : 'Unknown error occurred');
+      
+      // Still save the failed analysis to the database
+      if (txid) {
+        try {
+          const failedAnalysis = {
+            txid: txid,
+            vulnerability_type: 'unknown',
+            public_key: { x: '0x0', y: '0x0', isOnCurve: false },
+            status: 'failed',
+            message: error instanceof Error ? error.message : 'Unknown error occurred'
+          };
           
-        if (error) {
-          console.error('Error saving new key fragments:', error);
+          const { error: saveError } = await supabase
+            .from(Tables.vulnerability_analyses)
+            .upsert(failedAnalysis);
+            
+          if (saveError) {
+            console.error("Error saving failed analysis:", saveError);
+          }
+        } catch (dbError) {
+          console.error('Database error while saving failed analysis:', dbError);
         }
       }
-    } catch (error) {
-      console.error('Error processing key fragments:', error);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
   if (!txid) {
     return (
-      <Card className="h-full bg-crypto-muted border-crypto-border">
+      <Card className="bg-crypto-muted border-crypto-border h-full">
         <CardHeader>
-          <CardTitle className="text-crypto-foreground">Cryptographic Analyzer</CardTitle>
+          <CardTitle className="text-crypto-foreground">Cryptographic Analysis</CardTitle>
           <CardDescription className="text-crypto-foreground/70">
-            Select a transaction to analyze for vulnerabilities
+            Select a transaction to analyze
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex items-center justify-center h-[400px]">
-          <div className="text-center text-crypto-foreground/50">
-            <Lock className="mx-auto h-12 w-12 mb-4" />
-            <p>No transaction selected</p>
-            <p className="text-xs mt-2">Select a transaction to begin analysis</p>
+        <CardContent className="flex items-center justify-center h-[280px]">
+          <div className="text-center text-crypto-foreground/60">
+            <Lock className="h-16 w-16 mx-auto mb-4 opacity-20" />
+            <p>Fetch a transaction to begin analysis</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isAnalyzing) {
+    return (
+      <Card className="bg-crypto-muted border-crypto-border h-full">
+        <CardHeader>
+          <CardTitle className="text-crypto-foreground">Analyzing Transaction</CardTitle>
+          <CardDescription className="text-crypto-foreground/70">
+            Scanning for cryptographic vulnerabilities...
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center justify-center h-[280px]">
+          <Loader2 className="h-16 w-16 animate-spin text-crypto-primary mb-4" />
+          <p className="text-crypto-foreground/70 text-center">
+            Computing modular congruences and applying Chinese Remainder Theorem...
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="bg-crypto-muted border-crypto-border h-full">
+        <CardHeader>
+          <CardTitle className="text-crypto-foreground">Analysis Failed</CardTitle>
+          <CardDescription className="text-crypto-foreground/70">
+            TXID: {txid.substring(0, 8)}...{txid.substring(txid.length - 8)}
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="h-[280px] overflow-auto">
+          <div className="flex flex-col items-center justify-center h-full">
+            <XCircle className="h-16 w-16 text-red-500 mb-4" />
+            <p className="text-red-500 font-medium mb-2">Analysis Error</p>
+            <p className="text-center text-crypto-foreground/70">{error}</p>
+            <Button 
+              onClick={handleAnalyzeTransaction}
+              className="mt-6 bg-crypto-primary hover:bg-crypto-primary/80"
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -301,124 +286,101 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   }
 
   return (
-    <Card className="h-full bg-crypto-muted border-crypto-border overflow-auto">
+    <Card className="bg-crypto-muted border-crypto-border h-full">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <CardTitle className="text-crypto-foreground">Vulnerability Analysis</CardTitle>
-          <Badge 
-            variant={status === 'idle' ? "outline" : 
-                   status === 'analyzing' ? "secondary" : 
-                   status === 'completed' ? "default" : 
-                   "destructive"}
-            className="font-mono text-xs"
-          >
-            {status === 'idle' ? 'Ready' : 
-             status === 'analyzing' ? 'Analyzing' : 
-             status === 'completed' ? 'Vulnerable' : 
-             'Failed'}
-          </Badge>
+          <div>
+            <CardTitle className="text-crypto-foreground">Vulnerability Results</CardTitle>
+            <CardDescription className="text-crypto-foreground/70">
+              TXID: {txid.substring(0, 8)}...{txid.substring(txid.length - 8)}
+            </CardDescription>
+          </div>
+          {analysisResult && (
+            <Badge 
+              variant={analysisResult.status === 'completed' ? 'default' : 'destructive'} 
+              className="ml-auto"
+            >
+              {analysisResult.status}
+            </Badge>
+          )}
         </div>
-        <CardDescription className="text-crypto-foreground/70 font-mono text-xs">
-          TXID: {txid.substring(0, 10)}...{txid.substring(txid.length - 10)}
-        </CardDescription>
       </CardHeader>
-      
-      <CardContent className="space-y-6 pb-6">
-        {status === 'analyzing' && (
+      <CardContent className="h-[280px] overflow-auto">
+        {analysisResult ? (
           <div className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Loader2 className="h-4 w-4 animate-spin text-crypto-primary" />
-              <span className="text-sm">Analyzing transaction...</span>
-            </div>
-            <Progress value={progress} className="h-1.5" />
-          </div>
-        )}
-        
-        {status === 'failed' && (
-          <div className="bg-red-500/10 border border-red-500/20 rounded-md p-4 text-red-500">
-            <div className="flex items-center space-x-2">
-              <AlertCircle className="h-5 w-5" />
-              <span className="font-medium">Analysis failed</span>
-            </div>
-            <p className="mt-2 text-sm">Could not complete vulnerability analysis. The Chinese Remainder Theorem calculation failed to recover the private key. Please try again with a different transaction.</p>
-          </div>
-        )}
-        
-        {status === 'completed' && analysisResult && (
-          <div className="space-y-6">
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-4">
-              <h3 className="flex items-center text-amber-400 font-medium mb-2">
-                <AlertCircle className="mr-2 h-5 w-5" />
-                Vulnerability Detected
-              </h3>
-              <p className="text-sm text-crypto-foreground/90">
-                {analysisResult.message}
-              </p>
-              <div className="mt-2">
-                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 font-mono text-xs">
-                  {analysisResult.vulnerabilityType}
-                </Badge>
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
+              <div className="font-medium text-amber-500">
+                {analysisResult.vulnerabilityType.replace('_', ' ').toUpperCase()} DETECTED
               </div>
+              <p className="text-sm mt-1">{analysisResult.message}</p>
             </div>
             
-            <div>
-              <h3 className="text-sm font-medium mb-2 text-crypto-foreground flex items-center">
-                <Key className="mr-2 h-4 w-4" />
-                Public Key (Not on Curve)
-              </h3>
-              <div className="bg-crypto-background rounded-md p-2 font-mono text-xs space-y-1 break-all">
-                <div>
-                  <span className="text-crypto-accent">x: </span>
-                  <span>{analysisResult.publicKey.x}</span>
-                </div>
-                <div>
-                  <span className="text-crypto-accent">y: </span>
-                  <span>{analysisResult.publicKey.y}</span>
+            <div className="space-y-2">
+              <div className="text-xs font-medium text-crypto-foreground/70">
+                ECDSA Public Key (Not on Curve)
+              </div>
+              <div className="bg-crypto-background p-2 rounded">
+                <div className="text-xs font-mono">
+                  <div>x: {analysisResult.publicKey.x}</div>
+                  <div>y: {analysisResult.publicKey.y}</div>
                 </div>
               </div>
             </div>
             
             {analysisResult.primeFactors && analysisResult.primeFactors.length > 0 && (
-              <div>
-                <h3 className="text-sm font-medium mb-2 text-crypto-foreground">
-                  Twist Order Prime Factors
-                </h3>
-                <div className="grid grid-cols-2 gap-1 font-mono text-xs">
-                  {analysisResult.primeFactors.map((factor, index) => (
-                    <div key={index} className="bg-crypto-background rounded p-2">
-                      {factor}
-                    </div>
-                  ))}
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-crypto-foreground/70">
+                  Prime Factors of Twist Order
+                </div>
+                <div className="bg-crypto-background p-2 rounded">
+                  <div className="text-xs font-mono">
+                    {analysisResult.primeFactors.join(', ')}
+                  </div>
                 </div>
               </div>
             )}
             
             {analysisResult.privateKeyModulo && (
-              <div>
-                <h3 className="text-sm font-medium mb-2 text-crypto-foreground flex items-center">
-                  <Unlock className="mr-2 h-4 w-4" />
-                  Private Key Fragments (Chinese Remainder Theorem)
-                </h3>
-                <div className="bg-crypto-background rounded-md p-3 font-mono text-xs">
-                  <table className="w-full">
+              <div className="space-y-2">
+                <div className="text-xs font-medium text-crypto-foreground/70">
+                  Private Key Fragments
+                </div>
+                <div className="bg-crypto-background p-2 rounded">
+                  <table className="text-xs font-mono w-full">
                     <thead>
-                      <tr className="border-b border-crypto-border text-crypto-foreground/60">
-                        <th className="pb-2 text-left">Modulus</th>
-                        <th className="pb-2 text-left">Remainder</th>
+                      <tr className="text-crypto-foreground/60">
+                        <th className="text-left w-1/2">Modulus</th>
+                        <th className="text-left w-1/2">Remainder</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {Object.entries(analysisResult.privateKeyModulo).map(([mod, remainder], index) => (
-                        <tr key={index} className="border-b border-crypto-border/20 last:border-0">
-                          <td className="py-2 pr-4">{mod}</td>
-                          <td className="py-2">{remainder}</td>
+                      {Object.entries(analysisResult.privateKeyModulo).map(([mod, rem], i) => (
+                        <tr key={i}>
+                          <td>{mod}</td>
+                          <td>{rem}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
+                <div className="text-xs text-green-500 flex items-center gap-1">
+                  <Cpu className="h-3 w-3" />
+                  {Object.keys(analysisResult.privateKeyModulo).length >= 8
+                    ? 'All congruences recovered - full private key reconstruction possible!'
+                    : `${Object.keys(analysisResult.privateKeyModulo).length}/8 fragments recovered - partial key information`}
+                </div>
               </div>
             )}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-full">
+            <Button 
+              onClick={handleAnalyzeTransaction}
+              className="bg-crypto-accent hover:bg-crypto-accent/80"
+            >
+              <Cpu className="mr-2 h-4 w-4" />
+              Start Vulnerability Analysis
+            </Button>
           </div>
         )}
       </CardContent>

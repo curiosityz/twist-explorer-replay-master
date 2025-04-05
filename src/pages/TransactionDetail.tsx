@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock, Check, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock, Check, AlertCircle, Bitcoin, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { CryptographicPoint, Signature } from '@/types';
 
@@ -18,6 +18,7 @@ const TransactionDetail = () => {
   const [keyFragment, setKeyFragment] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('analysis');
+  const [totalInputValue, setTotalInputValue] = useState(0);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -31,12 +32,23 @@ const TransactionDetail = () => {
           .from(Tables.blockchain_transactions)
           .select('*')
           .eq('txid', txid)
-          .single();
+          .maybeSingle();
           
         if (txError) {
           console.error('Error fetching transaction:', txError);
         } else {
           setTransaction(txData);
+          
+          // Calculate total input value for recovered funds estimation
+          if (txData && txData.decoded_json) {
+            // For demo purposes, use output sum + fee estimation
+            const decodedTx = txData.decoded_json;
+            const outputSum = decodedTx.vout
+              ? decodedTx.vout.reduce((sum: number, output: any) => sum + output.value, 0)
+              : 0;
+            // Assume a slightly higher input value (0.3% fee)
+            setTotalInputValue(outputSum * 1.003);
+          }
         }
         
         // Fetch analysis details
@@ -44,7 +56,7 @@ const TransactionDetail = () => {
           .from(Tables.vulnerability_analyses)
           .select('*')
           .eq('txid', txid)
-          .single();
+          .maybeSingle();
           
         if (analysisError) {
           console.error('Error fetching analysis:', analysisError);
@@ -61,7 +73,7 @@ const TransactionDetail = () => {
               .from(Tables.private_key_fragments)
               .select('*')
               .eq('public_key_hex', publicKeyHex)
-              .single();
+              .maybeSingle();
               
             if (!keyError) {
               setKeyFragment(keyData);
@@ -85,6 +97,17 @@ const TransactionDetail = () => {
       case 'failed': return 'destructive';
       default: return 'outline';
     }
+  };
+  
+  // Format Bitcoin value to display properly
+  const formatBtcValue = (value: number) => {
+    return value.toFixed(8);
+  };
+  
+  // Format USD value (mock conversion rate of $60,000 per BTC)
+  const formatUsdValue = (btcValue: number) => {
+    const usdValue = btcValue * 60000;
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdValue);
   };
 
   if (loading) {
@@ -157,6 +180,34 @@ const TransactionDetail = () => {
       
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-8">
+          {/* UTXO Value Card - New addition */}
+          {totalInputValue > 0 && keyFragment && keyFragment.completed && (
+            <Card className="mb-6 border border-green-500/20 bg-green-500/5">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <div className="h-12 w-12 rounded-full bg-green-500/20 flex items-center justify-center mr-4">
+                      <Unlock className="h-6 w-6 text-green-500" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-green-500">Private Key Recovered!</h3>
+                      <p className="text-sm text-crypto-foreground/70">Funds potentially recoverable from this transaction</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="flex items-center justify-end mb-1">
+                      <Bitcoin className="h-4 w-4 text-amber-400 mr-1" />
+                      <span className="font-mono text-lg">{formatBtcValue(totalInputValue)} BTC</span>
+                    </div>
+                    <div className="font-mono text-sm text-crypto-foreground/70">
+                      {formatUsdValue(totalInputValue)}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          
           <Card>
             <CardHeader className="pb-3">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -198,6 +249,24 @@ const TransactionDetail = () => {
                           </div>
                         </div>
                       </div>
+                      
+                      {/* Add UTXO Value Info */}
+                      {totalInputValue > 0 && (
+                        <div className="mt-3 bg-crypto-background/50 border border-crypto-border/40 rounded-md p-3">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Bitcoin className="h-4 w-4 text-amber-400 mr-2" />
+                              <div className="text-sm">Total Transaction Value:</div>
+                            </div>
+                            <div className="font-mono">
+                              {formatBtcValue(totalInputValue)} BTC
+                              <span className="text-xs text-crypto-foreground/70 ml-2">
+                                (~{formatUsdValue(totalInputValue)})
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     
                     {analysis.public_key && (
@@ -256,9 +325,17 @@ const TransactionDetail = () => {
                         
                         {keyFragment && keyFragment.completed && (
                           <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-md">
-                            <div className="flex items-center">
-                              <Check className="h-4 w-4 text-green-500 mr-2" />
-                              <span className="text-green-500 font-medium">Private Key Recovered!</span>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center">
+                                <Check className="h-4 w-4 text-green-500 mr-2" />
+                                <span className="text-green-500 font-medium">Private Key Recovered!</span>
+                              </div>
+                              {totalInputValue > 0 && (
+                                <div className="flex items-center text-xs">
+                                  <Bitcoin className="h-3.5 w-3.5 text-amber-400 mr-1" />
+                                  <span>{formatBtcValue(totalInputValue)} BTC recoverable</span>
+                                </div>
+                              )}
                             </div>
                             <div className="mt-2 font-mono text-xs break-all">
                               {keyFragment.combined_fragments}
@@ -281,17 +358,26 @@ const TransactionDetail = () => {
                     <div className="mb-4">
                       <h3 className="text-lg font-medium mb-2">Private Key Status</h3>
                       <div className={`p-4 rounded-md ${keyFragment.completed ? 'bg-green-500/10 border border-green-500/20' : 'bg-amber-500/10 border border-amber-500/20'}`}>
-                        <div className="flex items-center">
-                          {keyFragment.completed ? (
-                            <>
-                              <Unlock className="h-5 w-5 text-green-500 mr-2" />
-                              <span className="text-green-500 font-medium">Private Key Recovered!</span>
-                            </>
-                          ) : (
-                            <>
-                              <Lock className="h-5 w-5 text-amber-500 mr-2" />
-                              <span className="text-amber-500 font-medium">Partial Key - {Object.keys(keyFragment.modulo_values).length} fragments collected</span>
-                            </>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center">
+                            {keyFragment.completed ? (
+                              <>
+                                <Unlock className="h-5 w-5 text-green-500 mr-2" />
+                                <span className="text-green-500 font-medium">Private Key Recovered!</span>
+                              </>
+                            ) : (
+                              <>
+                                <Lock className="h-5 w-5 text-amber-500 mr-2" />
+                                <span className="text-amber-500 font-medium">Partial Key - {Object.keys(keyFragment.modulo_values).length} fragments collected</span>
+                              </>
+                            )}
+                          </div>
+                          {keyFragment.completed && totalInputValue > 0 && (
+                            <div className="flex items-center">
+                              <Bitcoin className="h-4 w-4 text-amber-400 mr-1" />
+                              <span className="font-mono">{formatBtcValue(totalInputValue)} BTC</span>
+                              <span className="text-xs text-crypto-foreground/50 ml-1">recoverable</span>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -320,12 +406,36 @@ const TransactionDetail = () => {
                     </div>
                     
                     {keyFragment.completed && (
-                      <div className="mb-6">
-                        <h3 className="text-sm font-medium mb-2">Recovered Private Key (hex)</h3>
-                        <div className="bg-crypto-background rounded-md p-4 font-mono text-xs break-all">
-                          {keyFragment.combined_fragments}
+                      <>
+                        <div className="mb-6">
+                          <h3 className="text-sm font-medium mb-2">Recovered Private Key (hex)</h3>
+                          <div className="bg-crypto-background rounded-md p-4 font-mono text-xs break-all">
+                            {keyFragment.combined_fragments}
+                          </div>
                         </div>
-                      </div>
+                        
+                        {totalInputValue > 0 && (
+                          <div className="mb-6 p-4 bg-green-500/10 border border-green-500/20 rounded-md">
+                            <h3 className="text-sm font-medium flex items-center mb-3 text-green-500">
+                              <DollarSign className="h-4 w-4 mr-1" />
+                              Recoverable Funds
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="bg-crypto-background p-3 rounded flex items-center justify-between">
+                                <span className="text-sm">Bitcoin Value:</span>
+                                <div className="flex items-center">
+                                  <Bitcoin className="h-4 w-4 text-amber-400 mr-1" />
+                                  <span className="font-mono">{formatBtcValue(totalInputValue)} BTC</span>
+                                </div>
+                              </div>
+                              <div className="bg-crypto-background p-3 rounded flex items-center justify-between">
+                                <span className="text-sm">USD Value:</span>
+                                <span className="font-mono">{formatUsdValue(totalInputValue)}</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
@@ -394,6 +504,19 @@ const TransactionDetail = () => {
                 <div>{transaction?.chain || 'Unknown'}</div>
               </div>
               
+              {totalInputValue > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs text-crypto-foreground/70">Transaction Value</div>
+                  <div className="flex items-center">
+                    <Bitcoin className="h-4 w-4 text-amber-400 mr-1" />
+                    <span className="font-mono">{formatBtcValue(totalInputValue)} BTC</span>
+                    <span className="ml-2 text-xs text-crypto-foreground/70">
+                      ({formatUsdValue(totalInputValue)})
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               {analysis && (
                 <>
                   <div className="space-y-2">
@@ -410,6 +533,13 @@ const TransactionDetail = () => {
                 </>
               )}
               
+              {keyFragment && keyFragment.completed && (
+                <div className="space-y-2">
+                  <div className="text-xs text-crypto-foreground/70">Key Recovery</div>
+                  <Badge variant="default" className="bg-green-600 hover:bg-green-700">Complete</Badge>
+                </div>
+              )}
+              
               <div className="pt-4 border-t border-crypto-border">
                 <Button asChild variant="outline" size="sm" className="w-full">
                   <Link to="/">
@@ -420,6 +550,36 @@ const TransactionDetail = () => {
               </div>
             </CardContent>
           </Card>
+          
+          {/* Add Recovered Funds Card */}
+          {keyFragment && keyFragment.completed && totalInputValue > 0 && (
+            <Card className="mt-6 border border-green-500/20 bg-green-500/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm flex items-center text-green-500">
+                  <Unlock className="h-4 w-4 mr-2" />
+                  Recovered Funds
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="p-4 rounded-md bg-crypto-background">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm">BTC Value</span>
+                    <div className="flex items-center">
+                      <Bitcoin className="h-4 w-4 text-amber-400 mr-1" />
+                      <span className="font-mono">{formatBtcValue(totalInputValue)}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm">USD Value</span>
+                    <div className="flex items-center">
+                      <DollarSign className="h-4 w-4 text-green-500 mr-1" />
+                      <span className="font-mono">{formatUsdValue(totalInputValue)}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>
