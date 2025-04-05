@@ -56,6 +56,35 @@ export const modularInverse = (a: bigint, m: bigint): bigint | null => {
 };
 
 /**
+ * Check if all values in an array are coprime with each other
+ * @param values Array of bigint values to check
+ * @returns True if all values are pairwise coprime
+ */
+export const areAllCoprime = (values: bigint[]): boolean => {
+  for (let i = 0; i < values.length; i++) {
+    for (let j = i + 1; j < values.length; j++) {
+      if (gcd(values[i], values[j]) !== 1n) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+/**
+ * Calculate greatest common divisor of two numbers
+ * @param a First number
+ * @param b Second number
+ * @returns GCD of a and b
+ */
+export const gcd = (a: bigint, b: bigint): bigint => {
+  while (b !== 0n) {
+    [a, b] = [b, a % b];
+  }
+  return a;
+};
+
+/**
  * Convert hex string to BigInt
  * @param hex Hexadecimal string (with or without 0x prefix)
  * @returns BigInt representation
@@ -84,18 +113,42 @@ export const bigIntToHex = (num: bigint): string => {
  */
 export const combinePrivateKeyFragments = (fragments: Record<string, string>): string | null => {
   try {
+    if (Object.keys(fragments).length < 2) {
+      console.log('Not enough fragments to combine');
+      return null;
+    }
+    
     const congruences: [bigint, bigint][] = Object.entries(fragments).map(
       ([modulus, remainder]) => [hexToBigInt(remainder), hexToBigInt(modulus)]
     );
     
-    if (congruences.length < 2) return null;
+    // Check if all moduli are coprime - requirement for CRT
+    const moduli = congruences.map(([_, m]) => m);
+    if (!areAllCoprime(moduli)) {
+      console.log('Moduli are not all coprime, CRT cannot be applied');
+      return null;
+    }
     
     const combined = chineseRemainderTheorem(congruences);
-    if (combined === null) return null;
+    if (combined === null) {
+      console.log('No solution exists for the given congruences');
+      return null;
+    }
     
     return bigIntToHex(combined);
   } catch (error) {
     console.error("Error combining private key fragments:", error);
     return null;
   }
+};
+
+/**
+ * Determine if we have enough fragments to recover the full private key
+ * @param fragments Map of moduli to remainders
+ * @returns True if fragments are sufficient for full key recovery
+ */
+export const hasEnoughFragmentsForFullRecovery = (fragments: Record<string, string>): boolean => {
+  // In a real implementation, this would check the product of moduli against the curve order
+  // For this demo, we'll assume 6+ fragments is enough for full recovery
+  return Object.keys(fragments).length >= 6;
 };

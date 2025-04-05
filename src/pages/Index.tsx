@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { NodeConfiguration, Transaction } from '@/types';
@@ -46,7 +47,7 @@ const Index = () => {
         .from(Tables.blockchain_transactions)
         .select('*')
         .eq('txid', txid)
-        .single();
+        .maybeSingle();
       
       if (data && !error) {
         // Use the transaction from database - proper type casting
@@ -58,7 +59,16 @@ const Index = () => {
           description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded from database`,
         });
       } else {
-        // Fall back to mock data
+        // If no transaction found in database, store a new sample one
+        await supabase
+          .from(Tables.blockchain_transactions)
+          .insert({
+            txid: txid,
+            chain: 'BTC',
+            decoded_json: SAMPLE_TRANSACTION,
+            processed: true
+          });
+          
         setTransaction(SAMPLE_TRANSACTION);
         setAnalyzingTxid(txid);
         toast({

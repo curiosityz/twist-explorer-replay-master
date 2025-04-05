@@ -74,7 +74,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         setStatus('analyzing');
         setProgress(0);
         
-        // Create mock analysis result
+        // Create mock analysis result with more realistic prime factors
         const mockPublicKey: CryptographicPoint = {
           x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
           y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6',
@@ -87,24 +87,41 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           sighash: '0x789fed'
         };
         
+        // Generate more prime factors for more robust CRT calculations
+        const primesArray = ['0x101', '0x103', '0x107', '0x10d', '0x10f', '0x111'];
+        
+        // Generate private key modulo values for all prime factors
+        const privateKeyMods: Record<string, string> = {};
+        primesArray.forEach((prime, index) => {
+          // Simulating different remainders for each modulo
+          privateKeyMods[prime] = `0x${(0x45 + index * 10).toString(16)}`;
+        });
+        
+        // Create the full analysis result
         const mockResult: AnalysisResult = {
           txid: txid,
           vulnerabilityType: 'twisted_curve',
           publicKey: mockPublicKey,
           signature: mockSignature,
           status: 'completed',
-          message: 'Vulnerability identified: Public key not on secp256k1 curve.',
+          message: 'Vulnerability identified: Public key not on secp256k1 curve. Successfully calculated private key modulo values.',
           twistOrder: '0x6f8a80d37d1f8161d5385fda1672e4bfbb7276ea83c9b330b8c216e94dbdca83',
-          primeFactors: ['0x101', '0x103', '0x107', '0x10d'],
-          privateKeyModulo: {
-            '0x101': '0x45',
-            '0x103': '0x67',
-            '0x107': '0x89',
-            '0x10d': '0xab'
-          }
+          primeFactors: primesArray,
+          privateKeyModulo: privateKeyMods
         };
         
-        // Save analysis to database - use upsert with proper types
+        // Simulate progress
+        const interval = setInterval(() => {
+          setProgress(prev => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 300);
+        
+        // Save analysis to database - use upsert with proper structure
         const { error } = await supabase
           .from(Tables.vulnerability_analyses)
           .upsert({
@@ -125,17 +142,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           return;
         }
         
-        // Simulate progress
-        const interval = setInterval(() => {
-          setProgress(prev => {
-            if (prev >= 100) {
-              clearInterval(interval);
-              return 100;
-            }
-            return prev + 10;
-          });
-        }, 300);
-        
         // Check if we have existing private key fragments for this public key
         await checkAndCombineKeyFragments(mockResult.publicKey, mockResult.privateKeyModulo);
         
@@ -150,7 +156,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
     runAnalysis();
   }, [txid, startAnalysis, status]);
   
-  // Function to check for and combine key fragments
+  // Function to check for and combine key fragments using Chinese Remainder Theorem
   const checkAndCombineKeyFragments = async (
     publicKey: CryptographicPoint, 
     newFragments: Record<string, string> | undefined
@@ -165,9 +171,11 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         .from(Tables.private_key_fragments)
         .select('*')
         .eq('public_key_hex', publicKeyHex)
-        .single();
+        .maybeSingle();
         
       let allFragments = { ...newFragments };
+      let isComplete = false;
+      let combinedKey: string | null = null;
       
       if (existingData && !fetchError) {
         // Combine with existing fragments
@@ -176,33 +184,48 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           ...newFragments 
         };
         
-        // Try to combine all fragments
-        const combinedKey = combinePrivateKeyFragments(allFragments);
+        // Try to combine all fragments using Chinese Remainder Theorem
+        combinedKey = combinePrivateKeyFragments(allFragments);
+        isComplete = !!combinedKey;
         
         // Update with new combined key
-        const { data, error } = await supabase
+        await supabase
           .from(Tables.private_key_fragments)
           .update({
             modulo_values: allFragments,
             combined_fragments: combinedKey,
-            completed: !!combinedKey
+            completed: isComplete
           })
           .eq('id', existingData.id);
           
-        if (error) {
-          console.error('Error updating key fragments:', error);
-        } else if (combinedKey) {
+        if (combinedKey) {
           console.log('Private key recovered!', combinedKey);
+          
+          // Update analysis message to reflect key recovery status
+          const keyRecoveryMessage = isComplete 
+            ? `Private key successfully recovered: ${combinedKey}`
+            : `Partial key recovery: Private key determined modulo ${Object.keys(allFragments).length} factors`;
+            
+          await supabase
+            .from(Tables.vulnerability_analyses)
+            .update({
+              message: `Vulnerability identified: Public key not on secp256k1 curve. ${keyRecoveryMessage}`
+            })
+            .eq('txid', publicKey.x);
         }
       } else {
         // Create new fragment record
+        // Try to combine fragments first
+        combinedKey = combinePrivateKeyFragments(allFragments);
+        isComplete = !!combinedKey;
+        
         const { error } = await supabase
           .from(Tables.private_key_fragments)
           .insert({
             public_key_hex: publicKeyHex,
             modulo_values: allFragments,
-            combined_fragments: null,
-            completed: false
+            combined_fragments: combinedKey,
+            completed: isComplete
           });
           
         if (error) {
@@ -274,7 +297,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
               <AlertCircle className="h-5 w-5" />
               <span className="font-medium">Analysis failed</span>
             </div>
-            <p className="mt-2 text-sm">Could not complete vulnerability analysis. Please try again or select a different transaction.</p>
+            <p className="mt-2 text-sm">Could not complete vulnerability analysis. The Chinese Remainder Theorem calculation failed to recover the private key. Please try again with a different transaction.</p>
           </div>
         )}
         
@@ -331,7 +354,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
               <div>
                 <h3 className="text-sm font-medium mb-2 text-crypto-foreground flex items-center">
                   <Unlock className="mr-2 h-4 w-4" />
-                  Private Key Fragments
+                  Private Key Fragments (Chinese Remainder Theorem)
                 </h3>
                 <div className="bg-crypto-background rounded-md p-3 font-mono text-xs">
                   <table className="w-full">
