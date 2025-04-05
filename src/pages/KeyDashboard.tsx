@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { ArrowLeft, Check, Copy, Database, Key, Lock, Unlock } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Database, Key, Lock, Unlock, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 
 const KeyDashboard = () => {
@@ -57,6 +56,13 @@ const KeyDashboard = () => {
             </Link>
           </Button>
           <h1 className="text-2xl font-bold">Recovered Private Keys</h1>
+          
+          <Button variant="default" size="sm" asChild className="ml-auto">
+            <Link to="/wallet">
+              <Wallet className="h-4 w-4 mr-1" />
+              Open Wallet
+            </Link>
+          </Button>
         </div>
         <p className="text-crypto-foreground/70">
           View all private key fragments and recovered private keys

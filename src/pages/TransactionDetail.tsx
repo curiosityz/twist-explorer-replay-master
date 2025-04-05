@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock, Check, AlertCircle, Bitcoin, DollarSign, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock, 
+  Check, AlertCircle, Bitcoin, DollarSign, CheckCircle2, XCircle, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
 import { CryptographicPoint, Signature } from '@/types';
 import { verifyPrivateKey } from '@/lib/cryptoUtils';
@@ -123,12 +123,10 @@ const TransactionDetail = () => {
     }
   };
   
-  // Format Bitcoin value to display properly
   const formatBtcValue = (value: number) => {
     return value.toFixed(8);
   };
   
-  // Format USD value (mock conversion rate of $60,000 per BTC)
   const formatUsdValue = (btcValue: number) => {
     const usdValue = btcValue * 60000;
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdValue);
@@ -204,7 +202,6 @@ const TransactionDetail = () => {
       
       <div className="grid grid-cols-12 gap-6">
         <div className="col-span-12 lg:col-span-8">
-          {/* UTXO Value Card - New addition */}
           {totalInputValue > 0 && keyFragment && keyFragment.completed && (
             <Card className="mb-6 border border-green-500/20 bg-green-500/5">
               <CardContent className="p-6">
@@ -289,7 +286,6 @@ const TransactionDetail = () => {
                         </div>
                       </div>
                       
-                      {/* Add UTXO Value Info */}
                       {totalInputValue > 0 && (
                         <div className="mt-3 bg-crypto-background/50 border border-crypto-border/40 rounded-md p-3">
                           <div className="flex items-center justify-between">
@@ -468,7 +464,6 @@ const TransactionDetail = () => {
                             {keyFragment.combined_fragments}
                           </div>
                           
-                          {/* Key verification status */}
                           {keyVerificationStatus !== null && (
                             <div className={`mt-2 p-2 rounded ${keyVerificationStatus ? 'bg-green-500/10' : 'bg-amber-500/10'} flex items-center`}>
                               {keyVerificationStatus ? (
@@ -628,18 +623,28 @@ const TransactionDetail = () => {
                 </div>
               )}
               
-              <div className="pt-4 border-t border-crypto-border">
-                <Button asChild variant="outline" size="sm" className="w-full">
-                  <Link to="/">
-                    <Eye className="mr-2 h-4 w-4" />
-                    Analyze Another Transaction
-                  </Link>
-                </Button>
+              <div className="pt-4 border-t">
+                <div className="space-y-2">
+                  <Button asChild variant="outline" size="sm" className="w-full">
+                    <Link to="/">
+                      <Eye className="mr-2 h-4 w-4" />
+                      Analyze Another Transaction
+                    </Link>
+                  </Button>
+                  
+                  {keyFragment && keyFragment.completed && (
+                    <Button asChild variant="default" size="sm" className="w-full">
+                      <Link to="/wallet">
+                        <Wallet className="mr-2 h-4 w-4" />
+                        Open Wallet
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
           
-          {/* Add Recovered Funds Card */}
           {keyFragment && keyFragment.completed && totalInputValue > 0 && (
             <Card className="mt-6 border border-green-500/20 bg-green-500/5">
               <CardHeader className="pb-2">
