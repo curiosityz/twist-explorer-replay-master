@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -10,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { supabase, Tables } from '@/integrations/supabase/client';
 import { WalletKey, UTXO, formatBtcValue, deriveAddress, btcToSatoshis, satoshisToBtc, validateAddress } from '@/lib/walletUtils';
-import { normalizePrivateKey, verifyPrivateKey } from '@/lib/cryptoUtils';
+import { normalizePrivateKey, verifyPrivateKey, hexToBigInt } from '@/lib/cryptoUtils';
 import { chainstackService } from '@/services/chainstackService';
 import { toast } from 'sonner';
 import { Copy, ArrowRight, Wallet, Plus, Key, CircleDollarSign, AlertCircle, Check, RefreshCw, Send, ShieldCheck } from 'lucide-react';
@@ -111,6 +112,7 @@ const WalletInterface = () => {
     }
     
     try {
+      // Fix: Properly normalize the private key
       const normalizedKey = normalizePrivateKey(importedKey.trim());
       
       const exists = walletKeys.some(k => k.privateKey === normalizedKey);
@@ -119,8 +121,10 @@ const WalletInterface = () => {
         return;
       }
       
+      // Generate address from the normalized private key
       const address = deriveAddress(normalizedKey, selectedNetwork);
       
+      // Create and add the new wallet key
       const newKey: WalletKey = {
         privateKey: normalizedKey,
         publicKey: { x: '0x0', y: '0x0' },
@@ -135,6 +139,7 @@ const WalletInterface = () => {
       setImportedKey('');
       toast.success('Private key imported successfully');
       
+      // Load UTXOs for the new address
       loadUtxosForAddress(address);
     } catch (err) {
       console.error('Error importing key:', err);
@@ -398,10 +403,29 @@ const WalletInterface = () => {
                   {selectedKeyIndex >= 0 && (
                     <div className="mt-6 pt-4 border-t">
                       <h3 className="text-sm font-medium mb-2">Private Key</h3>
-                      <div className="bg-muted p-3 rounded-md">
+                      <div className="bg-muted p-3 rounded-md relative">
                         <div className="font-mono text-xs break-all">
                           {walletKeys[selectedKeyIndex]?.privateKey}
                         </div>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="absolute top-2 right-2"
+                          onClick={() => {
+                            if (selectedKeyIndex >= 0) {
+                              copyToClipboard(
+                                walletKeys[selectedKeyIndex]?.privateKey || '', 
+                                'private-key'
+                              );
+                            }
+                          }}
+                        >
+                          {copiedKey === 'private-key' ? (
+                            <Check className="h-4 w-4" />
+                          ) : (
+                            <Copy className="h-4 w-4" />
+                          )}
+                        </Button>
                         {!walletKeys[selectedKeyIndex]?.verified && (
                           <div className="flex items-center mt-2 text-amber-500 text-xs">
                             <AlertCircle className="h-3 w-3 mr-1" />
@@ -558,6 +582,9 @@ const WalletInterface = () => {
                   value={importedKey}
                   onChange={(e) => setImportedKey(e.target.value)}
                 />
+                <p className="text-xs text-muted-foreground">
+                  Enter a private key in hex format (with or without 0x prefix)
+                </p>
               </div>
               
               <div className="space-y-2">

@@ -18,7 +18,7 @@ const WalletPage = () => {
       // Initialize ChainStack service with the provided configuration
       const chainstack = chainstackService.initializeWithConfig({
         rpcUrl: config.rpcUrl,
-        apiKey: config.apiKey
+        apiKey: config.apiKey || '' // Ensure API key is never undefined
       });
       
       setNodeConfig(config);
