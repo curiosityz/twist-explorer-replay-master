@@ -7,21 +7,34 @@ import { Button } from '@/components/ui/button';
 import { supabase, Tables } from '@/integrations/supabase/client';
 import { ArrowLeft, Check, ChevronRight, Database, FileSearch, ShieldAlert, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
 
 const TransactionsDashboard = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
 
   const fetchTransactions = async () => {
     setLoading(true);
     
     try {
       // First fetch all blockchain transactions
-      const { data: txData } = await supabase
+      const { data: txData, error: txError } = await supabase
         .from(Tables.blockchain_transactions)
         .select('*')
         .order('created_at', { ascending: false });
+        
+      if (txError) {
+        console.error('Error fetching transactions:', txError);
+        toast({
+          title: "Database Error",
+          description: "Could not fetch transactions from database.",
+          variant: "destructive"
+        });
+        setLoading(false);
+        return;
+      }
         
       // Then get their analyses
       const { data: analysesData, error: analysesError } = await supabase
@@ -31,32 +44,88 @@ const TransactionsDashboard = () => {
         
       if (analysesError) {
         console.error('Error fetching analyses:', analysesError);
-        setLoading(false);
-        return;
+        toast({
+          title: "Database Error",
+          description: "Could not fetch vulnerability analyses from database.",
+          variant: "destructive"
+        });
+        
+        // Even with an error, we'll create a sample analysis later
       }
       
-      // If no analyses yet, but we have transactions, create mock analyses to demonstrate functionality
+      // If no analyses yet, but we have transactions, create mock analyses
       if ((!analysesData || analysesData.length === 0) && txData && txData.length > 0) {
-        const mockAnalyses = await createMockAnalyses(txData.slice(0, 3));
+        // Create mock analyses for all transactions
+        const mockAnalyses = await createMockAnalyses(txData);
         setTransactions(mockAnalyses);
+      } else if (analysesData && analysesData.length > 0) {
+        // Use the real analyses
+        setTransactions(analysesData);
+      } else if (!txData || txData.length === 0) {
+        // No transactions at all, create example data
+        await createExampleData();
+        const { data: newData } = await supabase
+          .from(Tables.vulnerability_analyses)
+          .select('*')
+          .order('created_at', { ascending: false });
+        
+        setTransactions(newData || []);
       } else {
-        setTransactions(analysesData || []);
+        setTransactions([]);
       }
     } catch (error) {
       console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred while fetching transaction data.",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
   };
 
-  // Create mock analyses for demo purposes if none exist
+  // Create complete example data for demo purposes
+  const createExampleData = async () => {
+    // Example transaction IDs
+    const exampleTxids = [
+      '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b',
+      'eb3b0c4b99bd11b9e537d928f3a45632f948021de982e4feded6bc34fbc155cf',
+      '9ec4bc49e828d924af1d82774ae8603d7705313acf1e40c3d0ad5ec0e3b29c4b'
+    ];
+    
+    for (const txid of exampleTxids) {
+      // Create a transaction record
+      const { error: txError } = await supabase
+        .from(Tables.blockchain_transactions)
+        .insert({
+          txid: txid,
+          chain: 'BTC',
+          decoded_json: {
+            version: 1,
+            inputs: [{prevTxid: "0000000000000000000000000000000000000000000000000000000000000000", outputIndex: 0}],
+            outputs: [{satoshis: 5000000000, script: "0x76a914...88ac"}]
+          },
+          processed: true
+        })
+        .select();
+    }
+    
+    // Create analyses for each transaction
+    await createMockAnalyses(exampleTxids.map(txid => ({ txid })));
+  };
+
+  // Create mock analyses for demo purposes
   const createMockAnalyses = async (transactions: any[]) => {
     const mockAnalyses = [];
     
     for (const tx of transactions) {
       const vulnerabilityTypes = ['twisted_curve', 'replay_attack', 'nonce_reuse'];
-      const randomType = vulnerabilityTypes[Math.floor(Math.random() * vulnerabilityTypes.length)];
+      const statusTypes = ['completed', 'completed', 'failed'];
+      const randomTypeIndex = Math.floor(Math.random() * vulnerabilityTypes.length);
+      const randomType = vulnerabilityTypes[randomTypeIndex];
+      const status = statusTypes[randomTypeIndex];
       
       // Create a mock public key
       const publicKey = {
@@ -72,25 +141,57 @@ const TransactionsDashboard = () => {
         '0x107': '0x89'
       };
       
+      let message = `Vulnerability found: ${randomType.replace('_', ' ')}`;
+      if (status === 'failed') {
+        message = 'Analysis failed due to computational error';
+      }
+      
       const mockAnalysis = {
         txid: tx.txid,
         vulnerability_type: randomType,
         public_key: publicKey,
         prime_factors: ['0x101', '0x103', '0x107'],
         private_key_modulo: privateKeyModulo,
-        status: 'completed',
-        message: `Vulnerability found: ${randomType.replace('_', ' ')}`,
+        status: status,
+        message: message,
         created_at: new Date().toISOString()
       };
       
-      // Insert mock analysis
-      const { data, error } = await supabase
-        .from(Tables.vulnerability_analyses)
-        .insert(mockAnalysis)
-        .select();
+      // Try to insert the mock analysis
+      try {
+        const { data, error } = await supabase
+          .from(Tables.vulnerability_analyses)
+          .upsert(mockAnalysis)
+          .select();
+          
+        if (error) {
+          console.error('Error creating mock analysis:', error);
+          continue;
+        }
         
-      if (data) {
-        mockAnalyses.push(data[0]);
+        if (data && data.length > 0) {
+          mockAnalyses.push(data[0]);
+          
+          // Also create key fragments
+          if (status === 'completed') {
+            const publicKeyHex = publicKey.x + publicKey.y;
+            
+            const { error: fragError } = await supabase
+              .from(Tables.private_key_fragments)
+              .upsert({
+                public_key_hex: publicKeyHex,
+                modulo_values: privateKeyModulo,
+                combined_fragments: randomTypeIndex === 0 ? '0x1a2b3c4d' : null,
+                completed: randomTypeIndex === 0
+              });
+              
+            if (fragError) {
+              console.error('Error creating key fragments:', fragError);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Exception creating mock analysis:', error);
       }
     }
     

@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress';
 import { Loader2, Check, AlertCircle, Key, Lock, Unlock } from 'lucide-react';
 import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
 import { supabase, Tables } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface CryptographicVisualizerProps {
   txid?: string;
@@ -17,6 +18,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   const [status, setStatus] = useState<'idle' | 'analyzing' | 'completed' | 'failed'>('idle');
   const [progress, setProgress] = useState(0);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     // Check if we already have an analysis for this transaction
@@ -28,7 +30,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           .from(Tables.vulnerability_analyses)
           .select('*')
           .eq('txid', txid)
-          .single();
+          .maybeSingle();
           
         if (data && !error) {
           // Type casting to ensure we convert the JSON data to proper types
@@ -73,6 +75,37 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
       try {
         setStatus('analyzing');
         setProgress(0);
+        
+        // First, verify that the transaction exists in blockchain_transactions
+        const { data: txExists, error: txError } = await supabase
+          .from(Tables.blockchain_transactions)
+          .select('txid')
+          .eq('txid', txid)
+          .maybeSingle();
+          
+        if (txError || !txExists) {
+          console.error('Transaction does not exist in blockchain_transactions:', txError);
+          
+          // Create the transaction first to satisfy the foreign key constraint
+          const { error: insertError } = await supabase
+            .from(Tables.blockchain_transactions)
+            .insert({
+              txid: txid,
+              chain: 'BTC',
+              processed: true
+            });
+            
+          if (insertError) {
+            console.error('Error creating transaction record:', insertError);
+            setStatus('failed');
+            toast({
+              title: "Analysis Failed",
+              description: "Could not create transaction record. Please try again.",
+              variant: "destructive"
+            });
+            return;
+          }
+        }
         
         // Create mock analysis result with more realistic prime factors
         const mockPublicKey: CryptographicPoint = {
@@ -121,7 +154,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           });
         }, 300);
         
-        // Save analysis to database - use upsert with proper structure
+        // Save analysis to database using a proper structure
         const { error } = await supabase
           .from(Tables.vulnerability_analyses)
           .upsert({
@@ -139,6 +172,11 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         if (error) {
           console.error('Error saving analysis:', error);
           setStatus('failed');
+          toast({
+            title: "Analysis Failed",
+            description: "Could not save analysis results. Please try again.",
+            variant: "destructive"
+          });
           return;
         }
         
@@ -150,11 +188,16 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
       } catch (error) {
         console.error('Error during analysis:', error);
         setStatus('failed');
+        toast({
+          title: "Analysis Failed",
+          description: "An unexpected error occurred during analysis.",
+          variant: "destructive"
+        });
       }
     };
     
     runAnalysis();
-  }, [txid, startAnalysis, status]);
+  }, [txid, startAnalysis, status, toast]);
   
   // Function to check for and combine key fragments using Chinese Remainder Theorem
   const checkAndCombineKeyFragments = async (
@@ -211,7 +254,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             .update({
               message: `Vulnerability identified: Public key not on secp256k1 curve. ${keyRecoveryMessage}`
             })
-            .eq('txid', publicKey.x);
+            .eq('txid', txid);
         }
       } else {
         // Create new fragment record

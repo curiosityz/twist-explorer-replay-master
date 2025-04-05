@@ -60,7 +60,7 @@ const Index = () => {
         });
       } else {
         // If no transaction found in database, store a new sample one
-        await supabase
+        const { error: insertError } = await supabase
           .from(Tables.blockchain_transactions)
           .insert({
             txid: txid,
@@ -68,6 +68,15 @@ const Index = () => {
             decoded_json: SAMPLE_TRANSACTION,
             processed: true
           });
+          
+        if (insertError) {
+          console.error("Error saving transaction to database:", insertError);
+          toast({
+            title: "Database Error",
+            description: "Could not save transaction to database. Will continue with sample data.",
+            variant: "destructive"
+          });
+        }
           
         setTransaction(SAMPLE_TRANSACTION);
         setAnalyzingTxid(txid);
