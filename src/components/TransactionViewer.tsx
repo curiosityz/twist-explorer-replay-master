@@ -16,9 +16,17 @@ interface TransactionViewerProps {
 const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: TransactionViewerProps) => {
   const [activeView, setActiveView] = useState('decoded');
   const [totalInputValue, setTotalInputValue] = useState(0);
+  const [currentTxid, setCurrentTxid] = useState('');
   
-  // Calculate total value of inputs when transaction changes
+  // Reset view and recalculate when transaction changes
   useEffect(() => {
+    if (transaction?.txid !== currentTxid) {
+      setCurrentTxid(transaction?.txid || '');
+      calculateTotalValue();
+    }
+  }, [transaction]);
+
+  const calculateTotalValue = () => {
     if (transaction && transaction.vin) {
       // For a real app, we would fetch the UTXO values from a blockchain API
       // For demo purposes, we'll estimate based on output values + a mock fee
@@ -27,7 +35,7 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
       const estimatedInputValue = outputSum * 1.003; // 0.3% fee estimate
       setTotalInputValue(estimatedInputValue);
     }
-  }, [transaction]);
+  };
 
   const handleAnalyze = () => {
     onAnalyze(transaction.txid);

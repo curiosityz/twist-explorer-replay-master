@@ -1,11 +1,13 @@
+
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { Cpu, Loader2, Lock, RefreshCw, XCircle, Check } from 'lucide-react';
+import { Cpu, Loader2, Lock, RefreshCw, XCircle, Check, Copy } from 'lucide-react';
 import { AnalysisResult, CryptographicPoint, Signature } from '@/types';
 import { combinePrivateKeyFragments, normalizePrivateKey, verifyPrivateKey } from '@/lib/cryptoUtils';
+import { toast } from 'sonner';
 
 interface CryptographicVisualizerProps {
   txid?: string;
@@ -17,6 +19,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [verificationResult, setVerificationResult] = useState<boolean | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (txid && startAnalysis) {
@@ -89,6 +92,19 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
       setAnalysisResult(mockAnalysisResult);
 
       try {
+        // Convert objects to JSON-compatible format
+        const analysisData = {
+          txid: mockAnalysisResult.txid,
+          vulnerability_type: mockAnalysisResult.vulnerabilityType,
+          public_key: mockPublicKey as unknown as Record<string, any>,
+          signature: mockSignature as unknown as Record<string, any>,
+          prime_factors: mockPrimeFactors,
+          private_key_modulo: mockPrivateKeyModulo,
+          twist_order: mockAnalysisResult.twistOrder,
+          status: mockAnalysisResult.status,
+          message: mockAnalysisResult.message
+        };
+          
         const { data: existingAnalysis, error: checkError } = await supabase
           .from(Tables.vulnerability_analyses)
           .select('id')
@@ -99,18 +115,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           console.error("Error checking existing analysis:", checkError);
         }
         
-        const analysisData = {
-          txid: mockAnalysisResult.txid,
-          vulnerability_type: mockAnalysisResult.vulnerabilityType,
-          public_key: mockPublicKey,
-          signature: mockSignature,
-          prime_factors: mockPrimeFactors,
-          private_key_modulo: mockPrivateKeyModulo,
-          twist_order: mockAnalysisResult.twistOrder,
-          status: mockAnalysisResult.status,
-          message: mockAnalysisResult.message
-        };
-          
         if (existingAnalysis) {
           const { error: updateError } = await supabase
             .from(Tables.vulnerability_analyses)
@@ -194,7 +198,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           const failedAnalysis = {
             txid: txid,
             vulnerability_type: 'unknown',
-            public_key: { x: '0x0', y: '0x0', isOnCurve: false },
+            public_key: { x: '0x0', y: '0x0', isOnCurve: false } as unknown as Record<string, any>,
             status: 'failed',
             message: error instanceof Error ? error.message : 'Unknown error occurred'
           };
@@ -212,6 +216,18 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
       }
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const copyPrivateKey = () => {
+    if (analysisResult?.privateKeyModulo) {
+      const privateKey = combinePrivateKeyFragments(analysisResult.privateKeyModulo);
+      if (privateKey) {
+        navigator.clipboard.writeText(privateKey);
+        setCopied(true);
+        toast.success("Private key copied to clipboard");
+        setTimeout(() => setCopied(false), 2000);
+      }
     }
   };
 
@@ -367,9 +383,19 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
                 
                 {Object.keys(analysisResult.privateKeyModulo).length >= 6 && (
                   <div className="mt-2 p-3 bg-green-500/10 border border-green-500/20 rounded">
-                    <div className="font-medium text-sm text-green-500 flex items-center">
-                      <Check className="h-4 w-4 mr-1" />
-                      Recovered Private Key
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-sm text-green-500 flex items-center">
+                        <Check className="h-4 w-4 mr-1" />
+                        Recovered Private Key
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-6 px-2 text-xs"
+                        onClick={copyPrivateKey}
+                      >
+                        {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+                      </Button>
                     </div>
                     <div className="font-mono text-xs mt-1 break-all">
                       {combinePrivateKeyFragments(analysisResult.privateKeyModulo)}
