@@ -1,10 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Key, PlusCircle, Wallet } from 'lucide-react';
 import WalletInterface from '@/components/WalletInterface';
 import ConnectionPanel from '@/components/ConnectionPanel';
+import KeyManagementPanel from '@/components/KeyManagementPanel';
 import { NodeConfiguration } from '@/types';
 import { chainstackService } from '@/services/chainstackService';
 import { toast } from 'sonner';
@@ -12,6 +13,7 @@ import { toast } from 'sonner';
 const WalletPage = () => {
   const [isConnected, setIsConnected] = useState(false);
   const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
+  const [showKeyManagement, setShowKeyManagement] = useState(false);
 
   const handleConnect = (config: NodeConfiguration) => {
     try {
@@ -44,6 +46,18 @@ const WalletPage = () => {
             <Wallet className="h-6 w-6 mr-2" />
             Crypto Wallet
           </h1>
+          
+          {isConnected && (
+            <Button 
+              variant={showKeyManagement ? "secondary" : "outline"} 
+              size="sm" 
+              className="ml-auto"
+              onClick={() => setShowKeyManagement(!showKeyManagement)}
+            >
+              <Key className="h-4 w-4 mr-1" />
+              {showKeyManagement ? "Hide Key Manager" : "Available Private Keys"}
+            </Button>
+          )}
         </div>
         <p className="text-crypto-foreground/70">
           Manage recovered private keys, check balances, and send transactions
@@ -53,18 +67,11 @@ const WalletPage = () => {
       <div className="grid gap-6">
         {!isConnected ? (
           <ConnectionPanel onConnect={handleConnect} />
+        ) : showKeyManagement ? (
+          <KeyManagementPanel onClose={() => setShowKeyManagement(false)} />
         ) : (
           <WalletInterface />
         )}
-        
-        <div className="flex justify-center mt-4">
-          <Button variant="outline" asChild>
-            <Link to="/keys">
-              <Key className="mr-2 h-4 w-4" />
-              View All Recovered Keys
-            </Link>
-          </Button>
-        </div>
       </div>
     </div>
   );

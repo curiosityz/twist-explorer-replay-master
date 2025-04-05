@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { supabase, Tables } from '@/integrations/supabase/client';
 import { ArrowLeft, Check, Copy, Database, Key, Lock, Unlock, Wallet } from 'lucide-react';
 import { format } from 'date-fns';
+import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
+import { toast } from 'sonner';
 
 const KeyDashboard = () => {
   const [keys, setKeys] = useState<any[]>([]);
@@ -42,7 +45,35 @@ const KeyDashboard = () => {
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
+    toast.success('Copied to clipboard');
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const exportAllKeys = () => {
+    const completedKeys = keys.filter(k => k.completed && k.combined_fragments);
+    
+    if (completedKeys.length === 0) {
+      toast.error('No completed keys to export');
+      return;
+    }
+    
+    const keysData = completedKeys.map(key => ({
+      publicKey: key.public_key_hex,
+      privateKey: key.combined_fragments,
+      recovered: format(new Date(key.updated_at), 'yyyy-MM-dd HH:mm:ss'),
+    }));
+    
+    const dataStr = JSON.stringify(keysData, null, 2);
+    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+    
+    const exportFileDefaultName = `crypto-recovery-keys-${format(new Date(), 'yyyyMMdd')}.json`;
+    
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('href', dataUri);
+    linkElement.setAttribute('download', exportFileDefaultName);
+    linkElement.click();
+    
+    toast.success(`Exported ${keysData.length} keys`);
   };
 
   return (
@@ -57,12 +88,19 @@ const KeyDashboard = () => {
           </Button>
           <h1 className="text-2xl font-bold">Recovered Private Keys</h1>
           
-          <Button variant="default" size="sm" asChild className="ml-auto">
-            <Link to="/wallet">
-              <Wallet className="h-4 w-4 mr-1" />
-              Open Wallet
-            </Link>
-          </Button>
+          <div className="ml-auto flex space-x-2">
+            <Button variant="outline" size="sm" onClick={exportAllKeys}>
+              <Copy className="h-4 w-4 mr-1" />
+              Export All
+            </Button>
+            
+            <Button variant="default" size="sm" asChild>
+              <Link to="/wallet">
+                <Wallet className="h-4 w-4 mr-1" />
+                Open Wallet
+              </Link>
+            </Button>
+          </div>
         </div>
         <p className="text-crypto-foreground/70">
           View all private key fragments and recovered private keys

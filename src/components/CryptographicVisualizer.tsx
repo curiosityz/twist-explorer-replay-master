@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,7 +18,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   const [error, setError] = useState<string | null>(null);
   const [verificationResult, setVerificationResult] = useState<boolean | null>(null);
 
-  // This effect runs when the component mounts or when txid/startAnalysis changes
   useEffect(() => {
     if (txid && startAnalysis) {
       handleAnalyzeTransaction();
@@ -34,7 +32,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
     setVerificationResult(null);
 
     try {
-      // First, check if transaction exists in database
       const { data: txData, error: txError } = await supabase
         .from(Tables.blockchain_transactions)
         .select('*')
@@ -51,10 +48,8 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         throw new Error("Transaction not found in database");
       }
 
-      // Simulate analysis delay
       await new Promise(resolve => setTimeout(resolve, 2000));
 
-      // Generate mock analysis result
       const mockPublicKey: CryptographicPoint = {
         x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
         y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6',
@@ -67,7 +62,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         sighash: '0x01'
       };
 
-      // Generate random prime factors and modulo values
       const mockPrimeFactors = ['101', '103', '107', '109', '113', '127', '131', '137'];
       const mockPrivateKeyModulo: Record<string, string> = {
         '101': '45',
@@ -94,9 +88,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
 
       setAnalysisResult(mockAnalysisResult);
 
-      // Save the analysis to the database
       try {
-        // First check if an analysis already exists for this txid
         const { data: existingAnalysis, error: checkError } = await supabase
           .from(Tables.vulnerability_analyses)
           .select('id')
@@ -107,21 +99,19 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           console.error("Error checking existing analysis:", checkError);
         }
         
-        // Format the data for insertion/update - convert objects to JSON for Supabase
         const analysisData = {
           txid: mockAnalysisResult.txid,
           vulnerability_type: mockAnalysisResult.vulnerabilityType,
-          public_key: mockPublicKey as unknown as JSON, // Cast to JSON for Supabase
-          signature: mockSignature as unknown as JSON,
-          prime_factors: mockPrimeFactors as unknown as JSON,
-          private_key_modulo: mockPrivateKeyModulo as unknown as JSON,
+          public_key: mockPublicKey,
+          signature: mockSignature,
+          prime_factors: mockPrimeFactors,
+          private_key_modulo: mockPrivateKeyModulo,
           twist_order: mockAnalysisResult.twistOrder,
           status: mockAnalysisResult.status,
           message: mockAnalysisResult.message
         };
           
         if (existingAnalysis) {
-          // Update existing analysis
           const { error: updateError } = await supabase
             .from(Tables.vulnerability_analyses)
             .update(analysisData)
@@ -131,7 +121,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             console.error("Error updating analysis:", updateError);
           }
         } else {
-          // Insert new analysis
           const { error: insertError } = await supabase
             .from(Tables.vulnerability_analyses)
             .insert(analysisData);
@@ -141,7 +130,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           }
         }
         
-        // Also try to save the key fragments
         const publicKeyHex = mockPublicKey.x + mockPublicKey.y;
         
         const { data: existingFragment, error: fragmentCheckError } = await supabase
@@ -154,11 +142,9 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           console.error("Error checking key fragments:", fragmentCheckError);
         }
         
-        // Calculate combined fragment based on CRT
         const combinedFragment = combinePrivateKeyFragments(mockPrivateKeyModulo);
         const isComplete = Object.keys(mockPrivateKeyModulo).length >= 6;
         
-        // Verify the private key if it was successfully recovered
         let isKeyVerified = false;
         if (combinedFragment && isComplete) {
           isKeyVerified = verifyPrivateKey(combinedFragment, mockPublicKey.x, mockPublicKey.y);
@@ -166,11 +152,10 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         }
         
         if (existingFragment) {
-          // Update existing fragments
           const { error: updateFragError } = await supabase
             .from(Tables.private_key_fragments)
             .update({
-              modulo_values: mockPrivateKeyModulo as unknown as JSON,
+              modulo_values: mockPrivateKeyModulo,
               combined_fragments: isComplete ? combinedFragment : existingFragment.combined_fragments,
               completed: isComplete
             })
@@ -180,15 +165,16 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             console.error("Error updating key fragments:", updateFragError);
           }
         } else {
-          // Insert new fragments
+          const fragmentData = {
+            public_key_hex: publicKeyHex,
+            modulo_values: mockPrivateKeyModulo,
+            combined_fragments: isComplete ? combinedFragment : null,
+            completed: isComplete
+          };
+          
           const { error: insertFragError } = await supabase
             .from(Tables.private_key_fragments)
-            .insert({
-              public_key_hex: publicKeyHex,
-              modulo_values: mockPrivateKeyModulo as unknown as JSON,
-              combined_fragments: isComplete ? combinedFragment : null,
-              completed: isComplete
-            });
+            .insert(fragmentData);
             
           if (insertFragError) {
             console.error("Error saving key fragments:", insertFragError);
@@ -203,13 +189,12 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
       console.error('Analysis error:', error);
       setError(error instanceof Error ? error.message : 'Unknown error occurred');
       
-      // Still save the failed analysis to the database
       if (txid) {
         try {
           const failedAnalysis = {
             txid: txid,
             vulnerability_type: 'unknown',
-            public_key: { x: '0x0', y: '0x0', isOnCurve: false } as unknown as JSON,
+            public_key: { x: '0x0', y: '0x0', isOnCurve: false },
             status: 'failed',
             message: error instanceof Error ? error.message : 'Unknown error occurred'
           };

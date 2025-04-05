@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,6 +14,7 @@ import { normalizePrivateKey, verifyPrivateKey, hexToBigInt } from '@/lib/crypto
 import { chainstackService } from '@/services/chainstackService';
 import { toast } from 'sonner';
 import { Copy, ArrowRight, Wallet, Plus, Key, CircleDollarSign, AlertCircle, Check, RefreshCw, Send, ShieldCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const WalletInterface = () => {
   const [walletKeys, setWalletKeys] = useState<WalletKey[]>([]);
@@ -46,6 +46,9 @@ const WalletInterface = () => {
   const loadRecoveredKeys = async () => {
     setLoadingKeys(true);
     try {
+      const localStorageImportedKeys = localStorage.getItem('importedKeys');
+      const importedKeyIds = localStorageImportedKeys ? JSON.parse(localStorageImportedKeys) : [];
+      
       const { data, error } = await supabase
         .from(Tables.private_key_fragments)
         .select('*')
@@ -112,7 +115,6 @@ const WalletInterface = () => {
     }
     
     try {
-      // Fix: Properly normalize the private key
       const normalizedKey = normalizePrivateKey(importedKey.trim());
       
       const exists = walletKeys.some(k => k.privateKey === normalizedKey);
@@ -121,10 +123,8 @@ const WalletInterface = () => {
         return;
       }
       
-      // Generate address from the normalized private key
       const address = deriveAddress(normalizedKey, selectedNetwork);
       
-      // Create and add the new wallet key
       const newKey: WalletKey = {
         privateKey: normalizedKey,
         publicKey: { x: '0x0', y: '0x0' },
@@ -139,7 +139,6 @@ const WalletInterface = () => {
       setImportedKey('');
       toast.success('Private key imported successfully');
       
-      // Load UTXOs for the new address
       loadUtxosForAddress(address);
     } catch (err) {
       console.error('Error importing key:', err);
@@ -300,15 +299,26 @@ const WalletInterface = () => {
                       ? 'Loading recovered keys...' 
                       : 'No private keys available yet'}
                   </p>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => setActiveTab('import')}
-                    className="mt-2"
-                  >
-                    <Plus className="mr-2 h-4 w-4" /> 
-                    Import Key
-                  </Button>
+                  <div className="flex justify-center space-x-2 mt-4">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setActiveTab('import')}
+                    >
+                      <Plus className="mr-2 h-4 w-4" /> 
+                      Import Key
+                    </Button>
+                    <Button 
+                      variant="default" 
+                      size="sm"
+                      asChild
+                    >
+                      <Link to="/keys">
+                        <Key className="mr-2 h-4 w-4" />
+                        View Recovered Keys
+                      </Link>
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <>
