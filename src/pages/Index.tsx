@@ -6,8 +6,10 @@ import ConnectionPanel from '@/components/ConnectionPanel';
 import TransactionFetcher from '@/components/TransactionFetcher';
 import TransactionViewer from '@/components/TransactionViewer';
 import CryptographicVisualizer from '@/components/CryptographicVisualizer';
+import TransactionBatchUploader from '@/components/TransactionBatchUploader';
 import { SAMPLE_TRANSACTION } from '@/lib/mockVulnerabilities';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
@@ -24,16 +26,33 @@ const Index = () => {
     });
   };
 
-  const handleFetchTransaction = (txid: string) => {
-    // In a real application, this would fetch the transaction from the blockchain
-    // For this demo, we'll use our sample transaction
-    setTransaction(SAMPLE_TRANSACTION);
-    setAnalyzingTxid(null);
+  const handleFetchTransaction = async (txid: string) => {
     setStartAnalysis(false);
-    toast({
-      title: "Transaction Fetched",
-      description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded`,
-    });
+    
+    // First check if the transaction exists in our database
+    const { data, error } = await supabase
+      .from('blockchain_transactions')
+      .select('*')
+      .eq('txid', txid)
+      .single();
+    
+    if (data && !error) {
+      // Use the transaction from database
+      setTransaction(data.decoded_json || SAMPLE_TRANSACTION);
+      setAnalyzingTxid(txid);
+      toast({
+        title: "Transaction Fetched",
+        description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded from database`,
+      });
+    } else {
+      // Fall back to mock data
+      setTransaction(SAMPLE_TRANSACTION);
+      setAnalyzingTxid(txid);
+      toast({
+        title: "Transaction Fetched",
+        description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded`,
+      });
+    }
   };
 
   const handleAnalyzeTransaction = (txid: string) => {
@@ -61,6 +80,7 @@ const Index = () => {
         <div className="col-span-12 md:col-span-4 space-y-6">
           <ConnectionPanel onConnect={handleConnect} />
           <TransactionFetcher onFetch={handleFetchTransaction} />
+          <TransactionBatchUploader onTransactionSelected={handleFetchTransaction} />
         </div>
         
         {/* Middle Column */}
@@ -85,7 +105,7 @@ const Index = () => {
           <div className="text-xs text-crypto-foreground/70">
             <p className="font-mono">
               NOTE: This application demonstrates the concepts behind the Twisted Curve and Cross-Chain Replay vulnerabilities for educational purposes only.
-              It uses simulated data and does not actually perform cryptographic attacks or broadcast transactions.
+              Transactions are stored in the database for analysis and private key fragments are automatically combined when possible.
             </p>
           </div>
         </Card>

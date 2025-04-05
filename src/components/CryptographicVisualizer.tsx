@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AnalysisResult, CryptographicPoint } from '@/types';
@@ -6,6 +5,9 @@ import { MOCK_ANALYSIS_RESULT } from '@/lib/mockVulnerabilities';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
+import { useToast } from '@/hooks/use-toast';
 
 interface CryptographicVisualizerProps {
   txid?: string;
@@ -19,6 +21,8 @@ const CryptographicVisualizer = ({
   const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'analyzing' | 'completed' | 'failed'>('idle');
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [progress, setProgress] = useState(0);
+  const [combiningKeys, setCombiningKeys] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (startAnalysis && txid) {
@@ -26,23 +30,142 @@ const CryptographicVisualizer = ({
       setProgress(0);
       setResult(null);
       
-      // Simulate analysis progress
-      const interval = setInterval(() => {
-        setProgress(prev => {
-          const newProgress = prev + Math.random() * 5;
-          if (newProgress >= 100) {
-            clearInterval(interval);
-            setAnalysisStatus('completed');
-            setResult(MOCK_ANALYSIS_RESULT);
-            return 100;
+      const fetchExistingAnalysis = async () => {
+        const { data, error } = await supabase
+          .from('vulnerability_analyses')
+          .select('*')
+          .eq('txid', txid)
+          .single();
+          
+        if (data && !error) {
+          const analysisResult: AnalysisResult = {
+            txid: data.txid,
+            vulnerabilityType: data.vulnerability_type,
+            publicKey: data.public_key as CryptographicPoint,
+            signature: data.signature,
+            twistOrder: data.twist_order,
+            primeFactors: data.prime_factors,
+            privateKeyModulo: data.private_key_modulo,
+            status: data.status as 'pending' | 'analyzing' | 'completed' | 'failed',
+            message: data.message
+          };
+          
+          setResult(analysisResult);
+          setAnalysisStatus(analysisResult.status);
+          setProgress(100);
+          
+          if (analysisResult.publicKey && analysisResult.privateKeyModulo) {
+            checkAndCombineKeyFragments(analysisResult);
           }
-          return newProgress;
-        });
-      }, 200);
+          
+          return true;
+        }
+        
+        return false;
+      };
       
-      return () => clearInterval(interval);
+      const performNewAnalysis = async () => {
+        const interval = setInterval(() => {
+          setProgress(prev => {
+            const newProgress = prev + Math.random() * 5;
+            if (newProgress >= 100) {
+              clearInterval(interval);
+              completeAnalysis();
+              return 100;
+            }
+            return newProgress;
+          });
+        }, 200);
+        
+        return () => clearInterval(interval);
+      };
+      
+      const completeAnalysis = async () => {
+        const mockResult: AnalysisResult = { ...MOCK_ANALYSIS_RESULT };
+        mockResult.txid = txid;
+        
+        setAnalysisStatus('completed');
+        setResult(mockResult);
+        
+        await supabase.from('vulnerability_analyses').upsert({
+          txid: mockResult.txid,
+          vulnerability_type: mockResult.vulnerabilityType,
+          public_key: mockResult.publicKey,
+          signature: mockResult.signature,
+          twist_order: mockResult.twistOrder,
+          prime_factors: mockResult.primeFactors,
+          private_key_modulo: mockResult.privateKeyModulo,
+          status: mockResult.status,
+          message: mockResult.message
+        }, { onConflict: 'txid' });
+        
+        if (mockResult.publicKey && mockResult.privateKeyModulo) {
+          checkAndCombineKeyFragments(mockResult);
+        }
+      };
+      
+      fetchExistingAnalysis().then(exists => {
+        if (!exists) {
+          performNewAnalysis();
+        }
+      });
     }
   }, [startAnalysis, txid]);
+  
+  const checkAndCombineKeyFragments = async (currentAnalysis: AnalysisResult) => {
+    if (!currentAnalysis.publicKey || !currentAnalysis.privateKeyModulo) return;
+    
+    setCombiningKeys(true);
+    
+    const pubKeyHex = `${currentAnalysis.publicKey.x}${currentAnalysis.publicKey.y}`;
+    
+    try {
+      const { data: existingFragment } = await supabase
+        .from('private_key_fragments')
+        .select('*')
+        .eq('public_key_hex', pubKeyHex)
+        .single();
+      
+      if (existingFragment) {
+        const updatedModuloValues = {
+          ...existingFragment.modulo_values,
+          ...currentAnalysis.privateKeyModulo
+        };
+        
+        const combinedKey = combinePrivateKeyFragments(updatedModuloValues);
+        
+        await supabase
+          .from('private_key_fragments')
+          .update({
+            modulo_values: updatedModuloValues,
+            combined_fragments: combinedKey,
+            completed: !!combinedKey
+          })
+          .eq('id', existingFragment.id);
+        
+        if (combinedKey && !existingFragment.combined_fragments) {
+          toast({
+            title: "Private Key Fragments Combined!",
+            description: "Multiple fragments were successfully combined into a partial private key.",
+            variant: "default"
+          });
+        }
+      } else {
+        await supabase
+          .from('private_key_fragments')
+          .insert({
+            public_key_hex: pubKeyHex,
+            modulo_values: currentAnalysis.privateKeyModulo,
+            combined_fragments: null,
+            completed: false
+          });
+      }
+    } catch (error) {
+      console.error("Error handling key fragments:", error);
+    } finally {
+      setCombiningKeys(false);
+    }
+  };
 
   const renderStatusIndicator = () => {
     switch(analysisStatus) {
@@ -273,6 +396,14 @@ const CryptographicVisualizer = ({
                           </div>
                         ))}
                       </div>
+                      
+                      {combiningKeys && (
+                        <div className="mt-2 flex items-center gap-2 text-yellow-400">
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                          <span>Checking for other key fragments...</span>
+                        </div>
+                      )}
+                      
                       <div className="mt-4 p-2 border border-dashed border-crypto-primary/30 rounded">
                         <p className="text-xs">
                           Using the Chinese Remainder Theorem, these modular values can be combined to

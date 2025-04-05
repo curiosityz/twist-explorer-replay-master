@@ -9,7 +9,119 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      [_ in never]: never
+      blockchain_transactions: {
+        Row: {
+          chain: string
+          created_at: string
+          decoded_json: Json | null
+          id: string
+          processed: boolean | null
+          raw_hex: string | null
+          txid: string
+        }
+        Insert: {
+          chain: string
+          created_at?: string
+          decoded_json?: Json | null
+          id?: string
+          processed?: boolean | null
+          raw_hex?: string | null
+          txid: string
+        }
+        Update: {
+          chain?: string
+          created_at?: string
+          decoded_json?: Json | null
+          id?: string
+          processed?: boolean | null
+          raw_hex?: string | null
+          txid?: string
+        }
+        Relationships: []
+      }
+      private_key_fragments: {
+        Row: {
+          combined_fragments: string | null
+          completed: boolean | null
+          created_at: string
+          id: string
+          modulo_values: Json
+          public_key_hex: string
+          updated_at: string
+        }
+        Insert: {
+          combined_fragments?: string | null
+          completed?: boolean | null
+          created_at?: string
+          id?: string
+          modulo_values: Json
+          public_key_hex: string
+          updated_at?: string
+        }
+        Update: {
+          combined_fragments?: string | null
+          completed?: boolean | null
+          created_at?: string
+          id?: string
+          modulo_values?: Json
+          public_key_hex?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vulnerability_analyses: {
+        Row: {
+          created_at: string
+          id: string
+          message: string | null
+          prime_factors: Json | null
+          private_key_modulo: Json | null
+          public_key: Json
+          signature: Json | null
+          status: string
+          twist_order: string | null
+          txid: string
+          updated_at: string
+          vulnerability_type: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          prime_factors?: Json | null
+          private_key_modulo?: Json | null
+          public_key: Json
+          signature?: Json | null
+          status: string
+          twist_order?: string | null
+          txid: string
+          updated_at?: string
+          vulnerability_type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message?: string | null
+          prime_factors?: Json | null
+          private_key_modulo?: Json | null
+          public_key?: Json
+          signature?: Json | null
+          status?: string
+          twist_order?: string | null
+          txid?: string
+          updated_at?: string
+          vulnerability_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vulnerability_analyses_txid_fkey"
+            columns: ["txid"]
+            isOneToOne: false
+            referencedRelation: "blockchain_transactions"
+            referencedColumns: ["txid"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never

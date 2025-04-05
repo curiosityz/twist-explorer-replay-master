@@ -80,3 +80,23 @@ export interface NodeConfiguration {
 }
 
 export type ChainType = 'BTC' | 'BCH' | 'BSV' | 'LTC' | 'Other';
+
+// Database types
+export interface DatabaseTransaction extends Transaction {
+  id: string;
+  chain: string;
+  raw_hex?: string;
+  decoded_json?: any;
+  created_at: string;
+  processed: boolean;
+}
+
+export interface PrivateKeyFragment {
+  id: string;
+  public_key_hex: string;
+  modulo_values: Record<string, string>;
+  combined_fragments?: string;
+  completed: boolean;
+  created_at: string;
+  updated_at: string;
+}
