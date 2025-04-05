@@ -1,421 +1,350 @@
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { AnalysisResult, CryptographicPoint } from '@/types';
-import { MOCK_ANALYSIS_RESULT } from '@/lib/mockVulnerabilities';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle2, AlertCircle, ArrowRight } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { CryptographicPoint, Signature, AnalysisResult } from '@/types';
+import { Progress } from '@/components/ui/progress';
+import { Loader2, Check, AlertCircle, Key, Lock, Unlock } from 'lucide-react';
 import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
-import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { Tables } from '@/integrations/supabase/client';
 
 interface CryptographicVisualizerProps {
   txid?: string;
   startAnalysis?: boolean;
 }
 
-const CryptographicVisualizer = ({ 
-  txid, 
-  startAnalysis = false 
-}: CryptographicVisualizerProps) => {
-  const [analysisStatus, setAnalysisStatus] = useState<'idle' | 'analyzing' | 'completed' | 'failed'>('idle');
-  const [result, setResult] = useState<AnalysisResult | null>(null);
+const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicVisualizerProps) => {
+  const [status, setStatus] = useState<'idle' | 'analyzing' | 'completed' | 'failed'>('idle');
   const [progress, setProgress] = useState(0);
-  const [combiningKeys, setCombiningKeys] = useState(false);
-  const { toast } = useToast();
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   useEffect(() => {
-    if (startAnalysis && txid) {
-      setAnalysisStatus('analyzing');
-      setProgress(0);
-      setResult(null);
+    // Check if we already have an analysis for this transaction
+    const fetchExistingAnalysis = async () => {
+      if (!txid) return;
       
-      const fetchExistingAnalysis = async () => {
+      try {
         const { data, error } = await supabase
-          .from('vulnerability_analyses')
+          .from(Tables.vulnerability_analyses)
           .select('*')
           .eq('txid', txid)
           .single();
           
         if (data && !error) {
-          const analysisResult: AnalysisResult = {
+          const result: AnalysisResult = {
             txid: data.txid,
             vulnerabilityType: data.vulnerability_type,
             publicKey: data.public_key as CryptographicPoint,
-            signature: data.signature,
-            twistOrder: data.twist_order,
-            primeFactors: data.prime_factors,
-            privateKeyModulo: data.private_key_modulo,
+            signature: data.signature as Signature,
+            twistOrder: data.twist_order || undefined,
+            primeFactors: data.prime_factors as string[] || undefined,
+            privateKeyModulo: data.private_key_modulo as Record<string, string> || undefined,
             status: data.status as 'pending' | 'analyzing' | 'completed' | 'failed',
-            message: data.message
+            message: data.message || undefined,
           };
           
-          setResult(analysisResult);
-          setAnalysisStatus(analysisResult.status);
-          setProgress(100);
-          
-          if (analysisResult.publicKey && analysisResult.privateKeyModulo) {
-            checkAndCombineKeyFragments(analysisResult);
-          }
-          
-          return true;
+          setAnalysisResult(result);
+          setStatus(data.status as 'analyzing' | 'completed' | 'failed');
+        } else {
+          setAnalysisResult(null);
+          setStatus('idle');
         }
-        
-        return false;
-      };
-      
-      const performNewAnalysis = async () => {
-        const interval = setInterval(() => {
-          setProgress(prev => {
-            const newProgress = prev + Math.random() * 5;
-            if (newProgress >= 100) {
-              clearInterval(interval);
-              completeAnalysis();
-              return 100;
-            }
-            return newProgress;
-          });
-        }, 200);
-        
-        return () => clearInterval(interval);
-      };
-      
-      const completeAnalysis = async () => {
-        const mockResult: AnalysisResult = { ...MOCK_ANALYSIS_RESULT };
-        mockResult.txid = txid;
-        
-        setAnalysisStatus('completed');
-        setResult(mockResult);
-        
-        await supabase.from('vulnerability_analyses').upsert({
-          txid: mockResult.txid,
-          vulnerability_type: mockResult.vulnerabilityType,
-          public_key: mockResult.publicKey,
-          signature: mockResult.signature,
-          twist_order: mockResult.twistOrder,
-          prime_factors: mockResult.primeFactors,
-          private_key_modulo: mockResult.privateKeyModulo,
-          status: mockResult.status,
-          message: mockResult.message
-        }, { onConflict: 'txid' });
-        
-        if (mockResult.publicKey && mockResult.privateKeyModulo) {
-          checkAndCombineKeyFragments(mockResult);
-        }
-      };
-      
-      fetchExistingAnalysis().then(exists => {
-        if (!exists) {
-          performNewAnalysis();
-        }
-      });
-    }
-  }, [startAnalysis, txid]);
+      } catch (error) {
+        console.error('Error fetching analysis:', error);
+        setAnalysisResult(null);
+        setStatus('idle');
+      }
+    };
+    
+    fetchExistingAnalysis();
+  }, [txid]);
   
-  const checkAndCombineKeyFragments = async (currentAnalysis: AnalysisResult) => {
-    if (!currentAnalysis.publicKey || !currentAnalysis.privateKeyModulo) return;
-    
-    setCombiningKeys(true);
-    
-    const pubKeyHex = `${currentAnalysis.publicKey.x}${currentAnalysis.publicKey.y}`;
-    
-    try {
-      const { data: existingFragment } = await supabase
-        .from('private_key_fragments')
-        .select('*')
-        .eq('public_key_hex', pubKeyHex)
-        .single();
+  useEffect(() => {
+    // Start analysis if requested
+    const runAnalysis = async () => {
+      if (!txid || !startAnalysis || status !== 'idle') return;
       
-      if (existingFragment) {
-        const updatedModuloValues = {
-          ...existingFragment.modulo_values,
-          ...currentAnalysis.privateKeyModulo
+      try {
+        setStatus('analyzing');
+        setProgress(0);
+        
+        // Create mock analysis result
+        const mockResult: AnalysisResult = {
+          txid: txid,
+          vulnerabilityType: 'twisted_curve',
+          publicKey: {
+            x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
+            y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6',
+            isOnCurve: false
+          },
+          signature: {
+            r: '0x123abc',
+            s: '0x456def',
+            sighash: '0x789fed'
+          },
+          status: 'completed',
+          message: 'Vulnerability identified: Public key not on secp256k1 curve.',
+          twistOrder: '0x6f8a80d37d1f8161d5385fda1672e4bfbb7276ea83c9b330b8c216e94dbdca83',
+          primeFactors: ['0x101', '0x103', '0x107', '0x10d'],
+          privateKeyModulo: {
+            '0x101': '0x45',
+            '0x103': '0x67',
+            '0x107': '0x89',
+            '0x10d': '0xab'
+          }
         };
         
-        const combinedKey = combinePrivateKeyFragments(updatedModuloValues);
+        // Save analysis to database
+        const { error } = await supabase
+          .from(Tables.vulnerability_analyses)
+          .upsert({
+            txid: mockResult.txid,
+            vulnerability_type: mockResult.vulnerabilityType,
+            public_key: mockResult.publicKey,
+            signature: mockResult.signature,
+            twist_order: mockResult.twistOrder,
+            prime_factors: mockResult.primeFactors,
+            private_key_modulo: mockResult.privateKeyModulo,
+            status: mockResult.status,
+            message: mockResult.message
+          }, { onConflict: 'txid' });
+          
+        if (error) {
+          console.error('Error saving analysis:', error);
+          setStatus('failed');
+          return;
+        }
         
-        await supabase
-          .from('private_key_fragments')
+        // Simulate progress
+        const interval = setInterval(() => {
+          setProgress(prev => {
+            if (prev >= 100) {
+              clearInterval(interval);
+              return 100;
+            }
+            return prev + 10;
+          });
+        }, 300);
+        
+        // Check if we have existing private key fragments for this public key
+        await checkAndCombineKeyFragments(mockResult.publicKey, mockResult.privateKeyModulo);
+        
+        setAnalysisResult(mockResult);
+        setStatus('completed');
+      } catch (error) {
+        console.error('Error during analysis:', error);
+        setStatus('failed');
+      }
+    };
+    
+    runAnalysis();
+  }, [txid, startAnalysis, status]);
+  
+  // Function to check for and combine key fragments
+  const checkAndCombineKeyFragments = async (
+    publicKey: CryptographicPoint, 
+    newFragments: Record<string, string> | undefined
+  ) => {
+    if (!newFragments) return;
+    
+    const publicKeyHex = publicKey.x + publicKey.y;
+    
+    try {
+      // Check for existing fragments
+      const { data: existingData, error: fetchError } = await supabase
+        .from(Tables.private_key_fragments)
+        .select('*')
+        .eq('public_key_hex', publicKeyHex)
+        .single();
+        
+      let allFragments = { ...newFragments };
+      
+      if (existingData && !fetchError) {
+        // Combine with existing fragments
+        allFragments = { 
+          ...existingData.modulo_values as Record<string, string>, 
+          ...newFragments 
+        };
+        
+        // Try to combine all fragments
+        const combinedKey = combinePrivateKeyFragments(allFragments);
+        
+        // Update with new combined key
+        const { data, error } = await supabase
+          .from(Tables.private_key_fragments)
           .update({
-            modulo_values: updatedModuloValues,
+            modulo_values: allFragments,
             combined_fragments: combinedKey,
             completed: !!combinedKey
           })
-          .eq('id', existingFragment.id);
-        
-        if (combinedKey && !existingFragment.combined_fragments) {
-          toast({
-            title: "Private Key Fragments Combined!",
-            description: "Multiple fragments were successfully combined into a partial private key.",
-            variant: "default"
-          });
+          .eq('id', existingData.id);
+          
+        if (error) {
+          console.error('Error updating key fragments:', error);
+        } else if (combinedKey) {
+          console.log('Private key recovered!', combinedKey);
         }
       } else {
-        await supabase
-          .from('private_key_fragments')
+        // Create new fragment record
+        const { error } = await supabase
+          .from(Tables.private_key_fragments)
           .insert({
-            public_key_hex: pubKeyHex,
-            modulo_values: currentAnalysis.privateKeyModulo,
+            public_key_hex: publicKeyHex,
+            modulo_values: newFragments,
             combined_fragments: null,
             completed: false
           });
+          
+        if (error) {
+          console.error('Error saving new key fragments:', error);
+        }
       }
     } catch (error) {
-      console.error("Error handling key fragments:", error);
-    } finally {
-      setCombiningKeys(false);
+      console.error('Error processing key fragments:', error);
     }
   };
 
-  const renderStatusIndicator = () => {
-    switch(analysisStatus) {
-      case 'analyzing':
-        return (
-          <div className="flex items-center space-x-2 text-yellow-400">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>Analysis in progress... ({Math.floor(progress)}%)</span>
+  if (!txid) {
+    return (
+      <Card className="h-full bg-crypto-muted border-crypto-border">
+        <CardHeader>
+          <CardTitle className="text-crypto-foreground">Cryptographic Analyzer</CardTitle>
+          <CardDescription className="text-crypto-foreground/70">
+            Select a transaction to analyze for vulnerabilities
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[400px]">
+          <div className="text-center text-crypto-foreground/50">
+            <Lock className="mx-auto h-12 w-12 mb-4" />
+            <p>No transaction selected</p>
+            <p className="text-xs mt-2">Select a transaction to begin analysis</p>
           </div>
-        );
-      case 'completed':
-        return (
-          <div className="flex items-center space-x-2 text-green-400">
-            <CheckCircle2 className="h-4 w-4" />
-            <span>Analysis complete</span>
-          </div>
-        );
-      case 'failed':
-        return (
-          <div className="flex items-center space-x-2 text-red-400">
-            <AlertCircle className="h-4 w-4" />
-            <span>Analysis failed</span>
-          </div>
-        );
-      default:
-        return (
-          <div className="text-crypto-foreground/60">
-            Start transaction analysis to see results
-          </div>
-        );
-    }
-  };
-
-  const MatrixBackground = () => (
-    <div className="absolute inset-0 overflow-hidden opacity-10 pointer-events-none z-0">
-      <div className="grid-matrix w-full h-full"></div>
-      {Array.from({ length: 15 }).map((_, i) => (
-        <div 
-          key={i} 
-          className="absolute text-crypto-primary font-mono text-xs top-0 whitespace-nowrap animate-matrix-fall"
-          style={{ 
-            left: `${Math.random() * 100}%`, 
-            animationDuration: `${10 + Math.random() * 20}s`,
-            animationDelay: `${Math.random() * 5}s`
-          }}
-        >
-          {Array.from({ length: 20 }).map(() => 
-            String.fromCharCode(0x30A0 + Math.random() * 96)
-          ).join('')}
-        </div>
-      ))}
-    </div>
-  );
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
-    <Card className="bg-crypto-muted border-crypto-border h-full overflow-hidden">
+    <Card className="h-full bg-crypto-muted border-crypto-border overflow-auto">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-crypto-foreground">Vulnerability Analysis</CardTitle>
-          <Badge variant="outline" className="bg-crypto-background border-crypto-border">
-            {result?.vulnerabilityType || 'No Analysis'}
+          <Badge 
+            variant={status === 'idle' ? "outline" : 
+                   status === 'analyzing' ? "secondary" : 
+                   status === 'completed' ? "default" : 
+                   "destructive"}
+            className="font-mono text-xs"
+          >
+            {status === 'idle' ? 'Ready' : 
+             status === 'analyzing' ? 'Analyzing' : 
+             status === 'completed' ? 'Vulnerable' : 
+             'Failed'}
           </Badge>
         </div>
-        <CardDescription className="text-crypto-foreground/70">
-          {renderStatusIndicator()}
+        <CardDescription className="text-crypto-foreground/70 font-mono text-xs">
+          TXID: {txid.substring(0, 10)}...{txid.substring(txid.length - 10)}
         </CardDescription>
       </CardHeader>
-      <CardContent className="relative p-0">
-        <MatrixBackground />
-
-        {analysisStatus === 'idle' && (
-          <div className="flex flex-col items-center justify-center p-8 h-[350px]">
-            <div className="text-crypto-foreground/40 text-center space-y-2">
-              <div className="border-2 border-dashed border-crypto-foreground/20 rounded-lg h-32 w-32 flex items-center justify-center mb-4">
-                <span className="text-5xl">⚡</span>
-              </div>
-              <p>Select a transaction and start analysis</p>
-              <p className="text-xs">The tool will extract cryptographic data and check for vulnerabilities</p>
+      
+      <CardContent className="space-y-6 pb-6">
+        {status === 'analyzing' && (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Loader2 className="h-4 w-4 animate-spin text-crypto-primary" />
+              <span className="text-sm">Analyzing transaction...</span>
             </div>
+            <Progress value={progress} className="h-1.5" />
           </div>
         )}
-
-        {analysisStatus === 'analyzing' && (
-          <div className="p-6 space-y-6">
-            <div className="relative h-2 bg-crypto-background rounded-full overflow-hidden">
-              <div 
-                className="absolute top-0 left-0 h-full bg-gradient-to-r from-crypto-primary to-crypto-accent"
-                style={{ width: `${progress}%`, transition: 'width 0.3s ease-in-out' }}
-              ></div>
+        
+        {status === 'failed' && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-md p-4 text-red-500">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-5 w-5" />
+              <span className="font-medium">Analysis failed</span>
             </div>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-crypto-background p-4 rounded border border-crypto-border">
-                <h4 className="text-xs font-medium text-crypto-primary mb-2">Extracting Public Key</h4>
-                <div className="space-y-1 text-xs font-mono">
-                  {progress > 10 && <div>Decoding transaction...</div>}
-                  {progress > 25 && <div>Extracting input scripts...</div>}
-                  {progress > 40 && <div>Found public key candidate...</div>}
-                  {progress > 50 && <div>Verifying curve point...</div>}
-                </div>
-              </div>
-              
-              <div className="bg-crypto-background p-4 rounded border border-crypto-border">
-                <h4 className="text-xs font-medium text-crypto-primary mb-2">Signature Analysis</h4>
-                <div className="space-y-1 text-xs font-mono">
-                  {progress > 30 && <div>Extracting DER signature...</div>}
-                  {progress > 55 && <div>Parsing r,s values...</div>}
-                  {progress > 70 && <div>Computing message hash...</div>}
-                  {progress > 85 && <div>Verifying signature...</div>}
-                </div>
+            <p className="mt-2 text-sm">Could not complete vulnerability analysis. Please try again or select a different transaction.</p>
+          </div>
+        )}
+        
+        {status === 'completed' && analysisResult && (
+          <div className="space-y-6">
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-4">
+              <h3 className="flex items-center text-amber-400 font-medium mb-2">
+                <AlertCircle className="mr-2 h-5 w-5" />
+                Vulnerability Detected
+              </h3>
+              <p className="text-sm text-crypto-foreground/90">
+                {analysisResult.message}
+              </p>
+              <div className="mt-2">
+                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 font-mono text-xs">
+                  {analysisResult.vulnerabilityType}
+                </Badge>
               </div>
             </div>
             
-            {progress > 60 && (
-              <div className="bg-crypto-background p-4 rounded border border-crypto-border">
-                <h4 className="text-xs font-medium text-crypto-primary mb-2">Vulnerability Detection</h4>
-                <div className="space-y-1 text-xs font-mono">
-                  {progress > 65 && <div>Point is NOT on secp256k1 curve...</div>}
-                  {progress > 75 && <div>Computing twist parameters...</div>}
-                  {progress > 85 && <div>Finding order of twisted curve...</div>}
-                  {progress > 95 && <div>Factoring order into primes...</div>}
+            <div>
+              <h3 className="text-sm font-medium mb-2 text-crypto-foreground flex items-center">
+                <Key className="mr-2 h-4 w-4" />
+                Public Key (Not on Curve)
+              </h3>
+              <div className="bg-crypto-background rounded-md p-2 font-mono text-xs space-y-1 break-all">
+                <div>
+                  <span className="text-crypto-accent">x: </span>
+                  <span>{analysisResult.publicKey.x}</span>
+                </div>
+                <div>
+                  <span className="text-crypto-accent">y: </span>
+                  <span>{analysisResult.publicKey.y}</span>
+                </div>
+              </div>
+            </div>
+            
+            {analysisResult.primeFactors && analysisResult.primeFactors.length > 0 && (
+              <div>
+                <h3 className="text-sm font-medium mb-2 text-crypto-foreground">
+                  Twist Order Prime Factors
+                </h3>
+                <div className="grid grid-cols-2 gap-1 font-mono text-xs">
+                  {analysisResult.primeFactors.map((factor, index) => (
+                    <div key={index} className="bg-crypto-background rounded p-2">
+                      {factor}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {analysisResult.privateKeyModulo && (
+              <div>
+                <h3 className="text-sm font-medium mb-2 text-crypto-foreground flex items-center">
+                  <Unlock className="mr-2 h-4 w-4" />
+                  Private Key Fragments
+                </h3>
+                <div className="bg-crypto-background rounded-md p-3 font-mono text-xs">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-crypto-border text-crypto-foreground/60">
+                        <th className="pb-2 text-left">Modulus</th>
+                        <th className="pb-2 text-left">Remainder</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(analysisResult.privateKeyModulo).map(([mod, remainder], index) => (
+                        <tr key={index} className="border-b border-crypto-border/20 last:border-0">
+                          <td className="py-2 pr-4">{mod}</td>
+                          <td className="py-2">{remainder}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
           </div>
-        )}
-
-        {analysisStatus === 'completed' && result && (
-          <Tabs defaultValue="summary" className="w-full">
-            <div className="px-6 pt-2">
-              <TabsList className="bg-crypto-background w-full">
-                <TabsTrigger value="summary" className="flex-1 data-[state=active]:bg-crypto-primary/20">Summary</TabsTrigger>
-                <TabsTrigger value="pubkey" className="flex-1 data-[state=active]:bg-crypto-primary/20">Public Key</TabsTrigger>
-                <TabsTrigger value="signature" className="flex-1 data-[state=active]:bg-crypto-primary/20">Signature</TabsTrigger>
-                <TabsTrigger value="privatekey" className="flex-1 data-[state=active]:bg-crypto-primary/20">Private Key</TabsTrigger>
-              </TabsList>
-            </div>
-            
-            <div className="p-6 max-h-[300px] overflow-auto terminal-text text-xs">
-              <TabsContent value="summary" className="mt-0 space-y-4">
-                <div className="bg-crypto-background p-4 rounded border border-crypto-border">
-                  <h4 className="font-medium text-crypto-primary mb-2">Vulnerability Analysis</h4>
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-                    <div className="text-crypto-foreground/70">Vulnerability:</div>
-                    <div>{result.vulnerabilityType}</div>
-                    <div className="text-crypto-foreground/70">Status:</div>
-                    <div className="text-green-400">{result.status}</div>
-                    <div className="text-crypto-foreground/70">Transaction:</div>
-                    <div className="break-all">{result.txid}</div>
-                  </div>
-                  <div className="mt-2 pt-2 border-t border-crypto-border">
-                    <div className="text-crypto-foreground/70">Summary:</div>
-                    <p className="mt-1">{result.message}</p>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="pubkey" className="mt-0 space-y-4">
-                <div className="bg-crypto-background p-4 rounded border border-crypto-border">
-                  <h4 className="font-medium text-crypto-primary mb-2">Public Key Analysis</h4>
-                  <div className="grid grid-cols-1 gap-y-1">
-                    <div className="text-crypto-foreground/70">Is On Curve:</div>
-                    <div className={result.publicKey.isOnCurve ? "text-green-400" : "text-red-400"}>
-                      {result.publicKey.isOnCurve ? "Yes (secp256k1)" : "No (not on secp256k1)"}
-                    </div>
-                    <div className="text-crypto-foreground/70 mt-2">X Coordinate:</div>
-                    <div className="break-all bg-crypto-muted p-1 rounded">
-                      {result.publicKey.x}
-                    </div>
-                    <div className="text-crypto-foreground/70 mt-2">Y Coordinate:</div>
-                    <div className="break-all bg-crypto-muted p-1 rounded">
-                      {result.publicKey.y}
-                    </div>
-                    <div className="text-crypto-foreground/70 mt-2">Twist Order:</div>
-                    <div className="break-all bg-crypto-muted p-1 rounded">
-                      {result.twistOrder}
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="signature" className="mt-0 space-y-4">
-                {result.signature && (
-                  <div className="bg-crypto-background p-4 rounded border border-crypto-border">
-                    <h4 className="font-medium text-crypto-primary mb-2">ECDSA Signature Components</h4>
-                    <div className="grid grid-cols-1 gap-y-1">
-                      <div className="text-crypto-foreground/70">r value:</div>
-                      <div className="break-all bg-crypto-muted p-1 rounded">
-                        {result.signature.r}
-                      </div>
-                      <div className="text-crypto-foreground/70 mt-2">s value:</div>
-                      <div className="break-all bg-crypto-muted p-1 rounded">
-                        {result.signature.s}
-                      </div>
-                      <div className="text-crypto-foreground/70 mt-2">Message Hash (sighash):</div>
-                      <div className="break-all bg-crypto-muted p-1 rounded">
-                        {result.signature.sighash}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </TabsContent>
-              
-              <TabsContent value="privatekey" className="mt-0 space-y-4">
-                <div className="bg-crypto-background p-4 rounded border border-crypto-border">
-                  <h4 className="font-medium text-crypto-primary mb-2">Private Key Recovery (Partial)</h4>
-                  
-                  {result.primeFactors && (
-                    <div className="mb-4">
-                      <div className="text-crypto-foreground/70 mb-1">Prime Factors of Twist Order:</div>
-                      <div className="flex flex-wrap gap-2">
-                        {result.primeFactors.map((factor, idx) => (
-                          <Badge key={idx} variant="outline" className="bg-crypto-muted">
-                            {factor}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {result.privateKeyModulo && (
-                    <div>
-                      <div className="text-crypto-foreground/70 mb-1">Private Key Modulo Small Primes:</div>
-                      <div className="space-y-2">
-                        {Object.entries(result.privateKeyModulo).map(([prime, value], idx) => (
-                          <div key={idx} className="flex items-center gap-2 bg-crypto-muted p-1 rounded">
-                            <span>d ≡ {value} (mod {prime})</span>
-                          </div>
-                        ))}
-                      </div>
-                      
-                      {combiningKeys && (
-                        <div className="mt-2 flex items-center gap-2 text-yellow-400">
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                          <span>Checking for other key fragments...</span>
-                        </div>
-                      )}
-                      
-                      <div className="mt-4 p-2 border border-dashed border-crypto-primary/30 rounded">
-                        <p className="text-xs">
-                          Using the Chinese Remainder Theorem, these modular values can be combined to
-                          partially recover the private key, allowing spending of funds from vulnerable addresses.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-            </div>
-          </Tabs>
         )}
       </CardContent>
     </Card>

@@ -27,35 +27,55 @@ const Index = () => {
   };
 
   const handleFetchTransaction = async (txid: string) => {
+    if (!txid) {
+      toast({
+        title: "Invalid Transaction ID",
+        description: "Please provide a valid transaction ID",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setStartAnalysis(false);
     
-    // First check if the transaction exists in our database
-    const { data, error } = await supabase
-      .from('blockchain_transactions')
-      .select('*')
-      .eq('txid', txid)
-      .single();
-    
-    if (data && !error) {
-      // Use the transaction from database
-      setTransaction(data.decoded_json || SAMPLE_TRANSACTION);
-      setAnalyzingTxid(txid);
+    try {
+      // First check if the transaction exists in our database
+      const { data, error } = await supabase
+        .from('blockchain_transactions')
+        .select('*')
+        .eq('txid', txid)
+        .single();
+      
+      if (data && !error) {
+        // Use the transaction from database
+        setTransaction(data.decoded_json || SAMPLE_TRANSACTION);
+        setAnalyzingTxid(txid);
+        toast({
+          title: "Transaction Fetched",
+          description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded from database`,
+        });
+      } else {
+        // Fall back to mock data
+        setTransaction(SAMPLE_TRANSACTION);
+        setAnalyzingTxid(txid);
+        toast({
+          title: "Transaction Fetched",
+          description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded`,
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching transaction:", error);
       toast({
-        title: "Transaction Fetched",
-        description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded from database`,
-      });
-    } else {
-      // Fall back to mock data
-      setTransaction(SAMPLE_TRANSACTION);
-      setAnalyzingTxid(txid);
-      toast({
-        title: "Transaction Fetched",
-        description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded`,
+        title: "Error Fetching Transaction",
+        description: "Could not fetch the transaction. Please try again.",
+        variant: "destructive"
       });
     }
   };
 
   const handleAnalyzeTransaction = (txid: string) => {
+    if (!txid) return;
+    
     setAnalyzingTxid(txid);
     setStartAnalysis(true);
     toast({

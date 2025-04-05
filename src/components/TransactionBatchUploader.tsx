@@ -18,6 +18,7 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
   const [progress, setProgress] = useState(0);
   const [processedCount, setProcessedCount] = useState(0);
   const [totalCount, setTotalCount] = useState(0);
+  const [errorCount, setErrorCount] = useState(0);
   const { toast } = useToast();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,16 +26,24 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
     setFile(selectedFile);
   };
 
+  const isValidTransaction = (tx: any): boolean => {
+    return tx && typeof tx === 'object' && tx.txid && typeof tx.txid === 'string';
+  };
+
   const processTransactions = async (transactions: any[]) => {
     setTotalCount(transactions.length);
     setProcessedCount(0);
+    setErrorCount(0);
     
-    for (let i = 0; i < transactions.length; i++) {
-      const tx = transactions[i];
+    let validTransactions = transactions.filter(isValidTransaction);
+    let successCount = 0;
+    
+    for (let i = 0; i < validTransactions.length; i++) {
+      const tx = validTransactions[i];
       
       try {
         // Store transaction in database
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('blockchain_transactions')
           .upsert({
             txid: tx.txid,
@@ -45,23 +54,28 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
 
         if (error) {
           console.error('Error storing transaction:', error);
+          setErrorCount(prev => prev + 1);
         } else {
+          successCount++;
           setProcessedCount(prev => prev + 1);
-          setProgress(Math.round(((i + 1) / transactions.length) * 100));
         }
       } catch (error) {
         console.error('Error processing transaction:', error);
+        setErrorCount(prev => prev + 1);
+      } finally {
+        setProgress(Math.round(((i + 1) / validTransactions.length) * 100));
       }
     }
 
-    // Select the first transaction for viewing
-    if (transactions.length > 0) {
-      onTransactionSelected(transactions[0].txid);
+    // Select the first valid transaction for viewing
+    if (validTransactions.length > 0) {
+      onTransactionSelected(validTransactions[0].txid);
     }
     
     toast({
       title: "Batch Processing Complete",
-      description: `Successfully processed ${processedCount} of ${totalCount} transactions.`,
+      description: `Successfully processed ${successCount} of ${transactions.length} transactions. ${transactions.length - validTransactions.length} skipped due to missing TXID.`,
+      variant: successCount === 0 ? "destructive" : "default",
     });
     
     setIsUploading(false);
@@ -72,13 +86,14 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
     
     setIsUploading(true);
     setProgress(0);
+    setErrorCount(0);
     
     try {
       const reader = new FileReader();
       
       reader.onload = async (e) => {
         const content = e.target?.result as string;
-        let transactions: Transaction[] = [];
+        let transactions: any[] = [];
         
         try {
           // Try to parse as JSON
@@ -99,8 +114,20 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
           // If not valid JSON, try parsing as newline-delimited JSON
           try {
             const lines = content.split('\n').filter(line => line.trim());
-            transactions = lines.map(line => JSON.parse(line));
-            await processTransactions(transactions);
+            const parsedLines = lines.map(line => {
+              try {
+                return JSON.parse(line);
+              } catch (e) {
+                return null;
+              }
+            }).filter(Boolean);
+            
+            if (parsedLines.length > 0) {
+              transactions = parsedLines;
+              await processTransactions(transactions);
+            } else {
+              throw new Error("No valid JSON found");
+            }
           } catch (error) {
             toast({
               title: "Error Processing File",
@@ -183,6 +210,13 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
           <div className="flex items-center gap-2 text-green-400">
             <CheckCircle className="h-4 w-4" />
             <span>Successfully processed {processedCount} transactions</span>
+          </div>
+        )}
+        
+        {errorCount > 0 && !isUploading && (
+          <div className="flex items-center gap-2 text-amber-400">
+            <AlertCircle className="h-4 w-4" />
+            <span>{errorCount} transactions had errors</span>
           </div>
         )}
       </CardContent>
