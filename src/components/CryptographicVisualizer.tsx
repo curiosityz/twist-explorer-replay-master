@@ -6,8 +6,7 @@ import { CryptographicPoint, Signature, AnalysisResult } from '@/types';
 import { Progress } from '@/components/ui/progress';
 import { Loader2, Check, AlertCircle, Key, Lock, Unlock } from 'lucide-react';
 import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
-import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/client';
+import { supabase, Tables } from '@/integrations/supabase/client';
 
 interface CryptographicVisualizerProps {
   txid?: string;
@@ -191,7 +190,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           .from(Tables.private_key_fragments)
           .insert({
             public_key_hex: publicKeyHex,
-            modulo_values: newFragments,
+            modulo_values: allFragments,
             combined_fragments: null,
             completed: false
           });

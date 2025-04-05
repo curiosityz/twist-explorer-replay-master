@@ -9,7 +9,10 @@ import CryptographicVisualizer from '@/components/CryptographicVisualizer';
 import TransactionBatchUploader from '@/components/TransactionBatchUploader';
 import { SAMPLE_TRANSACTION } from '@/lib/mockVulnerabilities';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, Tables } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
+import { Database } from '@/lib/database';
 
 const Index = () => {
   const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
@@ -41,14 +44,15 @@ const Index = () => {
     try {
       // First check if the transaction exists in our database
       const { data, error } = await supabase
-        .from('blockchain_transactions')
+        .from(Tables.blockchain_transactions)
         .select('*')
         .eq('txid', txid)
         .single();
       
       if (data && !error) {
         // Use the transaction from database
-        setTransaction(data.decoded_json || SAMPLE_TRANSACTION);
+        const txData = data.decoded_json as Transaction;
+        setTransaction(txData || SAMPLE_TRANSACTION);
         setAnalyzingTxid(txid);
         toast({
           title: "Transaction Fetched",
@@ -87,12 +91,28 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-crypto-background text-crypto-foreground p-6">
       <header className="mb-8">
-        <h1 className="text-3xl font-bold bg-gradient-to-r from-crypto-primary to-crypto-accent bg-clip-text text-transparent">
-          Twisted Curve Explorer
-        </h1>
-        <p className="text-crypto-foreground/70 mt-2">
-          Analyze and exploit cryptographic vulnerabilities in blockchain transactions
-        </p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-crypto-primary to-crypto-accent bg-clip-text text-transparent">
+              Twisted Curve Explorer
+            </h1>
+            <p className="text-crypto-foreground/70 mt-2">
+              Analyze and exploit cryptographic vulnerabilities in blockchain transactions
+            </p>
+          </div>
+          <div>
+            <Button asChild variant="outline" className="mr-2">
+              <Link to="/transactions">
+                Transaction Dashboard
+              </Link>
+            </Button>
+            <Button asChild variant="outline">
+              <Link to="/keys">
+                Recovered Keys
+              </Link>
+            </Button>
+          </div>
+        </div>
       </header>
       
       <div className="grid grid-cols-12 gap-6">

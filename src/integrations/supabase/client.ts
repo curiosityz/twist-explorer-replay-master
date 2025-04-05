@@ -11,9 +11,11 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
-// Create type-safe helpers for each table
+// Create type-safe table references
 export const Tables = {
   blockchain_transactions: 'blockchain_transactions',
   vulnerability_analyses: 'vulnerability_analyses',
   private_key_fragments: 'private_key_fragments'
-};
+} as const;
+
+export type TableNames = keyof typeof Tables;
