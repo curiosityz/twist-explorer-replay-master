@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { NodeConfiguration, Transaction } from '@/types';
@@ -50,8 +49,8 @@ const Index = () => {
         .single();
       
       if (data && !error) {
-        // Use the transaction from database
-        const txData = data.decoded_json as Transaction;
+        // Use the transaction from database - proper type casting
+        const txData = data.decoded_json as unknown as Transaction;
         setTransaction(txData || SAMPLE_TRANSACTION);
         setAnalyzingTxid(txid);
         toast({

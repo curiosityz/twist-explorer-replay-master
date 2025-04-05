@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock, Check, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { CryptographicPoint, Signature } from '@/types';
 
@@ -53,7 +53,9 @@ const TransactionDetail = () => {
           
           // If we have a public key, check for key fragments
           if (analysisData?.public_key) {
-            const publicKeyHex = analysisData.public_key.x + analysisData.public_key.y;
+            // Safe access with type checking
+            const publicKey = analysisData.public_key as unknown as CryptographicPoint;
+            const publicKeyHex = publicKey.x + publicKey.y;
             
             const { data: keyData, error: keyError } = await supabase
               .from(Tables.private_key_fragments)
@@ -204,11 +206,11 @@ const TransactionDetail = () => {
                         <div className="bg-crypto-background rounded-md p-4 font-mono text-xs space-y-2">
                           <div>
                             <span className="text-crypto-accent">x: </span>
-                            <span>{analysis.public_key.x}</span>
+                            <span>{(analysis.public_key as unknown as CryptographicPoint).x}</span>
                           </div>
                           <div>
                             <span className="text-crypto-accent">y: </span>
-                            <span>{analysis.public_key.y}</span>
+                            <span>{(analysis.public_key as unknown as CryptographicPoint).y}</span>
                           </div>
                         </div>
                       </div>
@@ -218,7 +220,7 @@ const TransactionDetail = () => {
                       <div className="mb-6">
                         <h3 className="text-sm font-medium mb-2">Twist Order Prime Factors</h3>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-xs">
-                          {analysis.prime_factors.map((factor: string, index: number) => (
+                          {(analysis.prime_factors as string[]).map((factor: string, index: number) => (
                             <div key={index} className="bg-crypto-background rounded p-2">
                               {factor}
                             </div>
@@ -242,7 +244,7 @@ const TransactionDetail = () => {
                               </tr>
                             </thead>
                             <tbody>
-                              {Object.entries(analysis.private_key_modulo).map(([mod, remainder], index) => (
+                              {Object.entries(analysis.private_key_modulo as Record<string, string>).map(([mod, remainder], index) => (
                                 <tr key={index} className="border-b border-crypto-border/20 last:border-0">
                                   <td className="py-2 pr-4">{mod}</td>
                                   <td className="py-2">{remainder as string}</td>

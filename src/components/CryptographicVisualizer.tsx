@@ -31,14 +31,20 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           .single();
           
         if (data && !error) {
+          // Type casting to ensure we convert the JSON data to proper types
+          const publicKey = data.public_key as unknown as CryptographicPoint;
+          const signature = data.signature as unknown as Signature | undefined;
+          const primeFactors = Array.isArray(data.prime_factors) ? data.prime_factors as string[] : undefined;
+          const privateKeyModulo = data.private_key_modulo as Record<string, string> | undefined;
+          
           const result: AnalysisResult = {
             txid: data.txid,
             vulnerabilityType: data.vulnerability_type,
-            publicKey: data.public_key as CryptographicPoint,
-            signature: data.signature as Signature,
+            publicKey: publicKey,
+            signature: signature,
             twistOrder: data.twist_order || undefined,
-            primeFactors: data.prime_factors as string[] || undefined,
-            privateKeyModulo: data.private_key_modulo as Record<string, string> || undefined,
+            primeFactors: primeFactors,
+            privateKeyModulo: privateKeyModulo,
             status: data.status as 'pending' | 'analyzing' | 'completed' | 'failed',
             message: data.message || undefined,
           };
@@ -69,19 +75,23 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         setProgress(0);
         
         // Create mock analysis result
+        const mockPublicKey: CryptographicPoint = {
+          x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
+          y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6',
+          isOnCurve: false
+        };
+        
+        const mockSignature: Signature = {
+          r: '0x123abc',
+          s: '0x456def',
+          sighash: '0x789fed'
+        };
+        
         const mockResult: AnalysisResult = {
           txid: txid,
           vulnerabilityType: 'twisted_curve',
-          publicKey: {
-            x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
-            y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6',
-            isOnCurve: false
-          },
-          signature: {
-            r: '0x123abc',
-            s: '0x456def',
-            sighash: '0x789fed'
-          },
+          publicKey: mockPublicKey,
+          signature: mockSignature,
           status: 'completed',
           message: 'Vulnerability identified: Public key not on secp256k1 curve.',
           twistOrder: '0x6f8a80d37d1f8161d5385fda1672e4bfbb7276ea83c9b330b8c216e94dbdca83',
@@ -94,7 +104,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           }
         };
         
-        // Save analysis to database
+        // Save analysis to database - use upsert with proper types
         const { error } = await supabase
           .from(Tables.vulnerability_analyses)
           .upsert({
@@ -107,7 +117,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             private_key_modulo: mockResult.privateKeyModulo,
             status: mockResult.status,
             message: mockResult.message
-          }, { onConflict: 'txid' });
+          });
           
         if (error) {
           console.error('Error saving analysis:', error);
