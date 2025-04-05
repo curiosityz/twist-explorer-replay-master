@@ -1,108 +1,87 @@
 
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Key, PlusCircle, Wallet, Download, Trash2 } from 'lucide-react';
-import WalletInterface from '@/components/WalletInterface';
-import ConnectionPanel from '@/components/ConnectionPanel';
+import { Link } from 'react-router-dom';
 import KeyManagementPanel from '@/components/KeyManagementPanel';
-import { NodeConfiguration, PrivateKeyFragment } from '@/types';
-import { chainstackService } from '@/services/chainstackService';
-import { toast } from 'sonner';
-import { supabase, Tables } from '@/integrations/supabase/client';
+import WalletInterface from '@/components/WalletInterface';
+import WalletKeyImport from '@/components/WalletKeyImport';
+import { ArrowLeft } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const WalletPage = () => {
-  const [isConnected, setIsConnected] = useState(false);
-  const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
-  const [showKeyManagement, setShowKeyManagement] = useState(false);
-  const [keyCount, setKeyCount] = useState<number>(0);
-  const [completedKeyCount, setCompletedKeyCount] = useState<number>(0);
-
-  useEffect(() => {
-    // Fetch key count on component mount
-    fetchKeyCount();
-  }, []);
-
-  const fetchKeyCount = async () => {
-    try {
-      const { data: keyData, error } = await supabase
-        .from(Tables.private_key_fragments)
-        .select('*');
-      
-      if (error) {
-        console.error('Error fetching keys:', error);
-        return;
-      }
-
-      setKeyCount(keyData?.length || 0);
-      setCompletedKeyCount(keyData?.filter(key => key.completed).length || 0);
-    } catch (error) {
-      console.error('Failed to fetch key count:', error);
-    }
+  const [showImport, setShowImport] = useState(false);
+  const [importedKey, setImportedKey] = useState<string | null>(null);
+  
+  const handleImportKey = (key: string) => {
+    setImportedKey(key);
+    setShowImport(false);
   };
-
-  const handleConnect = (config: NodeConfiguration) => {
-    try {
-      // Initialize ChainStack service with the provided configuration
-      const chainstack = chainstackService.initializeWithConfig({
-        rpcUrl: config.rpcUrl,
-        apiKey: config.apiKey || '' // Ensure API key is never undefined
-      });
-      
-      setNodeConfig(config);
-      setIsConnected(true);
-      toast.success(`Connected to ${config.name} successfully`);
-    } catch (error) {
-      console.error('Failed to connect to node:', error);
-      toast.error('Failed to connect to blockchain node');
-    }
-  };
-
+  
   return (
-    <div className="min-h-screen bg-crypto-background text-crypto-foreground p-6">
-      <header className="mb-8">
-        <div className="flex items-center mb-4">
-          <Button variant="outline" size="sm" asChild className="mr-2">
-            <Link to="/">
-              <ArrowLeft className="h-4 w-4 mr-1" />
-              Back
-            </Link>
-          </Button>
-          <h1 className="text-2xl font-bold flex items-center">
-            <Wallet className="h-6 w-6 mr-2" />
-            Crypto Wallet
-          </h1>
-          
-          {isConnected && (
-            <Button 
-              variant={showKeyManagement ? "secondary" : "outline"} 
-              size="sm" 
-              className="ml-auto"
-              onClick={() => setShowKeyManagement(!showKeyManagement)}
-            >
-              <Key className="h-4 w-4 mr-1" />
-              {showKeyManagement ? "Hide Key Manager" : "Available Private Keys"} 
-              {!showKeyManagement && completedKeyCount > 0 && (
-                <span className="ml-1.5 bg-green-500 text-white rounded-full px-1.5 text-xs">
-                  {completedKeyCount}
-                </span>
-              )}
+    <div className="min-h-screen bg-crypto-background text-crypto-foreground">
+      <div className="container mx-auto px-4 py-8">
+        <header className="mb-8">
+          <div className="flex items-center mb-4">
+            <Button variant="outline" size="sm" asChild className="mr-2">
+              <Link to="/">
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back to Dashboard
+              </Link>
             </Button>
-          )}
+          </div>
+          <h1 className="text-3xl font-bold">Bitcoin Wallet</h1>
+          <p className="text-crypto-foreground/70 mt-1">
+            Manage and recover private keys, view balances and transactions
+          </p>
+        </header>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <WalletInterface />
+          </div>
+          
+          <div className="space-y-6">
+            {showImport ? (
+              <WalletKeyImport 
+                onImport={handleImportKey}
+                onCancel={() => setShowImport(false)}
+              />
+            ) : (
+              <>
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-crypto-foreground">Wallet Actions</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      <Button 
+                        variant="default" 
+                        className="w-full"
+                        onClick={() => setShowImport(true)}
+                      >
+                        Import Private Key
+                      </Button>
+                      
+                      <Button 
+                        variant="outline" 
+                        className="w-full"
+                        asChild
+                      >
+                        <Link to="/keys">
+                          View Recovered Keys
+                        </Link>
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <KeyManagementPanel 
+                  initialPrivateKey={importedKey || undefined}
+                />
+              </>
+            )}
+          </div>
         </div>
-        <p className="text-crypto-foreground/70">
-          Manage recovered private keys, check balances, and send transactions
-        </p>
-      </header>
-      
-      <div className="grid gap-6">
-        {!isConnected ? (
-          <ConnectionPanel onConnect={handleConnect} />
-        ) : showKeyManagement ? (
-          <KeyManagementPanel onClose={() => setShowKeyManagement(false)} />
-        ) : (
-          <WalletInterface />
-        )}
       </div>
     </div>
   );
