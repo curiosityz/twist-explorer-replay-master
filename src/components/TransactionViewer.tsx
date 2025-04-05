@@ -7,6 +7,7 @@ import { Transaction } from '@/types';
 import { SAMPLE_TRANSACTION } from '@/lib/mockVulnerabilities';
 import { ExternalLink, FileCode, FileSearch, Play, Bitcoin, DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { toast } from 'sonner';
 
 interface TransactionViewerProps {
   transaction?: Transaction;
@@ -20,10 +21,10 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
   
   // Reset view and recalculate when transaction changes
   useEffect(() => {
-    if (transaction?.txid !== currentTxid) {
-      setCurrentTxid(transaction?.txid || '');
-      calculateTotalValue();
-    }
+    // Force reset when transaction prop changes, regardless of txid comparison
+    setActiveView('decoded');
+    calculateTotalValue();
+    setCurrentTxid(transaction?.txid || '');
   }, [transaction]);
 
   const calculateTotalValue = () => {
@@ -38,6 +39,10 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
   };
 
   const handleAnalyze = () => {
+    if (!transaction || !transaction.txid) {
+      toast.error("No valid transaction to analyze");
+      return;
+    }
     onAnalyze(transaction.txid);
   };
 

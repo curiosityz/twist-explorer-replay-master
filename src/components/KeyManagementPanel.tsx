@@ -1,315 +1,416 @@
-
 import React, { useState, useEffect } from 'react';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Key, Copy, Check, ArrowDown, Trash2, XCircle, CheckCircle2, Wallet } from 'lucide-react';
-import { supabase, Tables } from '@/integrations/supabase/client';
-import { PrivateKeyFragment } from '@/types';
-import { verifyPrivateKey } from '@/lib/cryptoUtils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
-import { satoshisToBtc, formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
+import { useToast } from '@/hooks/use-toast';
+import { supabase, Tables } from '@/integrations/supabase/client';
+import { formatBtcValue, formatUsdValue, deriveAddress } from '@/lib/walletUtils';
+import { combinePrivateKeyFragments, verifyPrivateKey, normalizePrivateKey } from '@/lib/cryptoUtils';
+import { WalletKey } from '@/lib/walletUtils';
+import { Check, Copy, Download, Trash2, UploadCloud, RefreshCw } from 'lucide-react';
 
 interface KeyManagementPanelProps {
-  onClose: () => void;
+  initialPrivateKey?: string;
+  onKeyChange?: (keyData: WalletKey) => void;
 }
 
-const KeyManagementPanel = ({ onClose }: KeyManagementPanelProps) => {
-  const [keys, setKeys] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [spentKeys, setSpentKeys] = useState<Set<string>>(new Set());
+const KeyManagementPanel = ({ initialPrivateKey, onKeyChange }: KeyManagementPanelProps) => {
+  const [privateKey, setPrivateKey] = useState(initialPrivateKey || '');
+  const [normalizedKey, setNormalizedKey] = useState('');
+  const [walletData, setWalletData] = useState<WalletKey | null>(null);
+  const [address, setAddress] = useState('');
+  const [isValidAddress, setIsValidAddress] = useState(false);
+  const [isKeyVerified, setIsKeyVerified] = useState(false);
+  const [verificationMessage, setVerificationMessage] = useState('');
+  const [isImporting, setIsImporting] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast: useToastHook } = useToast();
 
   useEffect(() => {
-    fetchKeys();
-  }, []);
+    if (privateKey) {
+      normalizeAndDerive(privateKey);
+    }
+  }, [privateKey]);
 
-  const fetchKeys = async () => {
-    setLoading(true);
+  const normalizeAndDerive = (key: string) => {
     try {
-      const { data, error } = await supabase
-        .from(Tables.private_key_fragments)
-        .select('*')
-        .order('updated_at', { ascending: false });
-        
-      if (error) {
-        console.error('Error fetching keys:', error);
-        toast.error('Failed to load private keys');
-      } else {
-        setKeys(data || []);
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Failed to load private keys');
+      const normalized = normalizePrivateKey(key);
+      setNormalizedKey(normalized);
+      deriveWalletData(normalized);
+    } catch (error: any) {
+      console.error("Error normalizing private key:", error.message);
+      setWalletData(null);
+      setAddress('');
+      useToastHook({
+        title: "Invalid Private Key",
+        description: "The entered private key is not valid.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const deriveWalletData = (normalizedKey: string) => {
+    try {
+      const derivedAddress = deriveAddress(normalizedKey);
+      setAddress(derivedAddress);
+
+      // Mock public key derivation for demo purposes
+      const publicKey = {
+        x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
+        y: '0x5c6e2e5eace8de16b686baaeb92d3e4d0fb5692834fff8248517f584e47170b6'
+      };
+
+      const newWalletData: WalletKey = {
+        privateKey: normalizedKey,
+        publicKey: publicKey,
+        address: derivedAddress,
+        network: 'mainnet',
+        balance: 0.0005,
+        verified: false
+      };
+
+      setWalletData(newWalletData);
+      onKeyChange?.(newWalletData);
+    } catch (error: any) {
+      console.error("Error deriving wallet data:", error.message);
+      setWalletData(null);
+      setAddress('');
+      useToastHook({
+        title: "Key Derivation Error",
+        description: "Could not derive wallet data from the private key.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleKeyInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setPrivateKey(e.target.value);
+  };
+
+  const handleVerifyKey = () => {
+    if (!walletData) {
+      setVerificationMessage('No wallet data available to verify.');
+      setIsKeyVerified(false);
+      return;
+    }
+
+    try {
+      const isValid = verifyPrivateKey(normalizedKey, walletData.publicKey.x, walletData.publicKey.y);
+      setIsKeyVerified(isValid);
+      setVerificationMessage(isValid ? 'Private key successfully verified!' : 'Private key verification failed.');
+      useToastHook({
+        title: isValid ? "Key Verified" : "Key Verification Failed",
+        description: verificationMessage,
+        variant: isValid ? "default" : "destructive"
+      });
+    } catch (error: any) {
+      console.error("Error verifying private key:", error.message);
+      setIsKeyVerified(false);
+      setVerificationMessage(`Verification Error: ${error.message}`);
+      useToastHook({
+        title: "Key Verification Error",
+        description: "An error occurred during key verification.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleImportKey = async () => {
+    setIsImporting(true);
+    try {
+      // Simulate key import process
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Mock successful import
+      useToastHook({
+        title: "Key Imported",
+        description: "Private key has been successfully imported.",
+      });
+    } catch (error: any) {
+      console.error("Key import error:", error.message);
+      useToastHook({
+        title: "Key Import Failed",
+        description: "Failed to import the private key.",
+        variant: "destructive"
+      });
     } finally {
-      setLoading(false);
+      setIsImporting(false);
     }
   };
 
-  const copyToClipboard = (text: string, id: string) => {
-    navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    toast.success('Copied to clipboard');
-    setTimeout(() => setCopiedId(null), 2000);
-  };
+  const handleExportKey = () => {
+    setIsExporting(true);
+    try {
+      // Simulate key export process
+      const blob = new Blob([normalizedKey], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'privateKey.txt';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
 
-  const exportAllKeys = () => {
-    const completedKeys = keys.filter(k => k.completed && k.combined_fragments);
-    
-    if (completedKeys.length === 0) {
-      toast.error('No completed keys to export');
-      return;
+      useToastHook({
+        title: "Key Exported",
+        description: "Private key has been successfully exported.",
+      });
+    } catch (error: any) {
+      console.error("Key export error:", error.message);
+      useToastHook({
+        title: "Key Export Failed",
+        description: "Failed to export the private key.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsExporting(false);
+      setIsExporting(false);
     }
-    
-    const keysData = completedKeys.map(key => ({
-      publicKey: key.public_key_hex,
-      privateKey: key.combined_fragments,
-      verified: verifyPrivateKey(key.combined_fragments, key.public_key_hex.substring(0, 66), key.public_key_hex.substring(66)),
-      recovered: new Date(key.updated_at).toISOString(),
-      spent: spentKeys.has(key.id)
-    }));
-    
-    const dataStr = JSON.stringify(keysData, null, 2);
-    const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-    
-    const exportFileName = `crypto-recovery-keys-${new Date().toISOString().split('T')[0]}.json`;
-    
-    const linkElement = document.createElement('a');
-    linkElement.setAttribute('href', dataUri);
-    linkElement.setAttribute('download', exportFileName);
-    linkElement.click();
-    
-    toast.success(`Exported ${keysData.length} keys`);
   };
 
-  const importKeyToWallet = (key: any) => {
-    if (!key.completed || !key.combined_fragments) {
-      toast.error('Cannot import incomplete key');
-      return;
+  const handleDeleteKey = async () => {
+    setIsDeleting(true);
+    try {
+      // Simulate key deletion process
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Clear the private key and reset wallet data
+      setPrivateKey('');
+      setNormalizedKey('');
+      setWalletData(null);
+      setAddress('');
+      setIsKeyVerified(false);
+      setVerificationMessage('');
+
+      useToastHook({
+        title: "Key Deleted",
+        description: "Private key has been successfully deleted.",
+      });
+    } catch (error: any) {
+      console.error("Key deletion error:", error.message);
+      useToastHook({
+        title: "Key Deletion Failed",
+        description: "Failed to delete the private key.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsDeleting(false);
     }
-
-    // In a real app, this would add the key to the active wallet
-    // For this demo, we'll just mark it as "spent" in our UI
-    const newSpentKeys = new Set(spentKeys);
-    newSpentKeys.add(key.id);
-    setSpentKeys(newSpentKeys);
-    
-    toast.success('Key imported to wallet');
   };
-
-  const clearSpentKeys = () => {
-    setSpentKeys(new Set());
-    toast.success('Cleared spent key indicators');
-  };
-
-  // Mock balance calculation (in a real app would check blockchain)
-  const getKeyBalance = (key: any) => {
-    // Using the public key hash as a source of pseudo-randomness
-    const hash = key.public_key_hex.slice(2, 10);
-    const hashNum = parseInt(hash, 16);
-    return (hashNum % 10000) / 10000;
+  
+  const handleRefreshAddress = () => {
+    setIsRefreshing(true);
+    try {
+      if (normalizedKey) {
+        deriveWalletData(normalizedKey);
+        useToastHook({
+          title: "Address Refreshed",
+          description: "Bitcoin address has been refreshed.",
+        });
+      } else {
+        useToastHook({
+          title: "No Key Available",
+          description: "Please enter a private key to derive the address.",
+          variant: "destructive"
+        });
+      }
+    } catch (error: any) {
+      console.error("Address refresh error:", error.message);
+      useToastHook({
+        title: "Address Refresh Failed",
+        description: "Failed to refresh the Bitcoin address.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   return (
-    <Card className="w-full">
+    <Card className="bg-crypto-muted border-crypto-border">
       <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>Private Key Manager</CardTitle>
-            <CardDescription>Manage your recovered private keys</CardDescription>
-          </div>
-          <div className="flex gap-2">
-            {keys.some(k => k.completed) && (
-              <Button variant="outline" size="sm" onClick={exportAllKeys}>
-                <Download className="h-4 w-4 mr-1" />
-                Export All Keys
-              </Button>
-            )}
-            {spentKeys.size > 0 && (
-              <Button variant="outline" size="sm" onClick={clearSpentKeys}>
-                <Trash2 className="h-4 w-4 mr-1" />
-                Clear Spent Keys
-              </Button>
-            )}
-            <Button variant="default" size="sm" onClick={onClose}>
-              <Wallet className="h-4 w-4 mr-1" />
-              Return to Wallet
+        <CardTitle className="text-crypto-foreground">Key Management</CardTitle>
+        <CardDescription className="text-crypto-foreground/70">
+          Enter or import your private key to manage your wallet.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid gap-2">
+          <label htmlFor="privateKey" className="text-sm font-medium leading-none text-crypto-foreground">
+            Private Key
+          </label>
+          <textarea
+            id="privateKey"
+            className="flex h-24 w-full rounded-md border border-crypto-border bg-crypto-background px-3 py-2 text-sm placeholder:text-crypto-foreground/50 focus:outline-none focus:ring-2 focus:ring-crypto-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-crypto-foreground"
+            placeholder="Enter your private key"
+            value={privateKey}
+            onChange={handleKeyInputChange}
+          />
+        </div>
+
+        <div className="grid gap-2">
+          <label htmlFor="normalizedKey" className="text-sm font-medium leading-none text-crypto-foreground">
+            Normalized Key
+          </label>
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              id="normalizedKey"
+              className="flex w-full rounded-md border border-crypto-border bg-crypto-background px-3 py-2 text-sm placeholder:text-crypto-foreground/50 focus:outline-none focus:ring-2 focus:ring-crypto-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-crypto-foreground"
+              value={normalizedKey}
+              readOnly
+              disabled
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-crypto-foreground/70 hover:text-crypto-foreground"
+              onClick={() => {
+                navigator.clipboard.writeText(normalizedKey);
+                toast({
+                  description: "Normalized key copied to clipboard.",
+                });
+              }}
+              disabled={!normalizedKey}
+            >
+              <Copy className="h-4 w-4" />
+              <span className="sr-only">Copy normalized key</span>
             </Button>
           </div>
         </div>
-      </CardHeader>
-      
-      <CardContent>
-        {loading ? (
-          <div className="text-center py-8">Loading keys...</div>
-        ) : keys.length === 0 ? (
-          <div className="text-center py-8">
-            <div className="mx-auto w-16 h-16 rounded-full bg-crypto-muted flex items-center justify-center mb-4">
-              <Key className="h-8 w-8 text-crypto-foreground/40" />
-            </div>
-            <h3 className="text-lg font-medium mb-2">No Private Keys Available Yet</h3>
-            <p className="text-crypto-foreground/70 mb-4">
-              Analyze transactions to recover private keys from vulnerable signatures.
-            </p>
-            <Button asChild>
-              <Link to="/">Analyze Transactions</Link>
+
+        <div className="grid gap-2">
+          <label htmlFor="address" className="text-sm font-medium leading-none text-crypto-foreground">
+            Bitcoin Address
+          </label>
+          <div className="flex items-center space-x-2">
+            <input
+              type="text"
+              id="address"
+              className="flex w-full rounded-md border border-crypto-border bg-crypto-background px-3 py-2 text-sm placeholder:text-crypto-foreground/50 focus:outline-none focus:ring-2 focus:ring-crypto-primary focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 font-mono text-crypto-foreground"
+              value={address}
+              readOnly
+              disabled
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshAddress}
+              disabled={isRefreshing}
+              className="h-8 w-8 p-0 text-crypto-foreground/70 hover:text-crypto-foreground"
+            >
+              <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-crypto-foreground/70 hover:text-crypto-foreground"
+              onClick={() => {
+                navigator.clipboard.writeText(address);
+                toast({
+                  description: "Bitcoin address copied to clipboard.",
+                });
+              }}
+              disabled={!address}
+            >
+              <Copy className="h-4 w-4" />
+              <span className="sr-only">Copy address</span>
             </Button>
           </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              {keys.map((key) => {
-                const isSpent = spentKeys.has(key.id);
-                const keyBalance = key.completed ? getKeyBalance(key) : 0;
-                
-                return (
-                  <div 
-                    key={key.id} 
-                    className={`border rounded-lg p-4 ${isSpent ? 'opacity-60 bg-crypto-background/30' : 'bg-crypto-muted'}`}
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center">
-                        {key.completed ? (
-                          <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center mr-3">
-                            <Key className="h-4 w-4 text-green-500" />
-                          </div>
-                        ) : (
-                          <div className="h-8 w-8 rounded-full bg-amber-500/10 flex items-center justify-center mr-3">
-                            <Key className="h-4 w-4 text-amber-500" />
-                          </div>
-                        )}
-                        <div>
-                          <div className="font-medium flex items-center">
-                            Private Key 
-                            {key.completed && (
-                              <Badge variant="outline" className="ml-2 text-green-500 border-green-500/30">
-                                Complete
-                              </Badge>
-                            )}
-                            {!key.completed && (
-                              <Badge variant="outline" className="ml-2 text-amber-500 border-amber-500/30">
-                                Partial
-                              </Badge>
-                            )}
-                            {isSpent && (
-                              <Badge variant="outline" className="ml-2 text-gray-500 border-gray-500/30">
-                                Spent
-                              </Badge>
-                            )}
-                          </div>
-                          <div className="text-xs text-crypto-foreground/70">
-                            Updated: {new Date(key.updated_at).toLocaleString()}
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {key.completed && keyBalance > 0 && (
-                        <div className="text-right">
-                          <div className="font-mono font-medium">{formatBtcValue(keyBalance)} BTC</div>
-                          <div className="text-xs text-crypto-foreground/70">
-                            {formatUsdValue(keyBalance)}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    
-                    <div className="mt-3 space-y-3">
-                      <div className="space-y-1">
-                        <div className="text-xs text-crypto-foreground/70">Public Key</div>
-                        <div className="bg-crypto-background p-2 rounded text-xs font-mono break-all">
-                          {key.public_key_hex}
-                        </div>
-                      </div>
-                      
-                      {key.completed && key.combined_fragments && (
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs text-crypto-foreground/70">Private Key</div>
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 px-2 py-0"
-                              onClick={() => copyToClipboard(key.combined_fragments, key.id)}
-                            >
-                              {copiedId === key.id ? (
-                                <Check className="h-3 w-3" />
-                              ) : (
-                                <Copy className="h-3 w-3" />
-                              )}
-                              <span className="ml-1 text-xs">Copy</span>
-                            </Button>
-                          </div>
-                          <div className="bg-crypto-background p-2 rounded text-xs font-mono break-all">
-                            {key.combined_fragments}
-                          </div>
-                          
-                          <div className="flex mt-2 items-center space-x-1 text-xs">
-                            {verifyPrivateKey(
-                              key.combined_fragments, 
-                              key.public_key_hex.substring(0, 66), 
-                              key.public_key_hex.substring(66)
-                            ) ? (
-                              <>
-                                <CheckCircle2 className="h-3 w-3 text-green-500" />
-                                <span className="text-green-500">Key verified</span>
-                              </>
-                            ) : (
-                              <>
-                                <XCircle className="h-3 w-3 text-amber-500" />
-                                <span className="text-amber-500">Key verification failed</span>
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {key.completed && (
-                        <div className="flex justify-end space-x-2 pt-2">
-                          {!isSpent ? (
-                            <Button 
-                              variant="default" 
-                              size="sm"
-                              onClick={() => importKeyToWallet(key)}
-                            >
-                              <Wallet className="h-3 w-3 mr-1" />
-                              Import Key
-                            </Button>
-                          ) : (
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              disabled
-                            >
-                              <Check className="h-3 w-3 mr-1" />
-                              Imported
-                            </Button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+        </div>
+
+        {walletData && (
+          <div className="space-y-2 border-t border-crypto-border pt-4">
+            <div className="text-sm font-medium text-crypto-foreground">Wallet Summary</div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <div className="text-xs text-crypto-foreground/70">Balance</div>
+                <div className="font-mono">{formatBtcValue(walletData.balance || 0)} BTC</div>
+                <div className="text-xs text-crypto-foreground/70">Est. Value</div>
+                <div className="font-mono">{formatUsdValue(walletData.balance || 0)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-crypto-foreground/70">Network</div>
+                <div>{walletData.network}</div>
+                <div className="text-xs text-crypto-foreground/70">Address</div>
+                <div className="font-mono text-xs break-all">{walletData.address}</div>
+              </div>
             </div>
           </div>
         )}
       </CardContent>
-      
-      <CardFooter className="flex justify-between border-t p-4">
-        <div className="text-sm text-crypto-foreground/70">
-          {keys.filter(k => k.completed).length} of {keys.length} keys fully recovered
+      <CardFooter className="flex justify-between">
+        <div className="flex space-x-2">
+          <Button
+            variant="secondary"
+            onClick={handleVerifyKey}
+            disabled={!normalizedKey}
+          >
+            <Check className="mr-2 h-4 w-4" />
+            Verify Key
+          </Button>
+          <Button
+            variant="outline"
+            onClick={handleImportKey}
+            disabled={isImporting}
+          >
+            {isImporting ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Importing...
+              </>
+            ) : (
+              <>
+                <UploadCloud className="mr-2 h-4 w-4" />
+                Import Key
+              </>
+            )}
+          </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={onClose}>
-          Close
-        </Button>
+        <div className="flex space-x-2">
+          <Button
+            variant="outline"
+            onClick={handleExportKey}
+            disabled={isExporting}
+          >
+            {isExporting ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Exporting...
+              </>
+            ) : (
+              <>
+                <Download className="mr-2 h-4 w-4" />
+                Export Key
+              </>
+            )}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDeleteKey}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="mr-2 h-4 w-4" />
+                Delete Key
+              </>
+            )}
+          </Button>
+        </div>
       </CardFooter>
     </Card>
   );
-};
-
-// For React-Router Link component
-const Link = ({ to, children, ...props }: { to: string; children: React.ReactNode; [key: string]: any }) => {
-  return <a href={to} {...props}>{children}</a>;
 };
 
 export default KeyManagementPanel;
