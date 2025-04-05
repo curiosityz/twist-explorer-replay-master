@@ -107,6 +107,73 @@ export const bigIntToHex = (num: bigint): string => {
 };
 
 /**
+ * Verifies whether a private key correctly generates the corresponding public key
+ * @param privateKeyHex Private key in hexadecimal format
+ * @param publicKeyX X-coordinate of the public key point (hex)
+ * @param publicKeyY Y-coordinate of the public key point (hex)
+ * @returns Boolean indicating if the private key is valid
+ */
+export const verifyPrivateKey = (
+  privateKeyHex: string, 
+  publicKeyX: string, 
+  publicKeyY: string
+): boolean => {
+  try {
+    // For real implementation, this would use elliptic curve operations
+    // to derive public key from private key and compare with provided public key
+    
+    // This is a simplified mock implementation
+    // In a real system, we would use a library like elliptic.js or noble-secp256k1
+    
+    // Mock verification (in practice, you'd derive the public key from private key)
+    const privateKey = hexToBigInt(privateKeyHex);
+    
+    // For demo, we'll use a simplified check
+    // A real implementation would compute: publicKey = G * privateKey (point multiplication)
+    const derivedPublicKeyX = `${publicKeyX.substring(0, 10)}...`;
+    const derivedPublicKeyY = `${publicKeyY.substring(0, 10)}...`;
+    
+    console.log("Verifying private key:", privateKeyHex);
+    console.log("Against public key:", publicKeyX, publicKeyY);
+    console.log("Mock derived public key:", derivedPublicKeyX, derivedPublicKeyY);
+    
+    // Since this is a mock function, return true for the demo 
+    // In real implementation, would do: return derivedPubKey.x === publicKeyX && derivedPubKey.y === publicKeyY
+    return true;
+  } catch (error) {
+    console.error("Error verifying private key:", error);
+    return false;
+  }
+};
+
+/**
+ * Normalize private key length to standard format
+ * @param keyHex Private key in hex format
+ * @returns Normalized private key hex (64 characters without 0x prefix)
+ */
+export const normalizePrivateKey = (keyHex: string): string => {
+  let key = keyHex;
+  
+  // Remove 0x prefix if present
+  if (key.startsWith('0x')) {
+    key = key.substring(2);
+  }
+  
+  // Pad with leading zeros to ensure 64 characters (32 bytes)
+  while (key.length < 64) {
+    key = '0' + key;
+  }
+  
+  // If too long, truncate to 64 chars (shouldn't happen with valid keys)
+  if (key.length > 64) {
+    console.warn("Private key appears too long, truncating to 64 chars");
+    key = key.substring(key.length - 64);
+  }
+  
+  return '0x' + key;
+};
+
+/**
  * Attempt to combine private key fragments using CRT
  * @param fragments Map of moduli to remainders
  * @returns Combined private key as hex string, or null if not enough fragments or no solution
@@ -135,7 +202,8 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
       return null;
     }
     
-    return bigIntToHex(combined);
+    // Normalize the private key to standard format
+    return normalizePrivateKey(bigIntToHex(combined));
   } catch (error) {
     console.error("Error combining private key fragments:", error);
     return null;

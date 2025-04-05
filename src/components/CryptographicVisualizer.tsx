@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { Cpu, Loader2, Lock, RefreshCw, XCircle } from 'lucide-react';
+import { Cpu, Loader2, Lock, RefreshCw, XCircle, Check } from 'lucide-react';
 import { AnalysisResult, CryptographicPoint, Signature } from '@/types';
+import { combinePrivateKeyFragments, normalizePrivateKey, verifyPrivateKey } from '@/lib/cryptoUtils';
 
 interface CryptographicVisualizerProps {
   txid?: string;
@@ -16,6 +17,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [verificationResult, setVerificationResult] = useState<boolean | null>(null);
 
   // This effect runs when the component mounts or when txid/startAnalysis changes
   useEffect(() => {
@@ -29,6 +31,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
 
     setIsAnalyzing(true);
     setError(null);
+    setVerificationResult(null);
 
     try {
       // First, check if transaction exists in database
@@ -104,14 +107,14 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           console.error("Error checking existing analysis:", checkError);
         }
         
-        // Format the data for insertion/update
+        // Format the data for insertion/update - convert objects to JSON for Supabase
         const analysisData = {
           txid: mockAnalysisResult.txid,
           vulnerability_type: mockAnalysisResult.vulnerabilityType,
-          public_key: mockPublicKey,
-          signature: mockSignature,
-          prime_factors: mockPrimeFactors,
-          private_key_modulo: mockPrivateKeyModulo,
+          public_key: mockPublicKey as unknown as JSON, // Cast to JSON for Supabase
+          signature: mockSignature as unknown as JSON,
+          prime_factors: mockPrimeFactors as unknown as JSON,
+          private_key_modulo: mockPrivateKeyModulo as unknown as JSON,
           twist_order: mockAnalysisResult.twistOrder,
           status: mockAnalysisResult.status,
           message: mockAnalysisResult.message
@@ -151,16 +154,23 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           console.error("Error checking key fragments:", fragmentCheckError);
         }
         
-        // Calculate a mock combined fragment based on CRT
-        const combinedFragment = '0x1a2b3c4d5e6f7890';
-        const isComplete = Object.keys(mockPrivateKeyModulo).length >= 8;
+        // Calculate combined fragment based on CRT
+        const combinedFragment = combinePrivateKeyFragments(mockPrivateKeyModulo);
+        const isComplete = Object.keys(mockPrivateKeyModulo).length >= 6;
+        
+        // Verify the private key if it was successfully recovered
+        let isKeyVerified = false;
+        if (combinedFragment && isComplete) {
+          isKeyVerified = verifyPrivateKey(combinedFragment, mockPublicKey.x, mockPublicKey.y);
+          setVerificationResult(isKeyVerified);
+        }
         
         if (existingFragment) {
           // Update existing fragments
           const { error: updateFragError } = await supabase
             .from(Tables.private_key_fragments)
             .update({
-              modulo_values: mockPrivateKeyModulo,
+              modulo_values: mockPrivateKeyModulo as unknown as JSON,
               combined_fragments: isComplete ? combinedFragment : existingFragment.combined_fragments,
               completed: isComplete
             })
@@ -175,7 +185,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             .from(Tables.private_key_fragments)
             .insert({
               public_key_hex: publicKeyHex,
-              modulo_values: mockPrivateKeyModulo,
+              modulo_values: mockPrivateKeyModulo as unknown as JSON,
               combined_fragments: isComplete ? combinedFragment : null,
               completed: isComplete
             });
@@ -199,7 +209,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           const failedAnalysis = {
             txid: txid,
             vulnerability_type: 'unknown',
-            public_key: { x: '0x0', y: '0x0', isOnCurve: false },
+            public_key: { x: '0x0', y: '0x0', isOnCurve: false } as unknown as JSON,
             status: 'failed',
             message: error instanceof Error ? error.message : 'Unknown error occurred'
           };
@@ -365,10 +375,38 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
                 </div>
                 <div className="text-xs text-green-500 flex items-center gap-1">
                   <Cpu className="h-3 w-3" />
-                  {Object.keys(analysisResult.privateKeyModulo).length >= 8
+                  {Object.keys(analysisResult.privateKeyModulo).length >= 6
                     ? 'All congruences recovered - full private key reconstruction possible!'
-                    : `${Object.keys(analysisResult.privateKeyModulo).length}/8 fragments recovered - partial key information`}
+                    : `${Object.keys(analysisResult.privateKeyModulo).length}/6 fragments recovered - partial key information`}
                 </div>
+                
+                {Object.keys(analysisResult.privateKeyModulo).length >= 6 && (
+                  <div className="mt-2 p-3 bg-green-500/10 border border-green-500/20 rounded">
+                    <div className="font-medium text-sm text-green-500 flex items-center">
+                      <Check className="h-4 w-4 mr-1" />
+                      Recovered Private Key
+                    </div>
+                    <div className="font-mono text-xs mt-1 break-all">
+                      {combinePrivateKeyFragments(analysisResult.privateKeyModulo)}
+                    </div>
+                    
+                    {verificationResult !== null && (
+                      <div className={`mt-2 text-xs ${verificationResult ? 'text-green-500' : 'text-red-500'} flex items-center`}>
+                        {verificationResult ? (
+                          <>
+                            <Check className="h-3 w-3 mr-1" />
+                            Private key verified - successfully regenerates public key
+                          </>
+                        ) : (
+                          <>
+                            <XCircle className="h-3 w-3 mr-1" />
+                            Key verification failed - does not match public key
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

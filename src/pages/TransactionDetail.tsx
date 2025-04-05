@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock, Check, AlertCircle, Bitcoin, DollarSign } from 'lucide-react';
+import { ArrowLeft, ChevronDown, Eye, FileCode, FileSearch, Key, Lock, RefreshCw, Shield, Unlock, Check, AlertCircle, Bitcoin, DollarSign, CheckCircle2, XCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { CryptographicPoint, Signature } from '@/types';
+import { verifyPrivateKey } from '@/lib/cryptoUtils';
 
 const TransactionDetail = () => {
   const { txid } = useParams();
@@ -19,6 +20,7 @@ const TransactionDetail = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('analysis');
   const [totalInputValue, setTotalInputValue] = useState(0);
+  const [keyVerificationStatus, setKeyVerificationStatus] = useState<boolean | null>(null);
   
   useEffect(() => {
     const fetchData = async () => {
@@ -41,13 +43,21 @@ const TransactionDetail = () => {
           
           // Calculate total input value for recovered funds estimation
           if (txData && txData.decoded_json) {
-            // For demo purposes, use output sum + fee estimation
-            const decodedTx = txData.decoded_json;
-            const outputSum = decodedTx.vout
-              ? decodedTx.vout.reduce((sum: number, output: any) => sum + output.value, 0)
-              : 0;
-            // Assume a slightly higher input value (0.3% fee)
-            setTotalInputValue(outputSum * 1.003);
+            try {
+              // For demo purposes, use output sum + fee estimation
+              const decodedTx = typeof txData.decoded_json === 'string' 
+                ? JSON.parse(txData.decoded_json) 
+                : txData.decoded_json;
+                
+              const outputSum = decodedTx.vout
+                ? decodedTx.vout.reduce((sum: number, output: any) => sum + (output.value || 0), 0)
+                : 0;
+              // Assume a slightly higher input value (0.3% fee)
+              setTotalInputValue(outputSum * 1.003);
+            } catch (err) {
+              console.error("Error parsing transaction data:", err);
+              setTotalInputValue(0);
+            }
           }
         }
         
@@ -65,18 +75,32 @@ const TransactionDetail = () => {
           
           // If we have a public key, check for key fragments
           if (analysisData?.public_key) {
-            // Safe access with type checking
-            const publicKey = analysisData.public_key as unknown as CryptographicPoint;
-            const publicKeyHex = publicKey.x + publicKey.y;
-            
-            const { data: keyData, error: keyError } = await supabase
-              .from(Tables.private_key_fragments)
-              .select('*')
-              .eq('public_key_hex', publicKeyHex)
-              .maybeSingle();
+            try {
+              // Safe access with type checking
+              const publicKey = analysisData.public_key as unknown as CryptographicPoint;
+              const publicKeyHex = publicKey.x + publicKey.y;
               
-            if (!keyError) {
-              setKeyFragment(keyData);
+              const { data: keyData, error: keyError } = await supabase
+                .from(Tables.private_key_fragments)
+                .select('*')
+                .eq('public_key_hex', publicKeyHex)
+                .maybeSingle();
+                
+              if (!keyError && keyData) {
+                setKeyFragment(keyData);
+                
+                // Verify the private key if it exists
+                if (keyData.completed && keyData.combined_fragments) {
+                  const isValid = verifyPrivateKey(
+                    keyData.combined_fragments, 
+                    publicKey.x, 
+                    publicKey.y
+                  );
+                  setKeyVerificationStatus(isValid);
+                }
+              }
+            } catch (err) {
+              console.error("Error processing key data:", err);
             }
           }
         }
@@ -192,6 +216,21 @@ const TransactionDetail = () => {
                     <div>
                       <h3 className="text-lg font-medium text-green-500">Private Key Recovered!</h3>
                       <p className="text-sm text-crypto-foreground/70">Funds potentially recoverable from this transaction</p>
+                      {keyVerificationStatus !== null && (
+                        <div className={`mt-1 text-sm flex items-center ${keyVerificationStatus ? 'text-green-500' : 'text-amber-500'}`}>
+                          {keyVerificationStatus ? (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Key verified - matches public key
+                            </>
+                          ) : (
+                            <>
+                              <AlertCircle className="h-4 w-4 mr-1" />
+                              Key verification failed
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="text-right">
@@ -285,7 +324,7 @@ const TransactionDetail = () => {
                       </div>
                     )}
                     
-                    {analysis.prime_factors && analysis.prime_factors.length > 0 && (
+                    {analysis.prime_factors && (
                       <div className="mb-6">
                         <h3 className="text-sm font-medium mb-2">Twist Order Prime Factors</h3>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-xs">
@@ -329,6 +368,12 @@ const TransactionDetail = () => {
                               <div className="flex items-center">
                                 <Check className="h-4 w-4 text-green-500 mr-2" />
                                 <span className="text-green-500 font-medium">Private Key Recovered!</span>
+                                
+                                {keyVerificationStatus !== null && (
+                                  <span className={`ml-2 text-xs ${keyVerificationStatus ? 'text-green-500' : 'text-amber-500'}`}>
+                                    {keyVerificationStatus ? '(verified)' : '(verification failed)'}
+                                  </span>
+                                )}
                               </div>
                               {totalInputValue > 0 && (
                                 <div className="flex items-center text-xs">
@@ -363,7 +408,14 @@ const TransactionDetail = () => {
                             {keyFragment.completed ? (
                               <>
                                 <Unlock className="h-5 w-5 text-green-500 mr-2" />
-                                <span className="text-green-500 font-medium">Private Key Recovered!</span>
+                                <span className="text-green-500 font-medium">
+                                  Private Key Recovered!
+                                  {keyVerificationStatus !== null && (
+                                    <span className={`ml-2 text-xs ${keyVerificationStatus ? 'text-green-500' : 'text-amber-500'}`}>
+                                      {keyVerificationStatus ? '(verified)' : '(verification failed)'}
+                                    </span>
+                                  )}
+                                </span>
                               </>
                             ) : (
                               <>
@@ -408,10 +460,34 @@ const TransactionDetail = () => {
                     {keyFragment.completed && (
                       <>
                         <div className="mb-6">
-                          <h3 className="text-sm font-medium mb-2">Recovered Private Key (hex)</h3>
+                          <h3 className="text-sm font-medium mb-2 flex items-center">
+                            <Key className="h-4 w-4 mr-1" />
+                            Recovered Private Key (hex)
+                          </h3>
                           <div className="bg-crypto-background rounded-md p-4 font-mono text-xs break-all">
                             {keyFragment.combined_fragments}
                           </div>
+                          
+                          {/* Key verification status */}
+                          {keyVerificationStatus !== null && (
+                            <div className={`mt-2 p-2 rounded ${keyVerificationStatus ? 'bg-green-500/10' : 'bg-amber-500/10'} flex items-center`}>
+                              {keyVerificationStatus ? (
+                                <>
+                                  <CheckCircle2 className={`h-4 w-4 mr-2 text-green-500`} />
+                                  <span className="text-xs text-green-500">
+                                    Public key regeneration successful - private key verified
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <XCircle className={`h-4 w-4 mr-2 text-amber-500`} />
+                                  <span className="text-xs text-amber-500">
+                                    Verification failed - generated public key doesn't match original
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                         
                         {totalInputValue > 0 && (
@@ -452,7 +528,12 @@ const TransactionDetail = () => {
                     </CollapsibleTrigger>
                     <CollapsibleContent>
                       <div className="mt-2 rounded-md bg-crypto-background p-4 font-mono text-xs overflow-auto max-h-[400px]">
-                        <pre>{transaction ? JSON.stringify(transaction.decoded_json, null, 2) : 'No data'}</pre>
+                        <pre>{transaction ? JSON.stringify(
+                          typeof transaction.decoded_json === 'string' 
+                            ? JSON.parse(transaction.decoded_json) 
+                            : transaction.decoded_json, 
+                          null, 2
+                        ) : 'No data'}</pre>
                       </div>
                     </CollapsibleContent>
                   </Collapsible>
@@ -536,7 +617,14 @@ const TransactionDetail = () => {
               {keyFragment && keyFragment.completed && (
                 <div className="space-y-2">
                   <div className="text-xs text-crypto-foreground/70">Key Recovery</div>
-                  <Badge variant="default" className="bg-green-600 hover:bg-green-700">Complete</Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="default" className="bg-green-600 hover:bg-green-700">Complete</Badge>
+                    {keyVerificationStatus !== null && (
+                      <Badge variant={keyVerificationStatus ? "outline" : "secondary"} className={keyVerificationStatus ? "border-green-500 text-green-500" : "border-amber-500 text-amber-500"}>
+                        {keyVerificationStatus ? "Verified" : "Verification Failed"}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               )}
               
