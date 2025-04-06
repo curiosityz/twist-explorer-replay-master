@@ -58,9 +58,18 @@ export interface Signature {
   sighash: string;
 }
 
+export enum VulnerabilityType {
+  TWISTED_CURVE = 'twisted_curve',
+  NONCE_REUSE = 'nonce_reuse',
+  WEAK_SIGNATURE = 'weak_signature',
+  UNKNOWN = 'unknown'
+}
+
+export type VulnerabilityTypeString = keyof typeof VulnerabilityType | string;
+
 export interface AnalysisResult {
   txid: string;
-  vulnerabilityType: 'twisted_curve' | 'nonce_reuse' | 'weak_signature' | 'unknown';
+  vulnerabilityType: VulnerabilityTypeString;
   publicKey: CryptographicPoint;
   signature?: Signature;
   twistOrder?: string;
