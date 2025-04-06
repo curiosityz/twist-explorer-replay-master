@@ -104,7 +104,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             twistOrder: analysisData.twist_order,
             primeFactors: analysisData.prime_factors as string[],
             privateKeyModulo: analysisData.private_key_modulo as Record<string, string>,
-            status: analysisData.status,
+            status: analysisData.status as "completed" | "analyzing" | "failed" | "pending",
             message: analysisData.message
           };
           
@@ -202,7 +202,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           public_key: mockPublicKey as unknown as Record<string, any>,
           signature: mockSignature as unknown as Record<string, any>,
           prime_factors: mockPrimeFactors,
-          private_key_modulo: mockPrivateKeyModulo,
+          private_key_modulo: mockPrivateKeyModulo as unknown as Record<string, any>,
           twist_order: mockAnalysisResult.twistOrder,
           status: mockAnalysisResult.status,
           message: mockAnalysisResult.message
@@ -427,7 +427,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           <div>
             <CardTitle className="text-crypto-foreground">Vulnerability Results</CardTitle>
             <CardDescription className="text-crypto-foreground/70">
-              TXID: {txid.substring(0, 8)}...{txid.substring(txid.length - 8)}
+              TXID: {txid?.substring(0, 8)}...{txid?.substring(txid.length - 8)}
             </CardDescription>
           </div>
           {analysisResult && (
@@ -520,7 +520,14 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
                         variant="ghost" 
                         size="sm" 
                         className="h-6 px-2 text-xs"
-                        onClick={copyPrivateKey}
+                        onClick={() => {
+                          if (privateKey) {
+                            navigator.clipboard.writeText(privateKey);
+                            setCopied(true);
+                            toast.success("Private key copied to clipboard");
+                            setTimeout(() => setCopied(false), 2000);
+                          }
+                        }}
                       >
                         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       </Button>

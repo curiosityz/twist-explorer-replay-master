@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
@@ -10,20 +10,27 @@ import { KeyFragmentsTab } from './KeyFragmentsTab';
 import { TransactionHeader } from './TransactionHeader';
 import { LoadingState } from './LoadingState';
 import { NotFoundState } from './NotFoundState';
-import { TransactionTabs } from './TransactionTabs';
 
 interface TransactionDetailViewProps {
   transaction: any;
   onClose: () => void;
   isLoading?: boolean;
   txid?: string;
+  analysis?: any;
+  keyFragment?: any;
+  totalInputValue?: number;
+  keyVerificationStatus?: boolean | null;
 }
 
 const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({ 
   transaction, 
   onClose,
   isLoading = false,
-  txid = '' 
+  txid = '',
+  analysis = null,
+  keyFragment = null,
+  totalInputValue = 0,
+  keyVerificationStatus = null
 }) => {
   return (
     <Card className="w-full">
@@ -45,33 +52,33 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
-          <LoadingState />
+          <LoadingState txid={txid} />
         ) : !transaction ? (
           <NotFoundState txid={txid} />
         ) : (
-          <Tabs defaultValue="raw" className="w-full">
+          <Tabs defaultValue="analysis" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="raw">Raw Data</TabsTrigger>
               <TabsTrigger value="analysis">Analysis</TabsTrigger>
               <TabsTrigger value="keys">Key Fragments</TabsTrigger>
+              <TabsTrigger value="raw">Raw Data</TabsTrigger>
             </TabsList>
-            <TabsContent value="raw" className="p-4">
-              <RawDataTab transaction={transaction} analysis={null} />
-            </TabsContent>
             <TabsContent value="analysis" className="p-4">
               <AnalysisTab 
-                analysis={null} 
-                keyFragment={null} 
-                totalInputValue={0}
-                keyVerificationStatus={null}
+                analysis={analysis || transaction.analysis} 
+                keyFragment={keyFragment} 
+                totalInputValue={totalInputValue}
+                keyVerificationStatus={keyVerificationStatus}
               />
             </TabsContent>
             <TabsContent value="keys" className="p-4">
               <KeyFragmentsTab 
-                keyFragment={null}
-                totalInputValue={0}
-                keyVerificationStatus={null}
+                keyFragment={keyFragment}
+                totalInputValue={totalInputValue}
+                keyVerificationStatus={keyVerificationStatus}
               />
+            </TabsContent>
+            <TabsContent value="raw" className="p-4">
+              <RawDataTab transaction={transaction} analysis={analysis} />
             </TabsContent>
           </Tabs>
         )}
