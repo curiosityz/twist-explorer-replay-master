@@ -89,14 +89,23 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             throw new Error("Failed to load existing analysis");
           }
           
+          const privateKeyModulo: Record<string, string> = {};
+          
+          if (analysisData.private_key_modulo && typeof analysisData.private_key_modulo === 'object') {
+            Object.entries(analysisData.private_key_modulo).forEach(([key, value]) => {
+              privateKeyModulo[key] = String(value);
+            });
+          }
+          
           const loadedResult: AnalysisResult = {
             txid: analysisData.txid,
             vulnerabilityType: analysisData.vulnerability_type,
             publicKey: analysisData.public_key as unknown as CryptographicPoint,
             signature: analysisData.signature as unknown as Signature,
             twistOrder: analysisData.twist_order,
-            primeFactors: analysisData.prime_factors as string[],
-            privateKeyModulo: analysisData.private_key_modulo as Record<string, string>,
+            primeFactors: Array.isArray(analysisData.prime_factors) ? 
+              analysisData.prime_factors.map(String) : [],
+            privateKeyModulo: privateKeyModulo,
             status: analysisData.status as "completed" | "analyzing" | "failed" | "pending",
             message: analysisData.message
           };
@@ -128,24 +137,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           return;
         }
       }
-
-      const { data: txData, error: txError } = await supabase
-        .from(Tables.blockchain_transactions)
-        .select('*')
-        .eq('txid', txid)
-        .maybeSingle();
-        
-      if (txError) {
-        console.error("Error checking transaction existence:", txError);
-        throw new Error("Failed to check if transaction exists");
-      }
-      
-      if (!txData) {
-        console.error("Transaction not found in database");
-        throw new Error("Transaction not found in database");
-      }
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
 
       const mockPublicKey: CryptographicPoint = {
         x: '0xa2e678b5d8ae35ae5125b83e7a0d8d843664b3abc98709048453b0a516e5d589',
@@ -192,7 +183,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           public_key: mockPublicKey as unknown as Record<string, any>,
           signature: mockSignature as unknown as Record<string, any>,
           prime_factors: mockPrimeFactors,
-          private_key_modulo: mockPrivateKeyModulo as Record<string, string>,
+          private_key_modulo: mockPrivateKeyModulo,
           twist_order: mockAnalysisResult.twistOrder,
           status: mockAnalysisResult.status,
           message: mockAnalysisResult.message
@@ -250,10 +241,17 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         }
         
         if (existingFragment) {
-          const existingModuloValues: Record<string, string> = existingFragment.modulo_values || {};
+          const existingModuloValues: Record<string, string> = {};
+          
+          if (existingFragment.modulo_values && typeof existingFragment.modulo_values === 'object') {
+            Object.entries(existingFragment.modulo_values).forEach(([mod, rem]) => {
+              existingModuloValues[mod] = String(rem);
+            });
+          }
+          
           let updated = false;
           
-          Object.entries(mockPrivateKeyModulo as Record<string, string>).forEach(([mod, rem]) => {
+          Object.entries(mockPrivateKeyModulo).forEach(([mod, rem]) => {
             if (!existingModuloValues[mod]) {
               existingModuloValues[mod] = rem;
               updated = true;
@@ -282,7 +280,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         } else {
           const fragmentData = {
             public_key_hex: publicKeyHex,
-            modulo_values: mockPrivateKeyModulo as Record<string, string>,
+            modulo_values: mockPrivateKeyModulo,
             combined_fragments: isComplete ? combinedFragment : null,
             completed: isComplete
           };
