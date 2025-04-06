@@ -202,7 +202,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           public_key: mockPublicKey as unknown as Record<string, any>,
           signature: mockSignature as unknown as Record<string, any>,
           prime_factors: mockPrimeFactors,
-          private_key_modulo: mockPrivateKeyModulo as unknown as Record<string, any>,
+          private_key_modulo: mockPrivateKeyModulo as Record<string, string>,
           twist_order: mockAnalysisResult.twistOrder,
           status: mockAnalysisResult.status,
           message: mockAnalysisResult.message

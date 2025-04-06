@@ -59,7 +59,14 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
           <Tabs defaultValue="analysis" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="analysis">Analysis</TabsTrigger>
-              <TabsTrigger value="keys">Key Fragments</TabsTrigger>
+              <TabsTrigger value="keys">
+                Key Fragments
+                {keyFragment && keyFragment.modulo_values && (
+                  <span className="ml-1 text-xs bg-amber-500/20 text-amber-500 px-1 rounded">
+                    {Object.keys(keyFragment.modulo_values).length}
+                  </span>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="raw">Raw Data</TabsTrigger>
             </TabsList>
             <TabsContent value="analysis" className="p-4">

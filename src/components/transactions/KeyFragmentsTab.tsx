@@ -21,7 +21,10 @@ export function KeyFragmentsTab({
     );
   }
 
-  const fragmentCount = keyFragment.modulo_values ? Object.keys(keyFragment.modulo_values).length : 0;
+  // Use modulo_values for fragment count if it exists, fallback to private_key_modulo
+  const fragmentCount = keyFragment.modulo_values 
+    ? Object.keys(keyFragment.modulo_values).length 
+    : 0;
 
   if (fragmentCount === 0) {
     return (
