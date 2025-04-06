@@ -21,6 +21,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   const [verificationResult, setVerificationResult] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
+  const [isDuplicate, setIsDuplicate] = useState(false);
 
   useEffect(() => {
     if (txid && startAnalysis) {
@@ -44,6 +45,21 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
     }
   }, [analysisResult]);
 
+  const checkIfTransactionIsAnalyzed = async (txidToCheck: string) => {
+    const { data, error } = await supabase
+      .from(Tables.vulnerability_analyses)
+      .select('id, vulnerability_type')
+      .eq('txid', txidToCheck)
+      .maybeSingle();
+      
+    if (error) {
+      console.error("Error checking if transaction is analyzed:", error);
+      return null;
+    }
+    
+    return data;
+  };
+
   const handleAnalyzeTransaction = async () => {
     if (!txid) return;
 
@@ -51,8 +67,77 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
     setError(null);
     setVerificationResult(null);
     setPrivateKey(null);
+    setIsDuplicate(false);
 
     try {
+      // First check if this transaction has already been analyzed
+      const existingAnalysis = await checkIfTransactionIsAnalyzed(txid);
+      
+      if (existingAnalysis) {
+        // If transaction was already analyzed, consider it a duplicate
+        const existingVulnerabilityType = existingAnalysis.vulnerability_type;
+        
+        if (existingVulnerabilityType !== 'unknown') {
+          setIsDuplicate(true);
+          toast.info("This transaction has already been analyzed", {
+            description: "The key fragments have already been extracted from this transaction."
+          });
+          
+          // Load the existing analysis data instead of creating new mock data
+          const { data: analysisData, error: loadError } = await supabase
+            .from(Tables.vulnerability_analyses)
+            .select('*')
+            .eq('id', existingAnalysis.id)
+            .single();
+            
+          if (loadError) {
+            console.error("Error loading existing analysis:", loadError);
+            throw new Error("Failed to load existing analysis");
+          }
+          
+          // Convert the data to the expected format for display
+          const loadedResult: AnalysisResult = {
+            txid: analysisData.txid,
+            vulnerabilityType: analysisData.vulnerability_type,
+            publicKey: analysisData.public_key as unknown as CryptographicPoint,
+            signature: analysisData.signature as unknown as Signature,
+            twistOrder: analysisData.twist_order,
+            primeFactors: analysisData.prime_factors as string[],
+            privateKeyModulo: analysisData.private_key_modulo as Record<string, string>,
+            status: analysisData.status,
+            message: analysisData.message
+          };
+          
+          setAnalysisResult(loadedResult);
+          
+          // Check if we have key fragments for this public key
+          if (loadedResult.publicKey) {
+            const publicKeyHex = loadedResult.publicKey.x + loadedResult.publicKey.y;
+            
+            const { data: keyData, error: keyError } = await supabase
+              .from(Tables.private_key_fragments)
+              .select('*')
+              .eq('public_key_hex', publicKeyHex)
+              .maybeSingle();
+              
+            if (!keyError && keyData && keyData.combined_fragments) {
+              setPrivateKey(keyData.combined_fragments);
+              
+              // Verify the key
+              const isValid = verifyPrivateKey(
+                keyData.combined_fragments, 
+                loadedResult.publicKey.x, 
+                loadedResult.publicKey.y
+              );
+              setVerificationResult(isValid);
+            }
+          }
+          
+          setIsAnalyzing(false);
+          return;
+        }
+      }
+
       const { data: txData, error: txError } = await supabase
         .from(Tables.blockchain_transactions)
         .select('*')
@@ -176,17 +261,39 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         }
         
         if (existingFragment) {
-          const { error: updateFragError } = await supabase
-            .from(Tables.private_key_fragments)
-            .update({
-              modulo_values: mockPrivateKeyModulo,
-              combined_fragments: isComplete ? combinedFragment : existingFragment.combined_fragments,
-              completed: isComplete
-            })
-            .eq('public_key_hex', publicKeyHex);
+          // Don't overwrite existing fragments with mock data
+          // Instead, merge the new fragments with existing ones if they're not already there
+          const existingModuloValues = existingFragment.modulo_values || {};
+          let updated = false;
+          
+          // Check if we have any new modulo values to add
+          Object.entries(mockPrivateKeyModulo).forEach(([mod, rem]) => {
+            if (!existingModuloValues[mod]) {
+              existingModuloValues[mod] = rem;
+              updated = true;
+            }
+          });
+          
+          if (updated) {
+            // Recalculate combined fragments with the merged data
+            const mergedCombinedFragment = combinePrivateKeyFragments(existingModuloValues);
+            const mergedIsComplete = Object.keys(existingModuloValues).length >= 6;
             
-          if (updateFragError) {
-            console.error("Error updating key fragments:", updateFragError);
+            const { error: updateFragError } = await supabase
+              .from(Tables.private_key_fragments)
+              .update({
+                modulo_values: existingModuloValues,
+                combined_fragments: mergedIsComplete ? mergedCombinedFragment : existingFragment.combined_fragments,
+                completed: mergedIsComplete
+              })
+              .eq('public_key_hex', publicKeyHex);
+              
+            if (updateFragError) {
+              console.error("Error updating key fragments:", updateFragError);
+            }
+          } else {
+            // If no new fragments, just notify the user
+            toast.info("No new key fragments were found in this transaction");
           }
         } else {
           const fragmentData = {
@@ -328,7 +435,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
               variant={analysisResult.status === 'completed' ? 'default' : 'destructive'} 
               className="ml-auto"
             >
-              {analysisResult.status}
+              {isDuplicate ? 'duplicate' : analysisResult.status}
             </Badge>
           )}
         </div>
@@ -336,11 +443,15 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
       <CardContent className="h-[280px] overflow-auto">
         {analysisResult ? (
           <div className="space-y-4">
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-md p-3">
-              <div className="font-medium text-amber-500">
-                {analysisResult.vulnerabilityType.replace('_', ' ').toUpperCase()} DETECTED
+            <div className={`${isDuplicate ? 'bg-blue-500/10 border-blue-500/20' : 'bg-amber-500/10 border-amber-500/20'} border rounded-md p-3`}>
+              <div className={`font-medium ${isDuplicate ? 'text-blue-500' : 'text-amber-500'}`}>
+                {isDuplicate ? 'DUPLICATE TRANSACTION' : `${analysisResult.vulnerabilityType.replace('_', ' ').toUpperCase()} DETECTED`}
               </div>
-              <p className="text-sm mt-1">{analysisResult.message}</p>
+              <p className="text-sm mt-1">
+                {isDuplicate 
+                  ? "This transaction has already been analyzed and its key fragments extracted."
+                  : analysisResult.message}
+              </p>
             </div>
             
             <div className="space-y-2">
@@ -368,7 +479,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
               </div>
             )}
             
-            {analysisResult.privateKeyModulo && (
+            {analysisResult.privateKeyModulo && Object.keys(analysisResult.privateKeyModulo).length > 0 && (
               <div className="space-y-2">
                 <div className="text-xs font-medium text-crypto-foreground/70">
                   Private Key Fragments

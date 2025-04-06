@@ -21,6 +21,19 @@ export function KeyFragmentsTab({
     );
   }
 
+  const fragmentCount = keyFragment.modulo_values ? Object.keys(keyFragment.modulo_values).length : 0;
+
+  if (fragmentCount === 0) {
+    return (
+      <div className="text-center py-6">
+        <Lock className="h-10 w-10 mx-auto mb-3 text-crypto-foreground/30" />
+        <p className="text-crypto-foreground/70">
+          No key fragments have been extracted from this transaction yet
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div>
       <div className="mb-4">
@@ -43,7 +56,7 @@ export function KeyFragmentsTab({
               ) : (
                 <>
                   <Lock className="h-5 w-5 text-amber-500 mr-2" />
-                  <span className="text-amber-500 font-medium">Partial Key - {Object.keys(keyFragment.modulo_values).length} fragments collected</span>
+                  <span className="text-amber-500 font-medium">Partial Key - {fragmentCount} fragments collected</span>
                 </>
               )}
             </div>
@@ -58,27 +71,29 @@ export function KeyFragmentsTab({
         </div>
       </div>
       
-      <div className="mb-6">
-        <h3 className="text-sm font-medium mb-2">Fragments (Chinese Remainder Theorem)</h3>
-        <div className="bg-crypto-background rounded-md p-4 font-mono text-xs">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-crypto-border">
-                <th className="pb-2 text-left text-crypto-foreground/70">Modulus</th>
-                <th className="pb-2 text-left text-crypto-foreground/70">Remainder</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(keyFragment.modulo_values).map(([mod, remainder], index) => (
-                <tr key={index} className="border-b border-crypto-border/20 last:border-0">
-                  <td className="py-2 pr-4">{mod}</td>
-                  <td className="py-2">{remainder as string}</td>
+      {fragmentCount > 0 && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium mb-2">Fragments (Chinese Remainder Theorem)</h3>
+          <div className="bg-crypto-background rounded-md p-4 font-mono text-xs">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-crypto-border">
+                  <th className="pb-2 text-left text-crypto-foreground/70">Modulus</th>
+                  <th className="pb-2 text-left text-crypto-foreground/70">Remainder</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {keyFragment.modulo_values && Object.entries(keyFragment.modulo_values).map(([mod, remainder], index) => (
+                  <tr key={index} className="border-b border-crypto-border/20 last:border-0">
+                    <td className="py-2 pr-4">{mod}</td>
+                    <td className="py-2">{remainder as string}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
       
       {keyFragment.completed && (
         <>

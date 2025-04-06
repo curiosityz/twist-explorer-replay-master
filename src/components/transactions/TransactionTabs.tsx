@@ -24,6 +24,8 @@ export function TransactionTabs({
   totalInputValue,
   keyVerificationStatus
 }: TransactionTabsProps) {
+  const fragmentCount = keyFragment?.modulo_values ? Object.keys(keyFragment.modulo_values).length : 0;
+  
   return (
     <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
       <TabsList className="grid grid-cols-3 mb-2">
@@ -33,7 +35,7 @@ export function TransactionTabs({
         </TabsTrigger>
         <TabsTrigger value="fragments" className="data-[state=active]:bg-crypto-primary/20">
           <Key className="h-4 w-4 mr-2" />
-          Key Fragments
+          Key Fragments {fragmentCount > 0 && <span className="ml-1 text-xs bg-amber-500/20 text-amber-500 px-1 rounded">{fragmentCount}</span>}
         </TabsTrigger>
         <TabsTrigger value="raw" className="data-[state=active]:bg-crypto-primary/20">
           <FileCode className="h-4 w-4 mr-2" />

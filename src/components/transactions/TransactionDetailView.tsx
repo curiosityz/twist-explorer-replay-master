@@ -29,7 +29,10 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
     <Card className="w-full">
       <CardHeader className="border-b pb-3">
         <div className="flex justify-between items-start">
-          <TransactionHeader transaction={transaction} txid={txid} />
+          <TransactionHeader 
+            txid={txid || (transaction?.txid || '')} 
+            status={transaction?.status}
+          />
           <Button 
             variant="ghost" 
             size="icon" 
@@ -44,7 +47,7 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
         {isLoading ? (
           <LoadingState />
         ) : !transaction ? (
-          <NotFoundState />
+          <NotFoundState txid={txid} />
         ) : (
           <Tabs defaultValue="raw" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
