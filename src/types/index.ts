@@ -1,3 +1,4 @@
+
 // Transaction related types
 export interface Transaction {
   txid: string;
@@ -59,7 +60,7 @@ export interface Signature {
 
 export interface AnalysisResult {
   txid: string;
-  vulnerabilityType: string;
+  vulnerabilityType: 'twisted_curve' | 'nonce_reuse' | 'weak_signature' | 'unknown';
   publicKey: CryptographicPoint;
   signature?: Signature;
   twistOrder?: string;
@@ -69,6 +70,18 @@ export interface AnalysisResult {
   message?: string;
 }
 
+// Expanded secp256k1 curve parameters
+export interface CurveParameters {
+  p: bigint; // Field prime
+  n: bigint; // Curve order
+  a: bigint; // Curve parameter a
+  b: bigint; // Curve parameter b
+  Gx: bigint; // Generator x-coordinate
+  Gy: bigint; // Generator y-coordinate
+  h: bigint; // Cofactor
+  name: string; // Curve name
+}
+
 // Node connection related types
 export interface NodeConfiguration {
   name: string;
@@ -76,6 +89,8 @@ export interface NodeConfiguration {
   chain: ChainType;
   apiKey?: string;
   connected: boolean;
+  lastSyncBlock?: number;
+  syncStatus?: 'connected' | 'syncing' | 'error';
 }
 
 export type ChainType = 'BTC' | 'BCH' | 'BSV' | 'LTC' | 'Other';
@@ -98,4 +113,19 @@ export interface PrivateKeyFragment {
   completed: boolean;
   created_at: string;
   updated_at: string;
+}
+
+// Key recovery types
+export interface KeyRecoveryResult {
+  privateKey: string;
+  verified: boolean;
+  estimatedValue: number;
+  userActionRequired: boolean;
+}
+
+export interface SecurityWarning {
+  level: 'info' | 'warning' | 'critical';
+  message: string;
+  actionRequired: boolean;
+  actionDescription?: string;
 }

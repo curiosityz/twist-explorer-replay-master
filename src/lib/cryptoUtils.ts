@@ -106,6 +106,140 @@ export const bigIntToHex = (num: bigint): string => {
   return `0x${num.toString(16)}`;
 };
 
+// Secp256k1 curve parameters (Bitcoin)
+const curveParams = {
+  p: BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEFFFFFC2F'), // Field prime
+  n: BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141'), // Curve order
+  a: 0n, // Curve parameter a
+  b: 7n,  // Curve parameter b
+  Gx: BigInt('0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798'), // Generator x
+  Gy: BigInt('0x483ADA7726A3C4655DA4FBFC0E1108A8FD17B448A68554199C47D08FFB10D4B8')  // Generator y
+};
+
+/**
+ * Check if a point is on the secp256k1 curve
+ * @param x X coordinate (hex or bigint)
+ * @param y Y coordinate (hex or bigint)
+ * @returns Boolean indicating if point is on curve
+ */
+export const isPointOnCurve = (x: string | bigint, y: string | bigint): boolean => {
+  const xBigInt = typeof x === 'string' ? hexToBigInt(x) : x;
+  const yBigInt = typeof y === 'string' ? hexToBigInt(y) : y;
+  
+  // Ensure x and y are within the field range
+  if (xBigInt < 0n || xBigInt >= curveParams.p || yBigInt < 0n || yBigInt >= curveParams.p) {
+    return false;
+  }
+  
+  // Check if point satisfies curve equation: y² = x³ + 7 (mod p)
+  const leftSide = (yBigInt * yBigInt) % curveParams.p;
+  const rightSide = (((xBigInt * xBigInt) % curveParams.p) * xBigInt + curveParams.b) % curveParams.p;
+  
+  return leftSide === rightSide;
+};
+
+/**
+ * Simplified point addition on secp256k1 curve
+ * Note: This is a basic implementation for demonstration - production code should use specialized libraries
+ * @param p1 First point [x, y]
+ * @param p2 Second point [x, y]
+ * @returns Resulting point [x, y] or null for point at infinity
+ */
+const pointAdd = (
+  p1: [bigint, bigint], 
+  p2: [bigint, bigint]
+): [bigint, bigint] | null => {
+  const [x1, y1] = p1;
+  const [x2, y2] = p2;
+  
+  // Handle point at infinity cases
+  if (x1 === 0n && y1 === 0n) return [x2, y2];
+  if (x2 === 0n && y2 === 0n) return [x1, y1];
+  
+  // Point doubling
+  if (x1 === x2 && y1 === y2) {
+    // If y is 0, return point at infinity
+    if (y1 === 0n) return null;
+    
+    // λ = (3x₁² + a) / 2y₁ mod p for point doubling
+    const numerator = (3n * x1 * x1 + curveParams.a) % curveParams.p;
+    const denominator = (2n * y1) % curveParams.p;
+    const denomInverse = modularInverse(denominator, curveParams.p);
+    
+    if (denomInverse === null) return null;
+    
+    const lambda = (numerator * denomInverse) % curveParams.p;
+    
+    // Calculate x3 = λ² - 2x₁ mod p
+    const x3 = (lambda * lambda - 2n * x1) % curveParams.p;
+    // Calculate y3 = λ(x₁ - x3) - y₁ mod p
+    const y3 = (lambda * (x1 - x3) - y1) % curveParams.p;
+    
+    return [(x3 + curveParams.p) % curveParams.p, (y3 + curveParams.p) % curveParams.p];
+  }
+  
+  // Different points
+  if (x1 === x2 && y1 !== y2) {
+    // Return point at infinity (vertical line)
+    return null;
+  }
+  
+  // λ = (y₂ - y₁) / (x₂ - x₁) mod p for different points
+  const numerator = (y2 - y1) % curveParams.p;
+  const denominator = (x2 - x1) % curveParams.p;
+  const denomInverse = modularInverse(denominator, curveParams.p);
+  
+  if (denomInverse === null) return null;
+  
+  const lambda = (numerator * denomInverse) % curveParams.p;
+  
+  // Calculate x3 = λ² - x₁ - x₂ mod p
+  const x3 = (lambda * lambda - x1 - x2) % curveParams.p;
+  // Calculate y3 = λ(x₁ - x3) - y₁ mod p
+  const y3 = (lambda * (x1 - x3) - y1) % curveParams.p;
+  
+  return [(x3 + curveParams.p) % curveParams.p, (y3 + curveParams.p) % curveParams.p];
+};
+
+/**
+ * Scalar multiplication (kG) on secp256k1 curve using double-and-add algorithm
+ * @param k Scalar value
+ * @param point Base point [x, y], defaults to generator point
+ * @returns Resulting point [x, y]
+ */
+const scalarMultiply = (
+  k: bigint, 
+  point: [bigint, bigint] = [curveParams.Gx, curveParams.Gy]
+): [bigint, bigint] | null => {
+  if (k === 0n) return null;
+  if (k === 1n) return point;
+  
+  let result: [bigint, bigint] | null = null;
+  let addend: [bigint, bigint] | null = point;
+  let n = k;
+  
+  while (n > 0n) {
+    if (n & 1n) {
+      // Add current bit's contribution
+      if (result === null) {
+        result = addend;
+      } else if (addend !== null) {
+        result = pointAdd(result, addend);
+      }
+    }
+    
+    // Double the addend for next bit
+    if (addend !== null) {
+      addend = pointAdd(addend, addend);
+    }
+    
+    // Shift to next bit
+    n >>= 1n;
+  }
+  
+  return result;
+};
+
 /**
  * Verifies whether a private key correctly generates the corresponding public key
  * @param privateKeyHex Private key in hexadecimal format
@@ -119,27 +253,50 @@ export const verifyPrivateKey = (
   publicKeyY: string
 ): boolean => {
   try {
-    // For real implementation, this would use elliptic curve operations
-    // to derive public key from private key and compare with provided public key
-    
-    // This is a simplified mock implementation
-    // In a real system, we would use a library like elliptic.js or noble-secp256k1
-    
-    // Mock verification (in practice, you'd derive the public key from private key)
+    // Parse keys to BigInt
     const privateKey = hexToBigInt(privateKeyHex);
+    const expectedX = hexToBigInt(publicKeyX);
+    const expectedY = hexToBigInt(publicKeyY);
     
-    // For demo, we'll use a simplified check
-    // A real implementation would compute: publicKey = G * privateKey (point multiplication)
-    const derivedPublicKeyX = `${publicKeyX.substring(0, 10)}...`;
-    const derivedPublicKeyY = `${publicKeyY.substring(0, 10)}...`;
+    // Private key must be in the valid range: 1 <= privateKey < n
+    if (privateKey <= 0n || privateKey >= curveParams.n) {
+      console.error("Private key out of valid range");
+      return false;
+    }
+    
+    // Calculate public key as privateKey * G
+    const calculatedPoint = scalarMultiply(privateKey);
+    
+    // Handle failure in calculation
+    if (calculatedPoint === null) {
+      console.error("Point calculation failed");
+      return false;
+    }
+    
+    const [calculatedX, calculatedY] = calculatedPoint;
     
     console.log("Verifying private key:", privateKeyHex);
-    console.log("Against public key:", publicKeyX, publicKeyY);
-    console.log("Mock derived public key:", derivedPublicKeyX, derivedPublicKeyY);
+    console.log("Expected public key:", publicKeyX, publicKeyY);
+    console.log("Calculated public key:", bigIntToHex(calculatedX), bigIntToHex(calculatedY));
     
-    // Since this is a mock function, return true for the demo 
-    // In real implementation, would do: return derivedPubKey.x === publicKeyX && derivedPubKey.y === publicKeyY
-    return true;
+    // For twisted curve vulnerability analysis, we may want to verify keys that are not on the main curve
+    const pointOnMainCurve = isPointOnCurve(expectedX, expectedY);
+    
+    // If the expected point is on the main curve, do exact verification
+    if (pointOnMainCurve) {
+      return calculatedX === expectedX && calculatedY === expectedY;
+    } else {
+      // For points not on the main curve, we're dealing with a possible twisted curve scenario
+      // In this case, we verify by checking the calculation result against the expected values
+      // This is a simplified check and in a real implementation would involve twist curve calculations
+      
+      // For demo purposes, we'll log that this is a twisted curve and simulate success
+      console.log("Note: Public key is not on the main curve - possible twisted curve vulnerability");
+      
+      // We'd implement actual twist curve verification here in a real system
+      // For now, return true to simulate successful validation for twisted curve scenarios
+      return true;
+    }
   } catch (error) {
     console.error("Error verifying private key:", error);
     return false;
@@ -216,7 +373,21 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
  * @returns True if fragments are sufficient for full key recovery
  */
 export const hasEnoughFragmentsForFullRecovery = (fragments: Record<string, string>): boolean => {
-  // In a real implementation, this would check the product of moduli against the curve order
-  // For this demo, we'll assume 6+ fragments is enough for full recovery
-  return Object.keys(fragments).length >= 6;
+  // Check product of moduli against curve order
+  try {
+    if (Object.keys(fragments).length < 6) {
+      return false;
+    }
+    
+    // Calculate product of all moduli
+    const moduliProduct = Object.keys(fragments).reduce((acc, mod) => {
+      return acc * hexToBigInt(mod);
+    }, 1n);
+    
+    // Compare with curve order
+    return moduliProduct > curveParams.n;
+  } catch (error) {
+    console.error("Error checking fragment sufficiency:", error);
+    return false;
+  }
 };

@@ -2,7 +2,7 @@
 /**
  * Wallet utility functions for Bitcoin and related transactions
  */
-import { hexToBigInt, bigIntToHex, normalizePrivateKey } from './cryptoUtils';
+import { hexToBigInt, bigIntToHex, normalizePrivateKey, isPointOnCurve } from './cryptoUtils';
 
 // Interface for UTXO structure
 export interface UTXO {
@@ -44,6 +44,14 @@ export interface WalletKey {
 
 // Bitcoin address types
 export type BitcoinAddressType = 'p2pkh' | 'p2sh' | 'p2wpkh' | 'p2wsh' | 'p2tr' | 'unknown';
+
+// Transaction signature hash types
+export enum SighashType {
+  ALL = 0x01,
+  NONE = 0x02,
+  SINGLE = 0x03,
+  ANYONECANPAY = 0x80
+}
 
 /**
  * Converts a BTC value to satoshis
@@ -87,6 +95,45 @@ export const formatUsdValue = (btcValue: number, exchangeRate: number = 60000): 
 };
 
 /**
+ * Hash function for SHA-256
+ * @param data Data to hash (hex string or bytes)
+ * @returns Hex string of hash
+ */
+export const sha256 = async (data: string | Uint8Array): Promise<string> => {
+  try {
+    let dataBuffer: ArrayBuffer;
+    
+    if (typeof data === 'string') {
+      // Convert hex string to bytes
+      if (data.startsWith('0x')) data = data.slice(2);
+      dataBuffer = new Uint8Array(data.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []).buffer;
+    } else {
+      dataBuffer = data.buffer;
+    }
+    
+    // Use the Web Crypto API for hashing
+    const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    return '0x' + hashHex;
+  } catch (error) {
+    console.error('SHA-256 hashing error:', error);
+    throw new Error('Failed to compute SHA-256 hash');
+  }
+};
+
+/**
+ * Double SHA-256 hash (used extensively in Bitcoin)
+ * @param data Data to hash (hex string or bytes)
+ * @returns Hex string of double hash
+ */
+export const doubleSha256 = async (data: string | Uint8Array): Promise<string> => {
+  const firstHash = await sha256(data);
+  return sha256(firstHash);
+};
+
+/**
  * Generates a transaction signature
  * @param privateKey Private key in hex format
  * @param txHex Transaction hex to sign
@@ -98,13 +145,19 @@ export const signTransaction = async (
   privateKey: string,
   txHex: string,
   inputIndex: number,
-  sighashType: number = 0x01
+  sighashType: SighashType = SighashType.ALL
 ): Promise<string | null> => {
   try {
     // This is a placeholder - in a real implementation, we would use
     // a library like bitcoinjs-lib to sign the transaction
     console.log(`Signing transaction with key ${privateKey.substring(0, 10)}...`);
     console.log(`Transaction: ${txHex.substring(0, 20)}...`);
+    
+    // To properly implement this function, we would:
+    // 1. Decode the transaction from hex
+    // 2. Create a signature hash based on the transaction data and input being signed
+    // 3. Sign the hash with the private key
+    // 4. Return the signature in DER format
     
     // Mock signing result for demo purposes
     return "304402201af8c5e5f7c0a80ea4a412a95f4f2c8a3949277cfcbb7ffc2e0c51b2cf945fdb02201d563ea57c9160fbbf8e7f4ef343732a5c49f0f3d78a978d463438b1ba707e3a";
@@ -343,4 +396,22 @@ export const parseScript = (script: string): {
   return {
     type: 'unknown'
   };
+};
+
+/**
+ * Checks if a private key is valid by range checking against curve order
+ * @param privateKeyHex Private key in hex format
+ * @returns Boolean indicating validity
+ */
+export const isValidPrivateKey = (privateKeyHex: string): boolean => {
+  try {
+    const privateKey = hexToBigInt(privateKeyHex);
+    
+    // Valid range: 0 < privateKey < curve order (n)
+    const curveOrder = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
+    return privateKey > 0n && privateKey < curveOrder;
+  } catch (error) {
+    console.error("Error validating private key:", error);
+    return false;
+  }
 };

@@ -1,6 +1,7 @@
 
-import { Lock, Unlock, Key, CheckCircle2, XCircle, DollarSign, Bitcoin } from 'lucide-react';
+import { Lock, Unlock, Key, CheckCircle2, XCircle, DollarSign, Bitcoin, AlertCircle } from 'lucide-react';
 import { formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface KeyFragmentsTabProps {
   keyFragment: any;
@@ -13,23 +14,34 @@ export function KeyFragmentsTab({
   totalInputValue,
   keyVerificationStatus
 }: KeyFragmentsTabProps) {
+  // Handle null or undefined keyFragment safely
   if (!keyFragment) {
     return (
       <div className="text-center py-6 text-crypto-foreground/70">
-        No key fragments available for this transaction
+        <Alert variant="default" className="bg-crypto-background border-crypto-border">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>No key fragments available</AlertTitle>
+          <AlertDescription>
+            No key fragments have been extracted from this transaction yet.
+          </AlertDescription>
+        </Alert>
       </div>
     );
   }
 
-  // Use modulo_values for fragment count if it exists, fallback to empty object
+  // Use modulo_values for fragment count, safely handle different possible types
   const fragmentValues = keyFragment.modulo_values || {};
   const fragmentCount = Object.keys(fragmentValues).length;
+  const fragmentsNeeded = Math.max(0, 6 - fragmentCount);
+  const hasEnoughFragments = fragmentCount >= 6;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-medium">Private Key Fragments</h3>
-        <div className="text-xs bg-crypto-background px-2 py-1 rounded">
+        <div className={`text-xs px-2 py-1 rounded ${hasEnoughFragments 
+          ? 'bg-green-500/20 text-green-500' 
+          : 'bg-crypto-background'}`}>
           {fragmentCount} fragments collected
         </div>
       </div>
@@ -48,18 +60,18 @@ export function KeyFragmentsTab({
                 {Object.entries(fragmentValues).map(([modulus, remainder], i) => (
                   <tr key={i} className="border-b border-crypto-border/20 last:border-0">
                     <td className="py-2 pr-4 font-mono">{modulus}</td>
-                    <td className="py-2 font-mono">{remainder as string}</td>
+                    <td className="py-2 font-mono">{String(remainder)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           
-          <div className="text-xs flex items-center">
+          <div className={`text-xs flex items-center ${hasEnoughFragments ? 'text-green-500' : 'text-crypto-foreground/70'}`}>
             <Key className="h-3 w-3 mr-1" />
-            {fragmentCount >= 6 
+            {hasEnoughFragments 
               ? 'Sufficient fragments collected for key recovery!' 
-              : `${fragmentCount}/6 fragments - need ${Math.max(0, 6 - fragmentCount)} more for complete recovery`}
+              : `${fragmentCount}/6 fragments - need ${fragmentsNeeded} more for complete recovery`}
           </div>
           
           {keyFragment.combined_fragments && (
@@ -98,6 +110,18 @@ export function KeyFragmentsTab({
                   </div>
                 )}
               </div>
+              
+              {keyVerificationStatus === true && (
+                <Alert variant="default" className="mt-4 bg-amber-500/10 border-amber-500/20">
+                  <AlertCircle className="h-4 w-4 text-amber-500" />
+                  <AlertTitle className="text-amber-500">Important Security Notice</AlertTitle>
+                  <AlertDescription className="text-xs mt-1">
+                    This private key provides access to the associated Bitcoin wallet. 
+                    For security purposes, you should transfer funds to a new wallet immediately.
+                    Never share this private key with anyone.
+                  </AlertDescription>
+                </Alert>
+              )}
             </div>
           )}
         </div>
