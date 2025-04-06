@@ -1,15 +1,16 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import RawDataTab from './RawDataTab';
-import AnalysisTab from './AnalysisTab';
-import KeyFragmentsTab from './KeyFragmentsTab';
-import TransactionHeader from './TransactionHeader';
-import LoadingState from './LoadingState';
-import NotFoundState from './NotFoundState';
+import { RawDataTab } from './RawDataTab';
+import { AnalysisTab } from './AnalysisTab';
+import { KeyFragmentsTab } from './KeyFragmentsTab';
+import { TransactionHeader } from './TransactionHeader';
+import { LoadingState } from './LoadingState';
+import { NotFoundState } from './NotFoundState';
+import { TransactionTabs } from './TransactionTabs';
 
 interface TransactionDetailViewProps {
   transaction: any;
@@ -28,7 +29,7 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
     <Card className="w-full">
       <CardHeader className="border-b pb-3">
         <div className="flex justify-between items-start">
-          <TransactionHeader transaction={transaction} />
+          <TransactionHeader transaction={transaction} txid={txid} />
           <Button 
             variant="ghost" 
             size="icon" 
@@ -41,35 +42,38 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
-          <LoadingState message="Loading transaction details..." />
+          <LoadingState />
         ) : !transaction ? (
-          <NotFoundState txid={txid} message="Transaction data could not be loaded" />
+          <NotFoundState />
         ) : (
-          <TransactionTabs transaction={transaction} />
+          <Tabs defaultValue="raw" className="w-full">
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="raw">Raw Data</TabsTrigger>
+              <TabsTrigger value="analysis">Analysis</TabsTrigger>
+              <TabsTrigger value="keys">Key Fragments</TabsTrigger>
+            </TabsList>
+            <TabsContent value="raw" className="p-4">
+              <RawDataTab transaction={transaction} analysis={null} />
+            </TabsContent>
+            <TabsContent value="analysis" className="p-4">
+              <AnalysisTab 
+                analysis={null} 
+                keyFragment={null} 
+                totalInputValue={0}
+                keyVerificationStatus={null}
+              />
+            </TabsContent>
+            <TabsContent value="keys" className="p-4">
+              <KeyFragmentsTab 
+                keyFragment={null}
+                totalInputValue={0}
+                keyVerificationStatus={null}
+              />
+            </TabsContent>
+          </Tabs>
         )}
       </CardContent>
     </Card>
-  );
-};
-
-const TransactionTabs = ({ transaction }: { transaction: any }) => {
-  return (
-    <Tabs defaultValue="raw" className="w-full">
-      <TabsList className="grid w-full grid-cols-3">
-        <TabsTrigger value="raw">Raw Data</TabsTrigger>
-        <TabsTrigger value="analysis">Analysis</TabsTrigger>
-        <TabsTrigger value="keys">Key Fragments</TabsTrigger>
-      </TabsList>
-      <TabsContent value="raw" className="p-4">
-        <RawDataTab transaction={transaction} />
-      </TabsContent>
-      <TabsContent value="analysis" className="p-4">
-        <AnalysisTab transaction={transaction} />
-      </TabsContent>
-      <TabsContent value="keys" className="p-4">
-        <KeyFragmentsTab transaction={transaction} />
-      </TabsContent>
-    </Tabs>
   );
 };
 
