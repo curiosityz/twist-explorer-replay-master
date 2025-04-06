@@ -1,78 +1,58 @@
 
 /**
- * Utility functions for working with Bitcoin transaction IDs
+ * Extract transaction IDs from various input formats
+ * @param input - String containing transaction IDs in various formats
+ * @returns Array of extracted transaction IDs
  */
-
-/**
- * Extracts transaction IDs from various input formats
- * @param input - String or object containing transaction IDs
- * @returns Array of transaction IDs
- */
-export const extractTransactionIds = (input: string | any[]): string[] => {
-  // If input is already an array
-  if (Array.isArray(input)) {
-    return input
-      .map(item => {
-        // If array contains objects with txid
-        if (item && typeof item === 'object' && 'txid' in item) {
-          return item.txid;
-        }
-        // If array contains strings (direct txids)
-        if (typeof item === 'string') {
-          return item;
-        }
-        return null;
-      })
-      .filter(Boolean) as string[];
-  }
+export const extractTransactionIds = (input: string): string[] => {
+  if (!input || typeof input !== 'string') return [];
   
-  // If input is a string, try to parse it
-  if (typeof input === 'string') {
-    try {
-      // Try to parse as JSON
-      const parsed = JSON.parse(input);
-      return extractTransactionIds(parsed);
-    } catch (e) {
-      // Not valid JSON, try to extract as plain text list
-      // Split by common delimiters and filter valid txid format
-      return input
-        .split(/[\s,\n]+/)
-        .map(line => line.trim())
-        .filter(line => /^[a-fA-F0-9]{64}$/.test(line));
-    }
-  }
+  let txids: string[] = [];
   
-  // If input is an object
-  if (input && typeof input === 'object') {
-    // If it has a transactions array
-    if ('transactions' in input && Array.isArray(input.transactions)) {
-      return extractTransactionIds(input.transactions);
-    }
+  // Try to parse as JSON
+  try {
+    const parsed = JSON.parse(input);
     
-    // If it has a txid property directly
-    if ('txid' in input && typeof input.txid === 'string') {
-      return [input.txid];
+    // If parsed result is an array, extract txids directly
+    if (Array.isArray(parsed)) {
+      txids = parsed
+        .map(item => typeof item === 'string' ? item.trim() : '')
+        .filter(item => item !== '');
+    } 
+    // Handle object with transactions field (e.g., export from some wallets)
+    else if (parsed && typeof parsed === 'object') {
+      // Handle case where object has a transactions array property
+      if (parsed.transactions && Array.isArray(parsed.transactions)) {
+        txids = parsed.transactions
+          .map((tx: any) => {
+            if (typeof tx === 'string') return tx.trim();
+            if (tx && typeof tx === 'object' && tx.txid) return tx.txid.trim();
+            return '';
+          })
+          .filter(txid => txid !== '');
+      }
     }
-    
-    // If it's some other object format, try to find txids in values
-    return Object.values(input)
-      .flatMap(val => {
-        if (Array.isArray(val)) return extractTransactionIds(val);
-        if (val && typeof val === 'object') return extractTransactionIds(val);
-        if (typeof val === 'string' && /^[a-fA-F0-9]{64}$/.test(val)) return [val];
-        return [];
-      });
+  } catch (error) {
+    // Not valid JSON, try other formats
+    // Split by common separators (newline, comma)
+    txids = input.split(/[\n,\s]+/)
+      .map(item => item.trim())
+      .filter(item => item !== '');
   }
   
-  return [];
+  // Filter for only valid txids
+  return txids.filter(isValidTxid);
 };
 
 /**
- * Validates if a string is a valid Bitcoin transaction ID
+ * Validate Bitcoin transaction ID format
  * @param txid - Transaction ID to validate
- * @returns Boolean indicating if the string is a valid txid
+ * @returns Boolean indicating if the TXID is valid
  */
 export const isValidTxid = (txid: string): boolean => {
-  // Basic validation: check if it's a valid hex string of 64 characters (32 bytes)
-  return /^[a-fA-F0-9]{64}$/.test(txid);
+  if (!txid || typeof txid !== 'string') return false;
+  
+  // Bitcoin TXIDs are 64 character hex strings
+  const txidRegex = /^[a-fA-F0-9]{64}$/;
+  return txidRegex.test(txid);
 };
