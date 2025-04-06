@@ -8,20 +8,38 @@ import WalletKeyImport from '@/components/WalletKeyImport';
 import TransactionBatchUploader from '@/components/TransactionBatchUploader';
 import { ArrowLeft } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import TransactionDetailView from '@/components/transactions/TransactionDetailView';
+import { fetchTransactionDetails } from '@/services/transactionService';
 
 const WalletPage = () => {
   const [showImport, setShowImport] = useState(false);
   const [importedKey, setImportedKey] = useState<string | null>(null);
   const [selectedTransaction, setSelectedTransaction] = useState<string | null>(null);
+  const [transactionData, setTransactionData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
   
   const handleImportKey = (key: string) => {
     setImportedKey(key);
     setShowImport(false);
   };
   
-  const handleTransactionSelected = (txid: string) => {
+  const handleTransactionSelected = async (txid: string) => {
     setSelectedTransaction(txid);
-    console.log(`Selected transaction: ${txid}`);
+    setIsLoading(true);
+    
+    try {
+      const txData = await fetchTransactionDetails(txid);
+      setTransactionData(txData);
+    } catch (error) {
+      console.error('Error fetching transaction details:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const handleCloseTransactionView = () => {
+    setSelectedTransaction(null);
+    setTransactionData(null);
   };
   
   return (
@@ -44,7 +62,16 @@ const WalletPage = () => {
         
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
-            <WalletInterface />
+            {selectedTransaction ? (
+              <TransactionDetailView
+                transaction={transactionData}
+                onClose={handleCloseTransactionView}
+                isLoading={isLoading}
+                txid={selectedTransaction}
+              />
+            ) : (
+              <WalletInterface />
+            )}
           </div>
           
           <div className="space-y-6">

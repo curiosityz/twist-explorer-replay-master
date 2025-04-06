@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Key, AlertCircle, Check, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { normalizePrivateKey } from '@/lib/cryptoUtils';
+import { Textarea } from '@/components/ui/textarea';
 
 interface WalletKeyImportProps {
   onImport: (key: string) => void;
@@ -17,7 +18,7 @@ const WalletKeyImport = ({ onImport, onCancel }: WalletKeyImportProps) => {
   const [privateKey, setPrivateKey] = useState('');
   const [isValidFormat, setIsValidFormat] = useState(false);
 
-  const handleKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleKeyChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value.trim();
     setPrivateKey(value);
     
@@ -57,11 +58,11 @@ const WalletKeyImport = ({ onImport, onCancel }: WalletKeyImportProps) => {
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <label className="text-sm text-crypto-foreground/70">Private Key (hex)</label>
-          <Input 
+          <Textarea 
             placeholder="0x... or raw hex"
             value={privateKey}
             onChange={handleKeyChange}
-            className="font-mono"
+            className="font-mono min-h-20"
           />
           <p className="text-xs text-crypto-foreground/70">
             Enter a 64-character hexadecimal private key, with or without 0x prefix

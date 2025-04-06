@@ -48,7 +48,8 @@ export const processTransactions = async (txids: string[]) => {
     processedCount: successCount,
     totalValid: validTxids.length,
     totalInput: txids.length,
-    firstValidTxid: validTxids.length > 0 ? validTxids[0] : null
+    firstValidTxid: validTxids.length > 0 ? validTxids[0] : null,
+    validTxids: validTxids // Return all valid transaction IDs
   };
 };
 
@@ -81,7 +82,7 @@ export const fetchTransactionDetails = async (txid: string) => {
     }
     
     // If not in database, fetch from blockchain API
-    const txData = await chainstackService.getTransactionByTxid(txid);
+    const txData = await chainstackService.getTransaction(txid);
     
     if (txData) {
       // Store the fetched data in our database for future use
@@ -101,4 +102,43 @@ export const fetchTransactionDetails = async (txid: string) => {
     toast.error('Failed to fetch transaction details');
     return null;
   }
+};
+
+/**
+ * Fetch multiple transactions by their IDs
+ * @param txids - Array of transaction IDs to fetch
+ * @returns Array of transaction data objects
+ */
+export const fetchMultipleTransactions = async (txids: string[]) => {
+  const validTxids = txids.filter(isValidTxid);
+  const results = [];
+  
+  for (const txid of validTxids) {
+    try {
+      const txData = await fetchTransactionDetails(txid);
+      if (txData) {
+        results.push({
+          txid,
+          data: txData,
+          status: 'success'
+        });
+      } else {
+        results.push({
+          txid,
+          data: null,
+          status: 'error'
+        });
+      }
+    } catch (error) {
+      console.error(`Failed to fetch transaction ${txid}:`, error);
+      results.push({
+        txid,
+        data: null,
+        status: 'error',
+        error: error
+      });
+    }
+  }
+  
+  return results;
 };

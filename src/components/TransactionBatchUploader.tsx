@@ -8,6 +8,8 @@ import PasteUploadTab from './transactions/PasteUploadTab';
 import UploadProgress from './transactions/UploadProgress';
 import { extractTransactionIds } from '@/utils/transactionUtils';
 import { processTransactions } from '@/services/transactionService';
+import { Button } from './ui/button';
+import { ScrollArea } from './ui/scroll-area';
 
 interface TransactionBatchUploaderProps {
   onTransactionSelected: (txid: string) => void;
@@ -20,6 +22,7 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
   const [totalCount, setTotalCount] = useState(0);
   const [errorCount, setErrorCount] = useState(0);
   const [activeTab, setActiveTab] = useState('file');
+  const [processedTxids, setProcessedTxids] = useState<string[]>([]);
   const { toast } = useToast();
 
   const handleProcessTransactions = async (txids: string[]) => {
@@ -44,6 +47,9 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
     setProcessedCount(result.processedCount);
     setErrorCount(result.errorCount);
     setProgress(100);
+    
+    // Store all processed txids
+    setProcessedTxids(result.validTxids || []);
     
     // Select the first valid transaction for viewing if available
     if (result.firstValidTxid) {
@@ -138,6 +144,27 @@ const TransactionBatchUploader = ({ onTransactionSelected }: TransactionBatchUpl
           totalCount={totalCount}
           errorCount={errorCount}
         />
+        
+        {processedTxids.length > 0 && !isUploading && (
+          <div className="mt-4">
+            <h4 className="text-sm font-medium mb-2">Processed Transactions ({processedTxids.length})</h4>
+            <ScrollArea className="h-32 rounded border border-crypto-border bg-crypto-background">
+              <div className="p-2 space-y-1">
+                {processedTxids.map((txid) => (
+                  <Button 
+                    key={txid} 
+                    variant="ghost" 
+                    size="sm" 
+                    className="w-full justify-start truncate font-mono text-xs"
+                    onClick={() => onTransactionSelected(txid)}
+                  >
+                    {txid}
+                  </Button>
+                ))}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
