@@ -39,11 +39,17 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
       hasTransaction: !!transaction,
       hasAnalysis: !!analysis,
       hasKeyFragment: !!keyFragment,
+      keyFragmentProperties: keyFragment ? Object.keys(keyFragment) : [],
       keyFragmentCompleted: keyFragment?.completed,
       keyFragmentCombined: keyFragment?.combined_fragments,
       keyVerificationStatus,
       totalInputValue
     });
+    
+    if (keyFragment) {
+      console.log("Key fragment modulo values:", keyFragment.modulo_values);
+      console.log("Combined fragments value:", keyFragment.combined_fragments);
+    }
   }, [transaction, analysis, keyFragment, keyVerificationStatus, totalInputValue, txid]);
 
   return (

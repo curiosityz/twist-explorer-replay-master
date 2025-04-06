@@ -192,7 +192,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           public_key: mockPublicKey as unknown as Record<string, any>,
           signature: mockSignature as unknown as Record<string, any>,
           prime_factors: mockPrimeFactors,
-          private_key_modulo: mockPrivateKeyModulo,
+          private_key_modulo: mockPrivateKeyModulo as Record<string, string>,
           twist_order: mockAnalysisResult.twistOrder,
           status: mockAnalysisResult.status,
           message: mockAnalysisResult.message
@@ -250,10 +250,10 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         }
         
         if (existingFragment) {
-          const existingModuloValues = existingFragment.modulo_values || {};
+          const existingModuloValues: Record<string, string> = existingFragment.modulo_values || {};
           let updated = false;
           
-          Object.entries(mockPrivateKeyModulo).forEach(([mod, rem]) => {
+          Object.entries(mockPrivateKeyModulo as Record<string, string>).forEach(([mod, rem]) => {
             if (!existingModuloValues[mod]) {
               existingModuloValues[mod] = rem;
               updated = true;
@@ -282,7 +282,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         } else {
           const fragmentData = {
             public_key_hex: publicKeyHex,
-            modulo_values: mockPrivateKeyModulo,
+            modulo_values: mockPrivateKeyModulo as Record<string, string>,
             combined_fragments: isComplete ? combinedFragment : null,
             completed: isComplete
           };
