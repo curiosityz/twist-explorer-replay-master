@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -29,13 +28,11 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
     }
   }, [txid, startAnalysis]);
 
-  // Calculate and set the private key whenever analysis result changes
   useEffect(() => {
     if (analysisResult?.privateKeyModulo && Object.keys(analysisResult.privateKeyModulo).length >= 6) {
       const calculatedKey = combinePrivateKeyFragments(analysisResult.privateKeyModulo);
       setPrivateKey(calculatedKey);
       
-      // Also verify the key
       if (calculatedKey && analysisResult.publicKey) {
         const isValid = verifyPrivateKey(calculatedKey, analysisResult.publicKey.x, analysisResult.publicKey.y);
         setVerificationResult(isValid);
@@ -70,11 +67,9 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
     setIsDuplicate(false);
 
     try {
-      // First check if this transaction has already been analyzed
       const existingAnalysis = await checkIfTransactionIsAnalyzed(txid);
       
       if (existingAnalysis) {
-        // If transaction was already analyzed, consider it a duplicate
         const existingVulnerabilityType = existingAnalysis.vulnerability_type;
         
         if (existingVulnerabilityType !== 'unknown') {
@@ -83,7 +78,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             description: "The key fragments have already been extracted from this transaction."
           });
           
-          // Load the existing analysis data instead of creating new mock data
           const { data: analysisData, error: loadError } = await supabase
             .from(Tables.vulnerability_analyses)
             .select('*')
@@ -95,7 +89,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             throw new Error("Failed to load existing analysis");
           }
           
-          // Convert the data to the expected format for display
           const loadedResult: AnalysisResult = {
             txid: analysisData.txid,
             vulnerabilityType: analysisData.vulnerability_type,
@@ -110,7 +103,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           
           setAnalysisResult(loadedResult);
           
-          // Check if we have key fragments for this public key
           if (loadedResult.publicKey) {
             const publicKeyHex = loadedResult.publicKey.x + loadedResult.publicKey.y;
             
@@ -123,7 +115,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
             if (!keyError && keyData && keyData.combined_fragments) {
               setPrivateKey(keyData.combined_fragments);
               
-              // Verify the key
               const isValid = verifyPrivateKey(
                 keyData.combined_fragments, 
                 loadedResult.publicKey.x, 
@@ -195,14 +186,13 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
       setAnalysisResult(mockAnalysisResult);
 
       try {
-        // Convert objects to JSON-compatible format
         const analysisData = {
           txid: mockAnalysisResult.txid,
           vulnerability_type: mockAnalysisResult.vulnerabilityType,
           public_key: mockPublicKey as unknown as Record<string, any>,
           signature: mockSignature as unknown as Record<string, any>,
           prime_factors: mockPrimeFactors,
-          private_key_modulo: mockPrivateKeyModulo as Record<string, string>,
+          private_key_modulo: mockPrivateKeyModulo,
           twist_order: mockAnalysisResult.twistOrder,
           status: mockAnalysisResult.status,
           message: mockAnalysisResult.message
@@ -237,7 +227,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           }
         }
         
-        // Calculate the combined private key
         const combinedFragment = combinePrivateKeyFragments(mockPrivateKeyModulo);
         const isComplete = Object.keys(mockPrivateKeyModulo).length >= 6;
         
@@ -261,12 +250,9 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
         }
         
         if (existingFragment) {
-          // Don't overwrite existing fragments with mock data
-          // Instead, merge the new fragments with existing ones if they're not already there
           const existingModuloValues = existingFragment.modulo_values || {};
           let updated = false;
           
-          // Check if we have any new modulo values to add
           Object.entries(mockPrivateKeyModulo).forEach(([mod, rem]) => {
             if (!existingModuloValues[mod]) {
               existingModuloValues[mod] = rem;
@@ -275,7 +261,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
           });
           
           if (updated) {
-            // Recalculate combined fragments with the merged data
             const mergedCombinedFragment = combinePrivateKeyFragments(existingModuloValues);
             const mergedIsComplete = Object.keys(existingModuloValues).length >= 6;
             
@@ -292,7 +277,6 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
               console.error("Error updating key fragments:", updateFragError);
             }
           } else {
-            // If no new fragments, just notify the user
             toast.info("No new key fragments were found in this transaction");
           }
         } else {
@@ -520,14 +504,7 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
                         variant="ghost" 
                         size="sm" 
                         className="h-6 px-2 text-xs"
-                        onClick={() => {
-                          if (privateKey) {
-                            navigator.clipboard.writeText(privateKey);
-                            setCopied(true);
-                            toast.success("Private key copied to clipboard");
-                            setTimeout(() => setCopied(false), 2000);
-                          }
-                        }}
+                        onClick={copyPrivateKey}
                       >
                         {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
                       </Button>

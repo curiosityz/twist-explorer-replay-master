@@ -106,7 +106,7 @@ export function KeyFragmentsTab({
               Recovered Private Key (hex)
             </h3>
             <div className="bg-crypto-background rounded-md p-4 font-mono text-xs break-all">
-              {keyFragment.combined_fragments}
+              {keyFragment.combined_fragments || "No private key data available"}
             </div>
             
             {keyVerificationStatus !== null && (

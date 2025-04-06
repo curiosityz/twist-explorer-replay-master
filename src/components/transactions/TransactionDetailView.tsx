@@ -32,13 +32,27 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
   totalInputValue = 0,
   keyVerificationStatus = null
 }) => {
+  // For debugging purposes, log the props to see if we're getting proper data
+  React.useEffect(() => {
+    console.log("TransactionDetailView props:", {
+      txid,
+      hasTransaction: !!transaction,
+      hasAnalysis: !!analysis,
+      hasKeyFragment: !!keyFragment,
+      keyFragmentCompleted: keyFragment?.completed,
+      keyFragmentCombined: keyFragment?.combined_fragments,
+      keyVerificationStatus,
+      totalInputValue
+    });
+  }, [transaction, analysis, keyFragment, keyVerificationStatus, totalInputValue, txid]);
+
   return (
     <Card className="w-full">
       <CardHeader className="border-b pb-3">
         <div className="flex justify-between items-start">
           <TransactionHeader 
             txid={txid || (transaction?.txid || '')} 
-            status={transaction?.status}
+            status={transaction?.status || analysis?.status}
           />
           <Button 
             variant="ghost" 
