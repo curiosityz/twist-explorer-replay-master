@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,7 +9,7 @@ import TransactionsDashboard from "./pages/TransactionsDashboard";
 import KeyDashboard from "./pages/KeyDashboard";
 import TransactionDetail from "./pages/TransactionDetail";
 import NotFound from "./pages/NotFound";
-import WalletPage from '@/pages/WalletPage';
+import WalletPage from './pages/WalletPage';
 
 const queryClient = new QueryClient();
 
