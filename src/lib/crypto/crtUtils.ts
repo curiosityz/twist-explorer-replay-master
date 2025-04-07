@@ -1,10 +1,10 @@
-
 /**
  * Implementation of the Chinese Remainder Theorem for private key recovery
  */
 import { bigIntToHex, bigIntToPrivateKeyHex } from './mathUtils';
 import bigInt from 'big-integer';
 import { convertToBigInt } from './factorize/utils';
+import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
 
 /**
  * Apply Chinese Remainder Theorem to recover the full value from its remainders
@@ -20,6 +20,12 @@ export const chineseRemainderTheorem = (
   modulos: Record<string, string>
 ): bigint | null => {
   try {
+    // Check if Bitcoin libraries are loaded
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     // Convert all inputs to BigInts
     const moduliEntries = Object.entries(modulos).map(([m, r]) => [
       BigInt(m),
@@ -177,6 +183,12 @@ export const combinePrivateKeyFragments = (
   keyFragments: Record<string, string>
 ): string | null => {
   try {
+    // Check if Bitcoin libraries are loaded
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     // Ensure we have enough fragments
     if (Object.keys(keyFragments).length < 6) {
       console.info("Not enough key fragments for recovery");

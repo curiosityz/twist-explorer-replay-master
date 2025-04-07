@@ -1,7 +1,8 @@
-
 /**
  * Bitcoin signature utilities
  */
+
+import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
 
 /**
  * Decode a DER signature from Bitcoin transaction
@@ -24,6 +25,11 @@ export const decodeDERSignature = (derHex: string): { r: string, s: string } => 
     console.log("Decoding DER signature:", hex);
     
     // Check if Bitcoin library is available 
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     if (window?.Bitcoin?.ECDSA) {
       console.log("Using Bitcoin.ECDSA to decode signature");
       try {
@@ -110,6 +116,11 @@ export const decodeDERSignature = (derHex: string): { r: string, s: string } => 
 export const encodeToDER = (r: string, s: string, sighashType: number = 0x01): string => {
   try {
     // Check if Bitcoin library is available for optimal encoding
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     if (window?.Bitcoin?.ECDSA) {
       try {
         // Convert r and s to BigIntegers as required by the library
@@ -181,6 +192,11 @@ export const verifySignature = (
 ): boolean => {
   try {
     // Use secp256k1 library if available for optimal verification
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     if (window?.secp256k1) {
       try {
         // Convert message hash to bytes

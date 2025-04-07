@@ -54,7 +54,14 @@ export const isValidWIF = (wif: string): boolean => {
           return false;
         }
         
-        return true;
+        // Validate checksum
+        const checksum = decoded.slice(-4);
+        const data = decoded.slice(0, -4);
+        const hash1 = sha256(data);
+        const hash2 = sha256(hash1);
+        const validChecksum = hash2.slice(0, 4);
+        
+        return checksum.every((byte, index) => byte === validChecksum[index]);
       } catch (e) {
         return false; // Decoding failed, invalid Base58
       }

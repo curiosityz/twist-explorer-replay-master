@@ -1,4 +1,3 @@
-
 /**
  * Re-export all Bitcoin utility functions from their respective modules
  * This ensures backward compatibility with code that imports from bitcoinUtilities

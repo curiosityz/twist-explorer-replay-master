@@ -1,10 +1,10 @@
-
 /**
  * Elliptic curve operations for secp256k1
  */
 
 import { curveParams, twistParams } from './constants';
 import { modularInverse, hexToBigInt } from './mathUtils';
+import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
 
 /**
  * Check if a point is on the secp256k1 curve
@@ -13,6 +13,11 @@ import { modularInverse, hexToBigInt } from './mathUtils';
  * @returns Boolean indicating if point is on curve
  */
 export const isPointOnCurve = (x: string | bigint, y: string | bigint): boolean => {
+  const libCheck = checkBitcoinLibsLoaded();
+  if (!libCheck.loaded) {
+    throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+  }
+
   const xBigInt = typeof x === 'string' ? hexToBigInt(x) : x;
   const yBigInt = typeof y === 'string' ? hexToBigInt(y) : y;
   
@@ -152,6 +157,11 @@ export const scalarMultiply = (
   point: [bigint, bigint] = [curveParams.Gx, curveParams.Gy]
 ): [bigint, bigint] | null => {
   try {
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     // Use secp256k1 library if available for most accurate and optimized results
     if (window && window.secp256k1) {
       try {

@@ -1,20 +1,8 @@
-
 /**
  * Bitcoin address utility functions
  */
 
-// Check if Bitcoin libraries are loaded
-const checkBitcoinLibsLoaded = (): boolean => {
-  return !!(
-    window.Bitcoin && 
-    window.bs58 && 
-    window.bip39 && 
-    window.bech32 && 
-    window.secp256k1 && 
-    window.bitcoinMessage && 
-    window.bitcoinAddressValidation
-  );
-};
+import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
 
 /**
  * Validate Bitcoin address format
@@ -29,6 +17,12 @@ export const isValidBitcoinAddress = (
   if (!address) return false;
   
   try {
+    // Ensure Bitcoin libraries are loaded
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     // First try with bitcoin-address-validation library if available
     if (window.bitcoinAddressValidation) {
       console.log("Using bitcoinAddressValidation to validate address");

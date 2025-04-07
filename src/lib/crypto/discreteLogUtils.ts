@@ -1,4 +1,3 @@
-
 /**
  * Implements algorithms for solving the discrete logarithm problem on elliptic curves,
  * particularly for small moduli used in twisted curve attacks.

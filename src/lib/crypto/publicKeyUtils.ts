@@ -1,4 +1,3 @@
-
 /**
  * Bitcoin public key utilities
  */
@@ -13,6 +12,12 @@ import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
  */
 export const createCompressedPublicKey = (x: string, y: string): string => {
   try {
+    // Check if Bitcoin libraries are loaded
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+
     // Remove 0x prefix if present
     const xClean = x.startsWith('0x') ? x.slice(2) : x;
     const yClean = y.startsWith('0x') ? y.slice(2) : y;
