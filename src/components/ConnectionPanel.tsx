@@ -106,7 +106,8 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
       
       toast(isCorsError ? 
         "CORS policy prevents direct connection. Try using a CORS proxy or provide CORS headers on your endpoint." :
-        `Failed to connect: ${errorMessage}`
+        `Failed to connect: ${errorMessage}`, 
+        { className: "bg-red-100" }
       );
     } finally {
       setIsLoading(false);

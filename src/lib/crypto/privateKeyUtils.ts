@@ -94,7 +94,7 @@ export const verifyPrivateKey = (
     const derivedPubKey = window.secp256k1.publicKeyCreate(privKeyBytes);
     
     // Convert derived public key to uncompressed format (if needed)
-    const uncompressedDerivedPubKey = window.secp256k1.publicKeyConvert(derivedPubKey, false);
+    const uncompressedDerivedPubKey = window.secp256k1.publicKeyConvert(derivedPubKey);
     
     // Extract x and y coordinates from the derived public key
     const derivedX = Array.from(uncompressedDerivedPubKey.slice(1, 33))

@@ -55,18 +55,18 @@ export const initializeApplication = (): void => {
     
     if (!bitcoinLibStatus.loaded) {
       console.error(`Bitcoin libraries not loaded: Missing ${bitcoinLibStatus.missing.join(', ')}`);
-      toast({
-        description: `Some Bitcoin libraries not detected: ${bitcoinLibStatus.missing.join(', ')}. Some features may not work correctly.`,
-        duration: 10000,
-        variant: "destructive"
+      // Fix: Change from passing an object to passing a string with options as second parameter
+      toast(`Some Bitcoin libraries not detected: ${bitcoinLibStatus.missing.join(', ')}. Some features may not work correctly.`, {
+        duration: 10000, 
+        className: "bg-red-100"
       });
       
       // Force window refresh of library references
       refreshLibraryReferences();
     } else {
       console.log("All Bitcoin libraries loaded successfully");
-      toast({
-        description: "All required libraries loaded successfully",
+      // Fix: Use proper toast API
+      toast("All required libraries loaded successfully", {
         duration: 3000
       });
     }
@@ -89,9 +89,9 @@ export const checkFeatureLibraries = (feature: string, requiredLibs: string[]): 
   if (missing.length > 0) {
     const error = `${feature} requires libraries that are not loaded: ${missing.join(', ')}`;
     console.error(error);
-    toast({
-      description: `${feature} unavailable: Missing required libraries: ${missing.join(', ')}`,
-      variant: "destructive"
+    // Fix: Use proper toast API
+    toast(`${feature} unavailable: Missing required libraries: ${missing.join(', ')}`, {
+      className: "bg-red-100"
     });
     return false;
   }
