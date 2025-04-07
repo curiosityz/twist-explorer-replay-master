@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -30,7 +29,6 @@ const TransactionDetail = () => {
       setLoading(true);
       
       try {
-        // Fetch transaction details
         const { data: txData, error: txError } = await supabase
           .from(Tables.blockchain_transactions)
           .select('*')
@@ -42,10 +40,8 @@ const TransactionDetail = () => {
         } else {
           setTransaction(txData);
           
-          // Calculate total input value for recovered funds estimation
           if (txData && txData.decoded_json) {
             try {
-              // For demo purposes, use output sum + fee estimation
               const decodedTx = typeof txData.decoded_json === 'string' 
                 ? JSON.parse(txData.decoded_json) 
                 : txData.decoded_json;
@@ -53,7 +49,6 @@ const TransactionDetail = () => {
               const outputSum = decodedTx.vout
                 ? decodedTx.vout.reduce((sum: number, output: any) => sum + (output.value || 0), 0)
                 : 0;
-              // Assume a slightly higher input value (0.3% fee)
               setTotalInputValue(outputSum * 1.003);
             } catch (err) {
               console.error("Error parsing transaction data:", err);
@@ -62,7 +57,6 @@ const TransactionDetail = () => {
           }
         }
         
-        // Fetch analysis details
         const { data: analysisData, error: analysisError } = await supabase
           .from(Tables.vulnerability_analyses)
           .select('*')
@@ -74,10 +68,8 @@ const TransactionDetail = () => {
         } else {
           setAnalysis(analysisData);
           
-          // If we have a public key, check for key fragments
           if (analysisData?.public_key) {
             try {
-              // Safe access with type checking
               const publicKey = analysisData.public_key as unknown as CryptographicPoint;
               const publicKeyHex = publicKey.x + publicKey.y;
               
@@ -90,7 +82,6 @@ const TransactionDetail = () => {
               if (!keyError && keyData) {
                 setKeyFragment(keyData);
                 
-                // Verify the private key if it exists
                 if (keyData.completed && keyData.combined_fragments) {
                   const isValid = verifyPrivateKey(
                     keyData.combined_fragments, 
@@ -141,18 +132,16 @@ const TransactionDetail = () => {
           
           <Card>
             <CardHeader className="pb-3">
+              <h2 className="text-xl font-semibold">Transaction Analysis</h2>
+            </CardHeader>
+            <CardContent>
               <TransactionTabs
-                activeTab={activeTab}
-                setActiveTab={setActiveTab}
                 analysis={analysis}
-                keyFragment={keyFragment}
                 transaction={transaction}
+                keyFragment={keyFragment}
                 totalInputValue={totalInputValue}
                 keyVerificationStatus={keyVerificationStatus}
               />
-            </CardHeader>
-            <CardContent>
-              {/* The tab content is handled by TransactionTabs component */}
             </CardContent>
           </Card>
         </div>

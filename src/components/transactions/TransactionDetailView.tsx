@@ -3,11 +3,8 @@ import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TransactionHeader } from './TransactionHeader';
-import { RawDataTab } from './RawDataTab';
-import { AnalysisTab } from './AnalysisTab';
-import { KeyFragmentsTab } from './KeyFragmentsTab';
+import { TransactionTabs } from './TransactionTabs';
 import { TransactionLoadingView } from './TransactionLoadingView';
 import { TransactionNotFoundView } from './TransactionNotFoundView';
 
