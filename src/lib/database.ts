@@ -1,4 +1,3 @@
-
 // Type definitions for our database
 
 export interface BlockchainTransaction {
@@ -32,6 +31,7 @@ export interface VulnerabilityAnalysis {
   private_key_modulo?: Record<string, string>;
   created_at: string;
   updated_at: string;
+  recovered_private_key?: string | null;
 }
 
 export interface PrivateKeyFragment {
@@ -85,7 +85,8 @@ export const normalizeVulnerabilityAnalysis = (data: any): VulnerabilityAnalysis
       data.prime_factors.map(String) : [],
     private_key_modulo: privateKeyModulo,
     created_at: data.created_at,
-    updated_at: data.updated_at
+    updated_at: data.updated_at,
+    recovered_private_key: data.recovered_private_key
   };
 };
 

@@ -77,6 +77,7 @@ export type Database = {
           prime_factors: Json | null
           private_key_modulo: Json | null
           public_key: Json
+          recovered_private_key: string | null
           signature: Json | null
           status: string
           twist_order: string | null
@@ -91,6 +92,7 @@ export type Database = {
           prime_factors?: Json | null
           private_key_modulo?: Json | null
           public_key: Json
+          recovered_private_key?: string | null
           signature?: Json | null
           status: string
           twist_order?: string | null
@@ -105,6 +107,7 @@ export type Database = {
           prime_factors?: Json | null
           private_key_modulo?: Json | null
           public_key?: Json
+          recovered_private_key?: string | null
           signature?: Json | null
           status?: string
           twist_order?: string | null
