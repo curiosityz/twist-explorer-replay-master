@@ -43,7 +43,7 @@ export {
 
 export {
   factorize
-} from './crypto/factorizeUtils';
+} from './crypto/factorize';
 
 // Re-export all vulnerability analysis functionality
 export {
