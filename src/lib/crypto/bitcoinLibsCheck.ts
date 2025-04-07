@@ -47,4 +47,3 @@ export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] }
 export const isLibrariesLoaded = (): boolean => {
   return checkBitcoinLibsLoaded().loaded;
 };
-
