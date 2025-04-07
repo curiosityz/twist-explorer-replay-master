@@ -1,3 +1,4 @@
+
 // Transaction related types
 export interface Transaction {
   txid: string;
@@ -78,7 +79,7 @@ export interface AnalysisResult {
   privateKeyModulo?: Record<string, string>;
   status: "completed" | "analyzing" | "failed" | "pending";
   message: string;
-  recoveredPrivateKey?: string; // Added field to store the recovered private key
+  recoveredPrivateKey?: string | null; // Added field to store the recovered private key
 }
 
 // Expanded secp256k1 curve parameters
@@ -147,15 +148,15 @@ export interface SecurityWarning {
 export interface VulnerabilityAnalysis {
   created_at: string;
   id: string;
-  message: string;
+  message: string | null;
   prime_factors: any;
   private_key_modulo: any;
   public_key: any;
   signature: any;
   status: string;
-  twist_order: string;
+  twist_order: string | null;
   txid: string;
   updated_at: string;
   vulnerability_type: string;
-  recovered_private_key?: string;
+  recovered_private_key?: string | null;
 }
