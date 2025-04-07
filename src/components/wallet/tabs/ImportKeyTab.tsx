@@ -1,11 +1,10 @@
-
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Alert, AlertCircle, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { Plus } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { AlertCircle, Plus } from 'lucide-react';
 
 interface ImportKeyTabProps {
   importedKey: string;
