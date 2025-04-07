@@ -1,188 +1,167 @@
 
 /**
- * Bitcoin-specific cryptographic utility functions
- * Uses imported libraries for reliable cryptographic operations
+ * Bitcoin utility functions using external libraries
  */
 
-import { CryptographicPoint } from '@/types';
+// Check if Bitcoin libraries are loaded
+const checkBitcoinLibsLoaded = (): boolean => {
+  return !!(
+    window.Bitcoin && 
+    window.bs58 && 
+    window.bip39 && 
+    window.bech32 && 
+    window.secp256k1 && 
+    window.bitcoinMessage && 
+    window.bitcoinAddressValidation
+  );
+};
 
 /**
- * Validates a Bitcoin address using the bitcoin-address-validation library
- * @param address Bitcoin address to validate
- * @returns True if address is valid, false otherwise
+ * Decode a DER signature from Bitcoin transaction
+ * @param derHex Signature in DER format (hex string)
+ * @returns Object with r and s values
  */
-export const validateBitcoinAddress = (address: string): boolean => {
+export const decodeDERSignature = (derHex: string): { r: string, s: string } => {
   try {
+    // Validate input
+    if (!derHex || typeof derHex !== 'string') {
+      throw new Error('Invalid DER signature format');
+    }
+    
+    // Remove any SIGHASH byte if present
+    let hex = derHex;
+    if (hex.length > 140) {
+      hex = hex.slice(0, -2); // Remove last byte which is likely SIGHASH_ALL
+    }
+    
+    console.log("Decoding DER signature:", hex);
+    
+    // Check if Bitcoin library is available 
+    if (!checkBitcoinLibsLoaded()) {
+      throw new Error("Bitcoin libraries not loaded");
+    }
+    
+    // Use bitcoinjs parsing if available
+    if (window.Bitcoin && window.Bitcoin.ECDSA) {
+      console.log("Using Bitcoin.ECDSA to decode signature");
+      const sig = window.Bitcoin.ECDSA.parseSig(hex);
+      return {
+        r: sig.r.toString(16).padStart(64, '0'),
+        s: sig.s.toString(16).padStart(64, '0')
+      };
+    }
+    
+    // Manual DER parsing as fallback
+    // DER format: 30 + len + 02 + rlen + r + 02 + slen + s
+    if (!hex.startsWith('30')) {
+      throw new Error('Invalid DER signature: missing header');
+    }
+    
+    let position = 2; // Skip '30'
+    const totalLen = parseInt(hex.slice(position, position + 2), 16);
+    position += 2;
+    
+    if (hex.slice(position, position + 2) !== '02') {
+      throw new Error('Invalid DER signature: missing first integer marker');
+    }
+    position += 2;
+    
+    const rLen = parseInt(hex.slice(position, position + 2), 16);
+    position += 2;
+    let r = hex.slice(position, position + rLen * 2);
+    
+    // Skip any leading zeros in r
+    if (r.startsWith('00') && r.length > 64) {
+      r = r.slice(2);
+    }
+    position += rLen * 2;
+    
+    if (hex.slice(position, position + 2) !== '02') {
+      throw new Error('Invalid DER signature: missing second integer marker');
+    }
+    position += 2;
+    
+    const sLen = parseInt(hex.slice(position, position + 2), 16);
+    position += 2;
+    let s = hex.slice(position, position + sLen * 2);
+    
+    // Skip any leading zeros in s
+    if (s.startsWith('00') && s.length > 64) {
+      s = s.slice(2);
+    }
+    
+    // Pad r and s to 64 characters (32 bytes)
+    r = r.padStart(64, '0');
+    s = s.padStart(64, '0');
+    
+    return { r, s };
+  } catch (error) {
+    console.error("Error decoding DER signature:", error);
+    throw new Error(`Failed to decode DER signature: ${error.message}`);
+  }
+};
+
+/**
+ * Validate Bitcoin address format
+ * @param address Bitcoin address to validate
+ * @param network Optional network (mainnet/testnet)
+ * @returns Boolean indicating if address is valid
+ */
+export const isValidBitcoinAddress = (
+  address: string, 
+  network: 'mainnet' | 'testnet' = 'mainnet'
+): boolean => {
+  if (!address) return false;
+  
+  try {
+    // First try with bitcoin-address-validation library if available
     if (window.bitcoinAddressValidation) {
+      console.log("Using bitcoinAddressValidation to validate address");
       return window.bitcoinAddressValidation.validate(address);
     }
     
-    // Fallback validation - very basic
-    const isValidFormat = /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$|^(bc1|tb1)[a-zA-HJ-NP-Z0-9]{8,87}$/.test(address);
-    return isValidFormat;
-  } catch (error) {
-    console.error("Address validation error:", error);
-    return false;
-  }
-};
-
-/**
- * Decodes a DER encoded signature using the Bitcoin library
- * @param sigHex Hex string of the DER signature
- * @returns Object containing r, s values and sighash type
- */
-export const decodeDERSignature = (sigHex: string) => {
-  try {
-    if (!window.Bitcoin || !window.Bitcoin.Util) {
-      throw new Error("Bitcoin library not loaded");
-    }
-    
-    const sigBytes = window.Bitcoin.Util.hexToBytes(sigHex);
-    
-    // Check if the signature starts with 0x30 (DER format)
-    if (sigBytes[0] !== 0x30) {
-      throw new Error("Invalid DER signature format");
-    }
-    
-    // Parse DER format manually (similar to what's in the cryptoDataExtraction.ts)
-    let pos = 2; // Skip 0x30 and length byte
-    
-    // R value
-    if (sigBytes[pos] !== 0x02) { // Integer type
-      throw new Error("Invalid R value format in DER signature");
-    }
-    
-    pos++;
-    const rLen = sigBytes[pos];
-    pos++;
-    const rValue = sigBytes.slice(pos, pos + rLen);
-    pos += rLen;
-    
-    // S value
-    if (sigBytes[pos] !== 0x02) { // Integer type
-      throw new Error("Invalid S value format in DER signature");
-    }
-    
-    pos++;
-    const sLen = sigBytes[pos];
-    pos++;
-    const sValue = sigBytes.slice(pos, pos + sLen);
-    
-    // Get sighash byte (last byte)
-    const sighashType = sigBytes[sigBytes.length - 1];
-    
-    // Convert to hex
-    const rHex = Array.from(rValue).map(b => ('0' + b.toString(16)).slice(-2)).join('');
-    const sHex = Array.from(sValue).map(b => ('0' + b.toString(16)).slice(-2)).join('');
-    const sighashHex = ('0' + sighashType.toString(16)).slice(-2);
-    
-    return {
-      r: rHex,
-      s: sHex,
-      sighash: sighashHex
-    };
-  } catch (error) {
-    console.error("Error decoding DER signature:", error);
-    throw error;
-  }
-};
-
-/**
- * Decompresses a compressed public key
- * @param pubKeyHex Hex string of the compressed public key (starts with 02 or 03)
- * @returns Object with x and y coordinates
- */
-export const decompressPublicKey = (pubKeyHex: string) => {
-  try {
-    if (!window.Bitcoin) {
-      throw new Error("Bitcoin library not loaded");
-    }
-    
-    const pubKeyBytes = window.Bitcoin.Util.hexToBytes(pubKeyHex);
-    
-    // Check if it's a compressed key format (02/03 + 32 bytes of x)
-    if ((pubKeyBytes[0] !== 0x02 && pubKeyBytes[0] !== 0x03) || pubKeyBytes.length !== 33) {
-      throw new Error("Invalid compressed public key format");
-    }
-    
-    // Use Bitcoin.js to decompress
-    const ecKey = new window.Bitcoin.ECKey();
-    ecKey.setPub(pubKeyBytes);
-    const point = ecKey.getPubPoint();
-    
-    if (!point || !point.getX || !point.getY) {
-      throw new Error("Failed to decompress public key");
-    }
-    
-    const x = point.getX().toString(16).padStart(64, '0');
-    const y = point.getY().toString(16).padStart(64, '0');
-    
-    return {
-      x,
-      y,
-      isOnCurve: true // Assume it's on the curve since decompress succeeded
-    };
-  } catch (error) {
-    console.error("Error decompressing public key:", error);
-    throw error;
-  }
-};
-
-/**
- * Checks if a point is on the secp256k1 curve
- * @param x X coordinate as hex string
- * @param y Y coordinate as hex string
- * @returns True if point is on curve, false otherwise
- */
-export const isPointOnCurve = (x: string, y: string): boolean => {
-  try {
-    if (!window.secp256k1) {
-      console.warn("secp256k1 library not loaded, using fallback check");
+    // Fallback to basic regex for common Bitcoin address patterns
+    const p2pkhRegex = network === 'mainnet' 
+      ? /^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/ 
+      : /^[mn][a-km-zA-HJ-NP-Z1-9]{25,34}$/;
       
-      // Very basic fallback check (should use proper library when available)
-      // This is not a complete check and should be replaced with proper library usage
-      return true;
-    }
-    
-    // Convert hex strings to BigInt
-    const xBigInt = BigInt('0x' + x);
-    const yBigInt = BigInt('0x' + y);
-    
-    // Use secp256k1 library to check
-    return window.secp256k1.Point.isOnCurve({ x: xBigInt, y: yBigInt });
+    const p2shRegex = network === 'mainnet' 
+      ? /^3[a-km-zA-HJ-NP-Z1-9]{25,34}$/ 
+      : /^2[a-km-zA-HJ-NP-Z1-9]{25,34}$/;
+      
+    const bech32Regex = network === 'mainnet' 
+      ? /^bc1[a-zA-HJ-NP-Z0-9]{25,89}$/ 
+      : /^tb1[a-zA-HJ-NP-Z0-9]{25,89}$/;
+      
+    return p2pkhRegex.test(address) || p2shRegex.test(address) || bech32Regex.test(address);
   } catch (error) {
-    console.error("Error checking if point is on curve:", error);
+    console.error("Error validating Bitcoin address:", error);
     return false;
   }
 };
 
 /**
- * Converts a WIF private key to raw hex format
- * @param wifKey WIF format private key
- * @returns Hex string of private key
+ * Create compressed public key from x and y coordinates
+ * @param x X coordinate (hex string)
+ * @param y Y coordinate (hex string)
+ * @returns Compressed public key as hex string
  */
-export const wifToPrivateKey = (wifKey: string): string => {
+export const createCompressedPublicKey = (x: string, y: string): string => {
   try {
-    if (!window.Bitcoin || !window.Bitcoin.Base58) {
-      throw new Error("Bitcoin library not loaded");
-    }
+    // Remove 0x prefix if present
+    const xClean = x.startsWith('0x') ? x.slice(2) : x;
+    const yClean = y.startsWith('0x') ? y.slice(2) : y;
     
-    // Use the Bitcoin.js library to decode WIF
-    const bytes = window.Bitcoin.Base58.decode(wifKey);
+    // Pad to 64 characters if needed
+    const xPadded = xClean.padStart(64, '0');
     
-    // Skip the network byte (1st byte) and compressed flag (if present, last byte)
-    // Private key is 32 bytes in the middle
-    const isCompressed = bytes.length === 38; // 1 network byte + 32 key bytes + 1 compressed flag + 4 checksum
+    // Determine prefix based on y value (02 if even, 03 if odd)
+    const isYEven = BigInt(`0x${yClean}`) % 2n === 0n;
+    const prefix = isYEven ? '02' : '03';
     
-    // Extract the private key bytes (skip 1st byte, take 32 bytes)
-    const privateKeyBytes = bytes.slice(1, 33);
-    
-    // Convert to hex
-    const privateKeyHex = Array.from(privateKeyBytes).map(b => ('0' + b.toString(16)).slice(-2)).join('');
-    
-    return privateKeyHex;
+    return prefix + xPadded;
   } catch (error) {
-    console.error("Error converting WIF to private key:", error);
-    throw error;
+    console.error("Error creating compressed public key:", error);
+    throw new Error(`Failed to create compressed public key: ${error.message}`);
   }
 };
