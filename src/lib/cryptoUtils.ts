@@ -47,11 +47,13 @@ export {
 
 // Export Bitcoin-specific utilities
 export {
+  isValidBitcoinAddress,
   validateBitcoinAddress,
   decodeDERSignature,
   decompressPublicKey,
-  isPointOnCurve as isPointOnSecp256k1Curve,
-  wifToPrivateKey
+  isPointOnSecp256k1Curve,
+  wifToPrivateKey,
+  createCompressedPublicKey
 } from './crypto/bitcoinUtilities';
 
 // Re-export all vulnerability analysis functionality
