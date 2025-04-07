@@ -20,7 +20,7 @@ export const useAnalysisError = () => {
       // Categorize error types for better error messages
       if (errorMessage.includes('extract cryptographic data')) {
         errorType = 'extraction';
-        errorMessage = "Could not extract cryptographic data from this transaction. It may not contain the signature format we're analyzing.";
+        errorMessage = "Could not extract cryptographic data from this transaction. It may use a transaction format we don't currently support, or may not contain standard signature data.";
       } else if (errorMessage.includes('CORS') || errorMessage.includes('Failed to fetch')) {
         errorType = 'network';
         errorMessage = "Network request failed. This could be due to CORS restrictions or connectivity issues.";
@@ -30,6 +30,9 @@ export const useAnalysisError = () => {
       } else if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
         errorType = 'notfound';
         errorMessage = "Transaction not found. Please verify the transaction ID is correct.";
+      } else if (errorMessage.includes('parse') || errorMessage.includes('invalid format')) {
+        errorType = 'parse';
+        errorMessage = "Failed to parse transaction data. The format may be invalid or unsupported.";
       }
     } else {
       errorMessage = 'Unknown error occurred';
@@ -105,4 +108,3 @@ export const useAnalysisError = () => {
     handleAnalysisError
   };
 };
-
