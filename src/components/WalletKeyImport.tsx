@@ -35,6 +35,7 @@ const WalletKeyImport = ({ onImport, onCancel }: WalletKeyImportProps) => {
 
     try {
       const normalizedKey = normalizePrivateKey(privateKey);
+      console.log('Normalized key:', normalizedKey); // Add debugging
       onImport(normalizedKey);
       toast.success('Private key imported successfully');
     } catch (error) {

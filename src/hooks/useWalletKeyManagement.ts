@@ -4,6 +4,7 @@ import { supabase, Tables } from '@/integrations/supabase/client';
 import { WalletKey, deriveAddress } from '@/lib/walletUtils';
 import { normalizePrivateKey, verifyPrivateKey } from '@/lib/cryptoUtils';
 import { toast } from 'sonner';
+import { saveImportedKeys, loadImportedKeys } from '@/lib/keyStorage';
 
 export const useWalletKeyManagement = () => {
   const [walletKeys, setWalletKeys] = useState<WalletKey[]>([]);
@@ -14,15 +15,58 @@ export const useWalletKeyManagement = () => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   
   useEffect(() => {
-    loadRecoveredKeys();
+    loadAllKeys();
   }, []);
   
-  const loadRecoveredKeys = async () => {
+  // Save keys to localStorage whenever walletKeys changes
+  useEffect(() => {
+    if (walletKeys.length > 0) {
+      saveImportedKeys(walletKeys);
+    }
+  }, [walletKeys]);
+  
+  const loadAllKeys = async () => {
     setLoadingKeys(true);
+    
     try {
-      const localStorageImportedKeys = localStorage.getItem('importedKeys');
-      const importedKeyIds = localStorageImportedKeys ? JSON.parse(localStorageImportedKeys) : [];
+      // First load locally stored keys
+      const localKeys = loadImportedKeys();
+      const processedLocalKeys: WalletKey[] = localKeys.map(key => ({
+        privateKey: key.privateKey || '',
+        publicKey: { x: '0x0', y: '0x0' },
+        address: key.address || '',
+        network: key.network || 'mainnet',
+        verified: key.verified || false,
+        balance: key.balance || 0
+      }));
       
+      // Then load recovered keys from Supabase
+      const recoveredKeys = await loadRecoveredKeys();
+      
+      // Combine both sets of keys (avoiding duplicates by private key)
+      const allKeys = [...processedLocalKeys];
+      
+      for (const recoveredKey of recoveredKeys) {
+        if (!allKeys.some(k => k.privateKey === recoveredKey.privateKey)) {
+          allKeys.push(recoveredKey);
+        }
+      }
+      
+      setWalletKeys(allKeys);
+      
+      if (allKeys.length > 0) {
+        setSelectedKeyIndex(0);
+        toast.success(`${allKeys.length} key(s) loaded`);
+      }
+    } catch (err) {
+      console.error('Error loading all keys:', err);
+    } finally {
+      setLoadingKeys(false);
+    }
+  };
+  
+  const loadRecoveredKeys = async (): Promise<WalletKey[]> => {
+    try {
       const { data, error } = await supabase
         .from(Tables.private_key_fragments)
         .select('*')
@@ -31,13 +75,12 @@ export const useWalletKeyManagement = () => {
       if (error) {
         console.error('Error fetching keys:', error);
         toast.error('Error loading recovered keys');
-        return;
+        return [];
       }
       
       if (!data || data.length === 0) {
-        toast.info('No recovered private keys found');
-        setLoadingKeys(false);
-        return;
+        console.log('No recovered private keys found in database');
+        return [];
       }
       
       const processedKeys: WalletKey[] = [];
@@ -45,18 +88,20 @@ export const useWalletKeyManagement = () => {
       for (const fragment of data) {
         if (fragment.combined_fragments) {
           try {
-            const pubKeyX = fragment.public_key_hex.substring(0, 66);
-            const pubKeyY = fragment.public_key_hex.substring(66);
+            const pubKeyX = fragment.public_key_hex?.substring(0, 66);
+            const pubKeyY = fragment.public_key_hex?.substring(66);
             
             const normalizedKey = normalizePrivateKey(fragment.combined_fragments);
+            console.log('Processing recovered key:', normalizedKey);
             
-            const isVerified = verifyPrivateKey(normalizedKey, pubKeyX, pubKeyY);
+            const isVerified = pubKeyX && pubKeyY ? 
+              verifyPrivateKey(normalizedKey, pubKeyX, pubKeyY) : false;
             
             const address = deriveAddress(normalizedKey, selectedNetwork);
             
             processedKeys.push({
               privateKey: normalizedKey,
-              publicKey: { x: pubKeyX, y: pubKeyY },
+              publicKey: { x: pubKeyX || '0x0', y: pubKeyY || '0x0' },
               address,
               network: selectedNetwork,
               verified: isVerified,
@@ -68,17 +113,10 @@ export const useWalletKeyManagement = () => {
         }
       }
       
-      setWalletKeys(processedKeys);
-      
-      if (processedKeys.length > 0) {
-        setSelectedKeyIndex(0);
-        toast.success(`${processedKeys.length} private key(s) loaded`);
-      }
+      return processedKeys;
     } catch (err) {
       console.error('Error in loadRecoveredKeys:', err);
-      toast.error('Failed to load keys');
-    } finally {
-      setLoadingKeys(false);
+      return [];
     }
   };
   
@@ -90,6 +128,7 @@ export const useWalletKeyManagement = () => {
     
     try {
       const normalizedKey = normalizePrivateKey(importedKey.trim());
+      console.log('Importing key:', normalizedKey);
       
       const exists = walletKeys.some(k => k.privateKey === normalizedKey);
       if (exists) {
@@ -125,6 +164,7 @@ export const useWalletKeyManagement = () => {
     navigator.clipboard.writeText(text);
     setCopiedKey(keyId);
     setTimeout(() => setCopiedKey(null), 2000);
+    toast.success('Copied to clipboard');
   };
 
   return {
@@ -140,6 +180,7 @@ export const useWalletKeyManagement = () => {
     setSelectedNetwork,
     loadRecoveredKeys,
     importPrivateKey,
-    copyToClipboard
+    copyToClipboard,
+    loadAllKeys
   };
 };
