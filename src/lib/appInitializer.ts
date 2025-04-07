@@ -13,22 +13,28 @@ import { toast } from 'sonner';
 export const initializeApplication = (): void => {
   console.log("Initializing application...");
   
-  // Initialize Bitcoin libraries
-  const bitcoinLibStatus = initializeBitcoinLibraries();
-  
-  if (!bitcoinLibStatus.loaded) {
-    console.error(`Bitcoin libraries not loaded: Missing ${bitcoinLibStatus.missing.join(', ')}`);
-    toast.error(`Missing required libraries: ${bitcoinLibStatus.missing.join(', ')}`, {
-      description: "Some features may not work correctly without these libraries.",
-      duration: 6000
-    });
-  } else {
-    console.log("All Bitcoin libraries loaded successfully");
-  }
-  
-  // Initialize any other application components here
-  
-  console.log("Application initialization completed");
+  // Wait a brief moment to ensure DOM content is loaded and libraries are initialized
+  setTimeout(() => {
+    // Initialize Bitcoin libraries
+    const bitcoinLibStatus = initializeBitcoinLibraries();
+    
+    if (!bitcoinLibStatus.loaded) {
+      console.error(`Bitcoin libraries not loaded: Missing ${bitcoinLibStatus.missing.join(', ')}`);
+      toast.error(`Some Bitcoin libraries not detected: ${bitcoinLibStatus.missing.join(', ')}`, {
+        description: "Some features may not work correctly. Please check your internet connection and refresh the page.",
+        duration: 6000
+      });
+    } else {
+      console.log("All Bitcoin libraries loaded successfully");
+      toast.success("All required libraries loaded successfully", {
+        duration: 3000
+      });
+    }
+    
+    // Initialize any other application components here
+    
+    console.log("Application initialization completed");
+  }, 300); // Small delay to ensure libraries have time to initialize
 };
 
 /**
@@ -51,4 +57,3 @@ export const checkFeatureLibraries = (feature: string, requiredLibs: string[]): 
   
   return true;
 };
-
