@@ -32,6 +32,10 @@ export {
   verifyPrivateKey
 } from './crypto/keyUtils';
 
+export {
+  solveDiscreteLog
+} from './crypto/discreteLogUtils';
+
 export { 
   curveParams, 
   twistParams 
