@@ -100,7 +100,7 @@ export const fetchTransactionDetails = async (txid: string) => {
   } catch (error) {
     console.error(`Failed to fetch transaction ${txid}:`, error);
     toast.error('Failed to fetch transaction details');
-    return null;
+    throw error; // Explicitly throw the error instead of returning null
   }
 };
 
@@ -121,12 +121,6 @@ export const fetchMultipleTransactions = async (txids: string[]) => {
           txid,
           data: txData,
           status: 'success'
-        });
-      } else {
-        results.push({
-          txid,
-          data: null,
-          status: 'error'
         });
       }
     } catch (error) {

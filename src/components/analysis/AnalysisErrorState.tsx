@@ -27,12 +27,12 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
         <Alert className="mb-4 max-w-md">
           <AlertTitle className="flex items-center">
             <Settings className="mr-2 h-4 w-4" />
-            Connection Issue Detected
+            Blockchain Connection Issue
           </AlertTitle>
           <AlertDescription>
-            There appears to be an issue connecting to the blockchain node. The application
-            will use demo data for basic functionality, but for full analysis capabilities,
-            please verify your network connection or configure a different node endpoint.
+            There appears to be an issue connecting to the blockchain node.
+            Please verify your network connection or configure a different node endpoint
+            to continue with transaction analysis.
           </AlertDescription>
         </Alert>
       )}

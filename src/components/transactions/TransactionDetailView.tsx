@@ -7,7 +7,6 @@ import { TransactionHeader } from './TransactionHeader';
 import { TransactionTabs } from './TransactionTabs';
 import { TransactionLoadingView } from './TransactionLoadingView';
 import { TransactionNotFoundView } from './TransactionNotFoundView';
-import { toast } from 'sonner';
 
 interface TransactionDetailViewProps {
   transaction: any;
@@ -47,17 +46,6 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
       console.log("Combined fragments value:", keyFragment.combined_fragments);
     }
   }, [transaction, analysis, keyFragment, keyVerificationStatus, totalInputValue, txid]);
-
-  // Check if we're using mock data and notify the user once
-  useEffect(() => {
-    if (transaction && !transaction.blocktime && !isLoading) {
-      toast.info("Using demo data for transaction", {
-        description: "Unable to connect to blockchain node. Using fallback demo data.",
-        id: "mock-transaction-notice",
-        duration: 5000
-      });
-    }
-  }, [transaction, isLoading]);
 
   return (
     <Card className="w-full">
