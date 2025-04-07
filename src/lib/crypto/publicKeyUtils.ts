@@ -67,15 +67,8 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Use try-catch for the decompression operation
-      let decompressedKey;
-      try {
-        // Fix: Call publicKeyConvert without additional parameters
-        decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
-      } catch (decompError) {
-        console.error("secp256k1 decompression error:", decompError);
-        throw new Error(`secp256k1 decompression failed: ${decompError}`);
-      }
+      // Call publicKeyConvert without additional parameters
+      const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
       
       if (!decompressedKey || decompressedKey.length !== 65) {
         throw new Error(`Invalid decompressed key length: ${decompressedKey?.length}`);
@@ -102,15 +95,8 @@ export const decompressPublicKey = (
     } catch (error) {
       console.error("Public key decompression failed:", error);
       
-      // Fallback implementation (if the library failed)
-      const isYOdd = prefix === "03";
-      
-      // For fallback, we can only return the x coordinate and a placeholder for y
-      return {
-        x: xHex,
-        y: "0".repeat(64), // Placeholder - proper implementation would compute y
-        isOnCurve: false // We can't verify this without proper decompression
-      };
+      // If decompression failed, the key is likely not on the curve
+      throw new Error(`Failed to decompress public key: ${error}`);
     }
   } catch (error: any) {
     console.error("Error decompressing public key:", error);
@@ -194,13 +180,14 @@ export const validatePublicKey = (xHex: string, yHex: string): {
         );
         
         // Use secp256k1 library to validate the key
-        // This will throw if the key is invalid
+        // This checks both that the point is on the curve AND that it has the correct order
+        // (i.e., multiplying by the curve order results in the point at infinity)
         const isValid = window.secp256k1.publicKeyVerify(pubKeyBytes);
         
         return {
-          isValid: isValid,
+          isValid,
           isOnCurve: true,
-          reason: isValid ? undefined : "Failed secp256k1 library validation"
+          reason: isValid ? undefined : "Failed secp256k1 library validation (incorrect order)"
         };
       } catch (error) {
         console.error("Error in secp256k1 validation:", error);
@@ -213,10 +200,12 @@ export const validatePublicKey = (xHex: string, yHex: string): {
     }
     
     // If we don't have the library for advanced validation,
-    // we'll trust the on-curve check
+    // we'll trust the on-curve check but warn about incomplete validation
+    console.warn("secp256k1 library not available for complete validation");
     return { 
       isValid: true, 
-      isOnCurve: true 
+      isOnCurve: true,
+      reason: "Incomplete validation: secp256k1 library not available for order checking"
     };
   } catch (error) {
     console.error("Error validating public key:", error);
@@ -227,3 +216,4 @@ export const validatePublicKey = (xHex: string, yHex: string): {
     };
   }
 };
+

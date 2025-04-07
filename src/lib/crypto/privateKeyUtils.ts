@@ -27,7 +27,7 @@ export const wifToPrivateKey = (wif: string): string | null => {
       throw new Error("Invalid WIF format - should be 51-52 Base58 characters");
     }
     
-    // Fix: Call bs58.decode without format parameter
+    // Call bs58.decode without any format parameters - it expects just the string
     const bytes = window.bs58.decode(wif);
     
     // WIF format: version(1) + key(32) + [compressed-flag(1)] + checksum(4)
@@ -153,3 +153,4 @@ function sha256(data: Uint8Array): Uint8Array {
   // Fallback - in a real implementation we'd have a pure JS SHA256
   throw new Error("Bitcoin crypto library not available for SHA256");
 }
+
