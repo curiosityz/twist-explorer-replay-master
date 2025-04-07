@@ -47,3 +47,16 @@ export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] }
 export const isLibrariesLoaded = (): boolean => {
   return checkBitcoinLibsLoaded().loaded;
 };
+
+/**
+ * Log Bitcoin library loading status
+ * This can be called on application initialization
+ */
+export const checkAndLogLibraryStatus = (): void => {
+  const status = checkBitcoinLibsLoaded();
+  if (!status.loaded) {
+    console.warn(`Bitcoin libraries not loaded: Missing ${status.missing.join(', ')}`);
+  } else {
+    console.log("All Bitcoin libraries loaded successfully");
+  }
+};
