@@ -1,34 +1,31 @@
 
+import React from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { FileCode, Key, Shield } from 'lucide-react';
+import { RawDataTab } from './RawDataTab';
 import { AnalysisTab } from './AnalysisTab';
 import { KeyFragmentsTab } from './KeyFragmentsTab';
-import { RawDataTab } from './RawDataTab';
 
 interface TransactionTabsProps {
-  activeTab: string;
-  setActiveTab: (tab: string) => void;
   analysis: any;
-  keyFragment: any;
   transaction: any;
+  keyFragment: any;
   totalInputValue: number;
   keyVerificationStatus: boolean | null;
 }
 
-export function TransactionTabs({
-  activeTab,
-  setActiveTab,
+export const TransactionTabs: React.FC<TransactionTabsProps> = ({
   analysis,
-  keyFragment,
   transaction,
+  keyFragment,
   totalInputValue,
   keyVerificationStatus
-}: TransactionTabsProps) {
+}) => {
   const fragmentCount = keyFragment?.modulo_values ? Object.keys(keyFragment.modulo_values).length : 0;
   
   return (
-    <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-      <TabsList className="grid grid-cols-3 mb-2">
+    <Tabs defaultValue="analysis" className="w-full">
+      <TabsList className="grid w-full grid-cols-3">
         <TabsTrigger value="analysis" className="data-[state=active]:bg-crypto-primary/20">
           <Shield className="h-4 w-4 mr-2" />
           Analysis
@@ -43,7 +40,7 @@ export function TransactionTabs({
         </TabsTrigger>
       </TabsList>
       
-      <TabsContent value="analysis" className="space-y-4">
+      <TabsContent value="analysis" className="p-4">
         <AnalysisTab 
           analysis={analysis} 
           keyFragment={keyFragment} 
@@ -52,7 +49,7 @@ export function TransactionTabs({
         />
       </TabsContent>
       
-      <TabsContent value="fragments" className="space-y-4">
+      <TabsContent value="fragments" className="p-4">
         <KeyFragmentsTab 
           keyFragment={keyFragment}
           totalInputValue={totalInputValue}
@@ -60,9 +57,9 @@ export function TransactionTabs({
         />
       </TabsContent>
       
-      <TabsContent value="raw" className="space-y-4">
+      <TabsContent value="raw" className="p-4">
         <RawDataTab transaction={transaction} analysis={analysis} />
       </TabsContent>
     </Tabs>
   );
-}
+};

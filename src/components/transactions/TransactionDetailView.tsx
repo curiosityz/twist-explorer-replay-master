@@ -4,12 +4,12 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TransactionHeader } from './TransactionHeader';
 import { RawDataTab } from './RawDataTab';
 import { AnalysisTab } from './AnalysisTab';
 import { KeyFragmentsTab } from './KeyFragmentsTab';
-import { TransactionHeader } from './TransactionHeader';
-import { LoadingState } from './LoadingState';
-import { NotFoundState } from './NotFoundState';
+import { TransactionLoadingView } from './TransactionLoadingView';
+import { TransactionNotFoundView } from './TransactionNotFoundView';
 
 interface TransactionDetailViewProps {
   transaction: any;
@@ -32,7 +32,7 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
   totalInputValue = 0,
   keyVerificationStatus = null
 }) => {
-  // For debugging purposes, log the props to see if we're getting proper data
+  // For debugging purposes
   React.useEffect(() => {
     console.log("TransactionDetailView props:", {
       txid,
@@ -40,8 +40,6 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
       hasAnalysis: !!analysis,
       hasKeyFragment: !!keyFragment,
       keyFragmentProperties: keyFragment ? Object.keys(keyFragment) : [],
-      keyFragmentCompleted: keyFragment?.completed,
-      keyFragmentCombined: keyFragment?.combined_fragments,
       keyVerificationStatus,
       totalInputValue
     });
@@ -72,42 +70,17 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
       </CardHeader>
       <CardContent className="p-0">
         {isLoading ? (
-          <LoadingState txid={txid} />
+          <TransactionLoadingView txid={txid} />
         ) : !transaction ? (
-          <NotFoundState txid={txid} />
+          <TransactionNotFoundView txid={txid} />
         ) : (
-          <Tabs defaultValue="analysis" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="analysis">Analysis</TabsTrigger>
-              <TabsTrigger value="keys">
-                Key Fragments
-                {keyFragment && keyFragment.modulo_values && (
-                  <span className="ml-1 text-xs bg-amber-500/20 text-amber-500 px-1 rounded">
-                    {Object.keys(keyFragment.modulo_values).length}
-                  </span>
-                )}
-              </TabsTrigger>
-              <TabsTrigger value="raw">Raw Data</TabsTrigger>
-            </TabsList>
-            <TabsContent value="analysis" className="p-4">
-              <AnalysisTab 
-                analysis={analysis || transaction.analysis} 
-                keyFragment={keyFragment} 
-                totalInputValue={totalInputValue}
-                keyVerificationStatus={keyVerificationStatus}
-              />
-            </TabsContent>
-            <TabsContent value="keys" className="p-4">
-              <KeyFragmentsTab 
-                keyFragment={keyFragment}
-                totalInputValue={totalInputValue}
-                keyVerificationStatus={keyVerificationStatus}
-              />
-            </TabsContent>
-            <TabsContent value="raw" className="p-4">
-              <RawDataTab transaction={transaction} analysis={analysis} />
-            </TabsContent>
-          </Tabs>
+          <TransactionTabs
+            analysis={analysis}
+            transaction={transaction}
+            keyFragment={keyFragment}
+            totalInputValue={totalInputValue}
+            keyVerificationStatus={keyVerificationStatus}
+          />
         )}
       </CardContent>
     </Card>
