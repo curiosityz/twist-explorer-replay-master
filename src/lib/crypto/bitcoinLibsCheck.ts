@@ -1,28 +1,7 @@
+
 /**
  * Utility to check if Bitcoin libraries are loaded
  */
-
-// Global type for BitcoinJS library
-declare global {
-  interface Window {
-    Bitcoin: any;
-    bitcoin: any; // For directly accessing the bitcoin global from bitcoinjs-lib
-    bitcoinjs: any; // Alternative name for Bitcoin lib
-    BitcoinLib: any; // Another alternative name
-    bs58: any;
-    bip39: any;
-    bech32: any;
-    secp256k1: any;
-    nobleSecp256k1: any;
-    secp: any; // For noble-secp256k1 module
-    bitcoinMessage: any;
-    bitcoinOps: any;
-    OPS: any; // Alternative name for bitcoin-ops
-    bitcoinAddressValidation: any;
-    validate: any; // Alternative name for bitcoin-address-validation
-    bitcoinLibsLoaded?: Record<string, boolean>; // Track library loading status
-  }
-}
 
 /**
  * Check if Bitcoin libraries are loaded
