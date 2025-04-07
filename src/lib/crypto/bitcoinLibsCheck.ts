@@ -1,4 +1,3 @@
-
 /**
  * Utility to check if Bitcoin libraries are loaded
  */
