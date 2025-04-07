@@ -3,7 +3,7 @@
  * Application initialization utilities
  */
 
-import { initializeBitcoinLibraries, handleMissingLibraries } from './crypto/initializeLibraries';
+import { checkAndLogLibraryStatus, checkBitcoinLibsLoaded } from './crypto/bitcoinLibsCheck';
 import { toast } from 'sonner';
 
 /**
@@ -15,8 +15,24 @@ export const initializeApplication = (): void => {
   
   // Wait a brief moment to ensure DOM content is loaded and libraries are initialized
   setTimeout(() => {
-    // Initialize Bitcoin libraries
-    const bitcoinLibStatus = initializeBitcoinLibraries();
+    console.log("Initializing Bitcoin libraries...");
+    
+    // First check if alternate library names are available and map them
+    if (!window.Bitcoin && (window.bitcoin || window.bitcoinjs)) {
+      window.Bitcoin = window.bitcoin || window.bitcoinjs;
+      console.log("Mapped alternative Bitcoin library name to window.Bitcoin");
+    }
+    
+    if (!window.secp256k1 && window.nobleSecp256k1) {
+      window.secp256k1 = window.nobleSecp256k1;
+      console.log("Mapped nobleSecp256k1 to window.secp256k1");
+    }
+    
+    // Log detailed status of all libraries
+    checkAndLogLibraryStatus();
+    
+    // Get final library status
+    const bitcoinLibStatus = checkBitcoinLibsLoaded();
     
     if (!bitcoinLibStatus.loaded) {
       console.error(`Bitcoin libraries not loaded: Missing ${bitcoinLibStatus.missing.join(', ')}`);
@@ -37,7 +53,7 @@ export const initializeApplication = (): void => {
     // Initialize any other application components here
     
     console.log("Application initialization completed");
-  }, 1000); // Increased delay to ensure libraries have time to initialize
+  }, 2000); // Increased delay to ensure libraries have time to initialize
 };
 
 /**
@@ -72,9 +88,14 @@ const refreshLibraryReferences = (): void => {
   }
   
   // Check for Bitcoin global object and try to find it from different sources
-  if (!window.Bitcoin && typeof window.bitcoinjs !== 'undefined') {
-    window.Bitcoin = window.bitcoinjs;
-    console.log("Refreshed Bitcoin reference from bitcoinjs");
+  if (!window.Bitcoin) {
+    if (typeof window.bitcoin !== 'undefined') {
+      window.Bitcoin = window.bitcoin;
+      console.log("Refreshed Bitcoin reference from window.bitcoin");
+    } else if (typeof window.bitcoinjs !== 'undefined') {
+      window.Bitcoin = window.bitcoinjs;
+      console.log("Refreshed Bitcoin reference from window.bitcoinjs");
+    }
   }
   
   // Log updated status

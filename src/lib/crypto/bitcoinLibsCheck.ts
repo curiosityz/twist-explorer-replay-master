@@ -7,6 +7,8 @@
 declare global {
   interface Window {
     Bitcoin: any;
+    bitcoin: any; // For directly accessing the bitcoin global from bitcoinjs-lib
+    bitcoinjs: any; // Alternative name for Bitcoin lib
     bs58: any;
     bip39: any;
     bech32: any;
@@ -15,7 +17,6 @@ declare global {
     bitcoinMessage: any;
     bitcoinOps: any;
     bitcoinAddressValidation: any;
-    bitcoinjs: any;
   }
 }
 
@@ -42,7 +43,7 @@ export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] }
     // Check for alternate global names
     switch(lib) {
       case 'Bitcoin':
-        return !window.bitcoinjs;
+        return !window.bitcoin && !window.bitcoinjs;
       case 'secp256k1':
         return !window.nobleSecp256k1;
       default:
@@ -69,6 +70,22 @@ export const isLibrariesLoaded = (): boolean => {
  * This can be called on application initialization
  */
 export const checkAndLogLibraryStatus = (): void => {
+  console.log("Checking Bitcoin libraries status...");
+  
+  // Check for alternate global names first and assign them if needed
+  if (!window.Bitcoin && window.bitcoin) {
+    window.Bitcoin = window.bitcoin;
+    console.log("Assigned window.bitcoin to window.Bitcoin");
+  } else if (!window.Bitcoin && window.bitcoinjs) {
+    window.Bitcoin = window.bitcoinjs;
+    console.log("Assigned window.bitcoinjs to window.Bitcoin");
+  }
+  
+  if (!window.secp256k1 && window.nobleSecp256k1) {
+    window.secp256k1 = window.nobleSecp256k1;
+    console.log("Assigned window.nobleSecp256k1 to window.secp256k1");
+  }
+
   const status = checkBitcoinLibsLoaded();
   
   // Log individual library status for debugging

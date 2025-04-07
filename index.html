@@ -24,42 +24,49 @@
     <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-ops@1.4.1/map.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bitcoinjs-lib/6.1.0/bitcoinjs-lib.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js"></script>
-
-    <!-- Initialize libraries globally -->
-    <script>
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log("Initializing Bitcoin libraries in DOM content loaded event");
-        
-        // Define global variables to hold library references
-        window.Bitcoin = window.Bitcoin || bitcoinjs;
-        
-        // Make noble-secp256k1 available globally as secp256k1
-        if (window.nobleSecp256k1) {
-          window.secp256k1 = window.nobleSecp256k1;
-          console.log("secp256k1 initialized from nobleSecp256k1");
-        } else {
-          console.warn("nobleSecp256k1 not found, secp256k1 functionality may be limited");
-        }
-
-        // Log library availability for debugging
-        setTimeout(function() {
-          console.log("Checking Bitcoin libraries after initialization:");
-          console.log("- Bitcoin (bitcoinjs-lib):", typeof window.Bitcoin !== 'undefined' ? "Available" : "Missing");
-          console.log("- bs58:", typeof window.bs58 !== 'undefined' ? "Available" : "Missing");
-          console.log("- bip39:", typeof window.bip39 !== 'undefined' ? "Available" : "Missing");
-          console.log("- bech32:", typeof window.bech32 !== 'undefined' ? "Available" : "Missing");
-          console.log("- secp256k1:", typeof window.secp256k1 !== 'undefined' ? "Available" : "Missing");
-          console.log("- bitcoinMessage:", typeof window.bitcoinMessage !== 'undefined' ? "Available" : "Missing");
-          console.log("- bitcoinAddressValidation:", typeof window.bitcoinAddressValidation !== 'undefined' ? "Available" : "Missing");
-        }, 500);
-      });
-    </script>
+    
+    <!-- Make sure to load bitcoinjs-lib from a CDN that properly exposes it globally -->
+    <script src="https://unpkg.com/bitcoinjs-lib@6.1.0/dist/bitcoin-lib.min.js"></script>
   </head>
 
   <body>
     <div id="root"></div>
+    
+    <!-- Initialize libraries globally after they are loaded -->
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        console.log("Initializing Bitcoin libraries in DOM content loaded event");
+        
+        try {
+          // Define global variables to hold library references
+          // Use window.bitcoin from the bitcoinjs-lib to set window.Bitcoin
+          if (typeof bitcoin !== 'undefined') {
+            window.Bitcoin = bitcoin;
+            console.log("Bitcoin initialized from bitcoinjs-lib");
+          } else if (typeof bitcoinjs !== 'undefined') {
+            window.Bitcoin = bitcoinjs;
+            console.log("Bitcoin initialized from bitcoinjs global");
+          } else {
+            console.warn("Neither bitcoin nor bitcoinjs global found");
+          }
+          
+          // Make noble-secp256k1 available globally as secp256k1
+          if (window.nobleSecp256k1) {
+            window.secp256k1 = window.nobleSecp256k1;
+            console.log("secp256k1 initialized from nobleSecp256k1");
+          } else {
+            console.warn("nobleSecp256k1 not found, secp256k1 functionality may be limited");
+          }
+          
+          // Log successful initialization
+          console.log("Bitcoin libraries initialization complete");
+        } catch (e) {
+          console.error("Error initializing Bitcoin libraries:", e);
+        }
+      });
+    </script>
+    
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>

@@ -1,4 +1,3 @@
-
 /**
  * Private key utilities for Bitcoin
  */
@@ -193,7 +192,7 @@ export const privateKeyToWif = (privateKeyHex: string, compressed = true): strin
     }
     
     // 4. Calculate checksum (SHA256(SHA256(version + key + [compressed])))
-    const checksum = sha256(sha256(new Uint8Array(wifBytes)));
+    const checksum = sha256(new Uint8Array(wifBytes));
     
     // 5. Append first 4 bytes of checksum
     for (let i = 0; i < 4; i++) {
