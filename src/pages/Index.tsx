@@ -7,7 +7,6 @@ import TransactionFetcher from '@/components/TransactionFetcher';
 import TransactionViewer from '@/components/TransactionViewer';
 import CryptographicVisualizer from '@/components/CryptographicVisualizer';
 import TransactionBatchUploader from '@/components/TransactionBatchUploader';
-import { SAMPLE_TRANSACTION } from '@/lib/mockVulnerabilities';
 import { useToast } from '@/hooks/use-toast';
 import { supabase, Tables } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -50,46 +49,29 @@ const Index = () => {
         .maybeSingle();
       
       if (data && !error) {
-        // Use the transaction from database - proper type casting
+        // Use the transaction from database
         const txData = data.decoded_json as unknown as Transaction;
-        setTransaction(txData || SAMPLE_TRANSACTION);
+        setTransaction(txData);
         setAnalyzingTxid(txid);
         toast({
           title: "Transaction Fetched",
           description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded from database`,
         });
       } else {
-        // If no transaction found in database, store a new sample one
-        const { error: insertError } = await supabase
-          .from(Tables.blockchain_transactions)
-          .insert({
-            txid: txid,
-            chain: 'BTC',
-            decoded_json: SAMPLE_TRANSACTION,
-            processed: true
-          });
-          
-        if (insertError) {
-          console.error("Error saving transaction to database:", insertError);
-          toast({
-            title: "Database Error",
-            description: "Could not save transaction to database. Will continue with sample data.",
-            variant: "destructive"
-          });
-        }
-          
-        setTransaction(SAMPLE_TRANSACTION);
-        setAnalyzingTxid(txid);
+        // If transaction not found in database, fetch it from blockchain
+        // This would normally call your blockchain service
         toast({
-          title: "Transaction Fetched",
-          description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded`,
+          title: "Transaction Not Found",
+          description: "Transaction not found in database. Please use a real blockchain connection to fetch data.",
+          variant: "destructive"
         });
+        setTransaction(null);
       }
     } catch (error) {
       console.error("Error fetching transaction:", error);
       toast({
         title: "Error Fetching Transaction",
-        description: "Could not fetch the transaction. Please try again.",
+        description: "Could not fetch the transaction. Please try again or check your connection.",
         variant: "destructive"
       });
     }
@@ -162,8 +144,8 @@ const Index = () => {
         <Card className="bg-crypto-muted border-crypto-border p-4">
           <div className="text-xs text-crypto-foreground/70">
             <p className="font-mono">
-              NOTE: This application demonstrates the concepts behind the Twisted Curve and Cross-Chain Replay vulnerabilities for educational purposes only.
-              Transactions are stored in the database for analysis and private key fragments are automatically combined when possible.
+              NOTE: This application connects to real blockchain data to analyze real cryptographic vulnerabilities.
+              No mock data is used for vulnerability detection and cryptographic analysis.
             </p>
           </div>
         </Card>

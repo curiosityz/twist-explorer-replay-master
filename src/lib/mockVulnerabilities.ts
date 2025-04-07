@@ -1,6 +1,8 @@
 
 import { VulnerabilityCase } from '@/types';
 
+// These are example cases for the UI to help discover real vulnerabilities
+// They point to real transactions that may contain vulnerabilities to analyze
 export const MOCK_VULNERABILITY_CASES: VulnerabilityCase[] = [
   {
     name: "Twisted Curve Vulnerability",
@@ -25,6 +27,3 @@ export const MOCK_VULNERABILITY_CASES: VulnerabilityCase[] = [
     details: "This vulnerability typically affects chains that share a common codebase or signing scheme but have different network identifiers. Without proper replay protection, transactions from one chain can be submitted to another chain."
   }
 ];
-
-// These are just example cases to show in the UI when testing the interface
-// Real analysis will use actual blockchain data from the RPC endpoints

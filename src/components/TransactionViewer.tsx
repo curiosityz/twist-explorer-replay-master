@@ -4,7 +4,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Transaction } from '@/types';
-import { SAMPLE_TRANSACTION } from '@/lib/mockVulnerabilities';
 import { ExternalLink, FileCode, FileSearch, Play, Bitcoin, DollarSign } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
@@ -14,7 +13,7 @@ interface TransactionViewerProps {
   onAnalyze: (txid: string) => void;
 }
 
-const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: TransactionViewerProps) => {
+const TransactionViewer = ({ transaction, onAnalyze }: TransactionViewerProps) => {
   const [activeView, setActiveView] = useState('decoded');
   const [totalInputValue, setTotalInputValue] = useState(0);
   const [currentTxid, setCurrentTxid] = useState('');
@@ -23,14 +22,16 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
   useEffect(() => {
     // Force reset when transaction prop changes, regardless of txid comparison
     setActiveView('decoded');
-    calculateTotalValue();
-    setCurrentTxid(transaction?.txid || '');
+    if (transaction) {
+      calculateTotalValue();
+      setCurrentTxid(transaction?.txid || '');
+    }
   }, [transaction]);
 
   const calculateTotalValue = () => {
     if (transaction && transaction.vin) {
       // For a real app, we would fetch the UTXO values from a blockchain API
-      // For demo purposes, we'll estimate based on output values + a mock fee
+      // For now, we'll estimate based on output values + a mock fee
       const outputSum = transaction.vout.reduce((sum, output) => sum + output.value, 0);
       // Assume a slightly higher input value to account for fees
       const estimatedInputValue = outputSum * 1.003; // 0.3% fee estimate
@@ -56,6 +57,23 @@ const TransactionViewer = ({ transaction = SAMPLE_TRANSACTION, onAnalyze }: Tran
     const usdValue = btcValue * 60000;
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdValue);
   };
+
+  // If no transaction is provided, show empty state
+  if (!transaction) {
+    return (
+      <Card className="bg-crypto-muted border-crypto-border h-full overflow-hidden">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-crypto-foreground">Transaction Details</CardTitle>
+          <CardDescription className="text-crypto-foreground/70">
+            Select a transaction to view details
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-center h-[400px] text-crypto-foreground/50">
+          No transaction selected
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className="bg-crypto-muted border-crypto-border h-full overflow-hidden">
