@@ -34,13 +34,11 @@ export const modularInverse = (a: bigint, m: bigint): bigint | null => {
   // Extended Euclidean Algorithm
   let [old_r, r] = [a, m];
   let [old_s, s] = [1n, 0n];
-  let [old_t, t] = [0n, 1n];
   
   while (r !== 0n) {
     const quotient = old_r / r;
     [old_r, r] = [r, old_r - quotient * r];
     [old_s, s] = [s, old_s - quotient * s];
-    [old_t, t] = [t, old_t - quotient * t];
   }
   
   // GCD must be 1 for the inverse to exist
@@ -108,5 +106,29 @@ export const bigIntToHex = (num: bigint): string => {
     num = -num;
   }
   
-  return `0x${num.toString(16)}`;
+  // Convert to hex string without 0x prefix
+  const hexString = num.toString(16);
+  return `0x${hexString}`;
+};
+
+/**
+ * Format a BigInt to a properly formatted private key hex string (64 characters)
+ * @param num BigInt to convert
+ * @returns 64-character hex string (without 0x prefix)
+ */
+export const bigIntToPrivateKeyHex = (num: bigint): string => {
+  if (num < 0n) {
+    console.warn("Negative BigInt being converted to private key hex. Taking absolute value.");
+    num = -num;
+  }
+  
+  // Convert to hex string without 0x prefix
+  let hexString = num.toString(16);
+  
+  // Pad with leading zeros to ensure 64 characters (32 bytes)
+  while (hexString.length < 64) {
+    hexString = '0' + hexString;
+  }
+  
+  return hexString;
 };

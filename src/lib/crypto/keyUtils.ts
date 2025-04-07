@@ -3,46 +3,39 @@
  * Utilities for key handling, verification, and normalization
  */
 
-import { hexToBigInt, bigIntToHex } from './mathUtils';
+import { hexToBigInt, bigIntToHex, bigIntToPrivateKeyHex } from './mathUtils';
 import { isPointOnCurve, isPointOnTwistCurve, scalarMultiply } from './curveOperations';
 import { curveParams } from './constants';
 
 /**
  * Normalize private key length to standard format
  * @param keyHex Private key in hex format
- * @returns Normalized private key hex (64 characters without 0x prefix)
+ * @returns Normalized private key hex (64 characters with 0x prefix)
  */
 export const normalizePrivateKey = (keyHex: string): string => {
   try {
-    let key = keyHex;
+    let key = keyHex.trim();
     
     // Remove 0x prefix if present
     if (key.startsWith('0x')) {
       key = key.substring(2);
     }
     
-    // Convert to BigInt and back to ensure consistent handling
-    const keyBigInt = BigInt(`0x${key}`);
+    console.log("Normalizing key, input value:", key);
     
-    console.log("Normalizing key, raw BigInt value:", keyBigInt.toString());
+    // Convert to BigInt
+    const keyBigInt = BigInt(`0x${key}`);
+    console.log("Key as BigInt:", keyBigInt.toString());
     
     // Ensure the key is within the valid range for secp256k1
     const normalizedBigInt = keyBigInt % curveParams.n;
-    
-    // Convert back to hex string without 0x prefix
-    key = normalizedBigInt.toString(16);
-    
     console.log("Normalized BigInt value:", normalizedBigInt.toString());
-    console.log("Hex before padding:", key);
     
-    // Pad with leading zeros to ensure 64 characters (32 bytes)
-    while (key.length < 64) {
-      key = '0' + key;
-    }
+    // Convert to properly formatted 64-character hex
+    const formattedHex = bigIntToPrivateKeyHex(normalizedBigInt);
+    console.log("Final normalized key (64 chars):", formattedHex);
     
-    console.log("Final normalized key (64 chars):", key);
-    
-    return '0x' + key;
+    return `0x${formattedHex}`;
   } catch (error) {
     console.error("Error normalizing private key:", error);
     throw new Error(`Failed to normalize private key: ${error}`);

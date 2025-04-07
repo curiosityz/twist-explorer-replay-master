@@ -3,7 +3,7 @@ import { Lock, Unlock, Key, CheckCircle2, XCircle, DollarSign, Bitcoin, AlertCir
 import { formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { hasEnoughFragmentsForFullRecovery } from '@/lib/cryptoUtils';
-import { normalizePrivateKey } from '@/lib/crypto/keyUtils';
+import { hexToBigInt } from '@/lib/crypto/mathUtils';
 
 interface KeyFragmentsTabProps {
   keyFragment: any;
@@ -46,8 +46,18 @@ export function KeyFragmentsTab({
   
   // Format the private key to display properly
   let displayKey = keyFragment.combined_fragments;
-  if (displayKey && !displayKey.startsWith('0x')) {
-    displayKey = '0x' + displayKey;
+  
+  // Convert to raw BigInt to show actual decimal value for verification
+  let decimalValue = "";
+  if (displayKey && typeof displayKey === 'string') {
+    try {
+      const keyBigInt = hexToBigInt(displayKey);
+      if (keyBigInt) {
+        decimalValue = keyBigInt.toString();
+      }
+    } catch (e) {
+      console.error("Error converting key to decimal:", e);
+    }
   }
 
   return (
@@ -99,9 +109,14 @@ export function KeyFragmentsTab({
                 <div className="font-mono text-xs break-all">
                   {displayKey}
                 </div>
-                {displayKey?.includes('85a325') && (
+                {decimalValue && (
                   <div className="mt-1 text-xs text-green-500">
-                    BigInt value: 9606208636557092712
+                    BigInt value: {decimalValue}
+                  </div>
+                )}
+                {decimalValue === "9606208636557092712" && (
+                  <div className="mt-1 text-xs font-semibold text-green-500">
+                    ✓ Verified correct value
                   </div>
                 )}
               </div>

@@ -3,39 +3,57 @@
  * Chinese Remainder Theorem (CRT) implementation for private key recovery
  */
 
-import { areAllCoprime, modularInverse, hexToBigInt, bigIntToHex } from './mathUtils';
+import { areAllCoprime, modularInverse, hexToBigInt, bigIntToHex, bigIntToPrivateKeyHex } from './mathUtils';
 import { curveParams } from './constants';
-import { normalizePrivateKey } from './keyUtils';
 
 /**
  * Chinese Remainder Theorem (CRT) to combine private key fragments
  * @param congruences Array of [remainder, modulus] pairs
- * @returns Combined value mod product of moduli, or null if no solution exists
+ * @returns Combined value that satisfies all congruences, or null if no solution exists
  */
 export const chineseRemainderTheorem = (congruences: [bigint, bigint][]): bigint | null => {
   if (congruences.length === 0) return null;
   
-  // Calculate product of all moduli
-  const product = congruences.reduce((acc, [_, modulus]) => acc * modulus, 1n);
+  // Verify all moduli are coprime
+  const moduli = congruences.map(([_, m]) => m);
+  if (!areAllCoprime(moduli)) {
+    console.error("Moduli are not coprime, CRT requires coprime moduli");
+    return null;
+  }
+  
+  // Calculate product of all moduli (M)
+  const M = moduli.reduce((acc, m) => acc * m, 1n);
+  console.log("Product of all moduli (M):", M.toString());
   
   let result = 0n;
   
-  for (const [remainder, modulus] of congruences) {
-    const partialProduct = product / modulus;
-    const inverse = modularInverse(partialProduct, modulus);
+  // For each congruence, calculate Ni, yi, and partial result
+  for (let i = 0; i < congruences.length; i++) {
+    const [remainder, modulus] = congruences[i];
     
-    if (inverse === null) {
-      console.error(`Failed to find modular inverse for ${partialProduct} mod ${modulus}`);
-      return null; // Moduli are not coprime
+    // Calculate Ni = M / modulus
+    const Ni = M / modulus;
+    console.log(`N${i} = M / m${i} = ${M} / ${modulus} = ${Ni}`);
+    
+    // Calculate yi = inverse of Ni (mod modulus)
+    const yi = modularInverse(Ni, modulus);
+    if (yi === null) {
+      console.error(`Failed to find modular inverse for ${Ni} mod ${modulus}`);
+      return null;
     }
+    console.log(`y${i} = inverse(${Ni} mod ${modulus}) = ${yi}`);
     
-    result += remainder * partialProduct * inverse;
+    // Add partial result: remainder * Ni * yi
+    const partialResult = remainder * Ni * yi;
+    console.log(`Partial result for ${i}: ${remainder} * ${Ni} * ${yi} = ${partialResult}`);
+    
+    result += partialResult;
   }
   
-  // Take modulo of the result with the product of all moduli
-  result = ((result % product) + product) % product;
+  // Take the final result modulo M
+  result = result % M;
   
-  console.log("CRT calculation result:", result.toString());
+  console.log("Final CRT raw result:", result.toString());
   return result;
 };
 
@@ -92,60 +110,39 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
       }
     );
     
-    // Double-check: Log all congruences for debugging
-    congruences.forEach(([r, m]) => {
-      console.log(`Using congruence: x ≡ ${r} (mod ${m})`);
+    // Log all congruences for debugging
+    congruences.forEach(([r, m], index) => {
+      console.log(`Congruence ${index}: x ≡ ${r} (mod ${m})`);
     });
     
-    // Extract moduli
-    const moduli = congruences.map(([_, m]) => m);
-    
-    // Check if all moduli are coprime - requirement for CRT
-    if (!areAllCoprime(moduli)) {
-      console.log('Not all moduli are coprime. Selecting a coprime subset...');
-      
-      // Select a subset of moduli that are coprime
-      const selectedModuli = selectCoprimeModuli(moduli, curveParams.n);
-      
-      if (selectedModuli.length < 2) {
-        console.log('Could not find enough coprime moduli');
-        return null;
-      }
-      
-      // Filter congruences to only use the selected moduli
-      const filteredCongruences = congruences.filter(([_, m]) => 
-        selectedModuli.includes(m)
-      );
-      
-      console.log(`Selected ${filteredCongruences.length} coprime moduli for CRT calculation`);
-      
-      // Apply CRT on the filtered congruences
-      const combined = chineseRemainderTheorem(filteredCongruences);
-      
-      if (combined === null) {
-        console.log('No solution exists for the given congruences');
-        return null;
-      }
-      
-      console.log("Expected output for test case:", "9606208636557092712");
-      console.log("Actual CRT result:", combined.toString());
-      
-      // Return the raw hex without normalizing for the key fragments case
-      return bigIntToHex(combined);
+    // Test case specific log
+    if (congruences.some(([_, m]) => m === 101n)) {
+      console.log("TEST CASE DETECTED: Verifying against expected output 9606208636557092712");
     }
     
     // Apply CRT to all congruences
-    const combined = chineseRemainderTheorem(congruences);
-    if (combined === null) {
+    const combinedValue = chineseRemainderTheorem(congruences);
+    if (combinedValue === null) {
       console.log('No solution exists for the given congruences');
       return null;
     }
     
-    console.log("CRT result (raw):", combined.toString());
-    console.log("Expected output for test case:", "9606208636557092712");
+    console.log("CRT result raw BigInt:", combinedValue.toString());
     
-    // Return the raw hex without normalizing for the key fragments case
-    return bigIntToHex(combined);
+    // For the test case, verify against the expected value
+    const expectedTestValue = 9606208636557092712n;
+    if (congruences.some(([_, m]) => m === 101n)) {
+      console.log("Comparing with expected test value:");
+      console.log(`Expected: ${expectedTestValue}`);
+      console.log(`Actual  : ${combinedValue}`);
+      console.log(`Match   : ${combinedValue === expectedTestValue}`);
+    }
+    
+    // Convert to properly formatted private key hex
+    const formattedHex = bigIntToPrivateKeyHex(combinedValue);
+    console.log("Formatted private key hex:", formattedHex);
+    
+    return `0x${formattedHex}`;
   } catch (error) {
     console.error("Error combining private key fragments:", error);
     return null;
@@ -174,5 +171,53 @@ export const hasEnoughFragmentsForFullRecovery = (fragments: Record<string, stri
   } catch (error) {
     console.error("Error checking fragment sufficiency:", error);
     return false;
+  }
+};
+
+/**
+ * Test function to verify the CRT implementation with known test case
+ * @returns Verification result and details
+ */
+export const testCrtImplementation = () => {
+  try {
+    // Test case with fragments that should produce 9606208636557092712
+    const testFragments = {
+      "0x65": "0x2d",    // 101: 45
+      "0x67": "0x43",    // 103: 67
+      "0x6b": "0x59",    // 107: 89
+      "0x6d": "0x5e",    // 109: 94
+      "0x71": "0x33",    // 113: 51
+      "0x7f": "0x53",    // 127: 83
+      "0x83": "0x70",    // 131: 112
+      "0x89": "0x3b"     // 137: 59
+    };
+    
+    console.log("Running CRT test with fragments:", testFragments);
+    
+    // Call the combinePrivateKeyFragments function with the test fragments
+    const result = combinePrivateKeyFragments(testFragments);
+    
+    // Expected value for comparison
+    const expectedBigInt = 9606208636557092712n;
+    const expectedHex = `0x${bigIntToPrivateKeyHex(expectedBigInt)}`;
+    console.log("Expected BigInt:", expectedBigInt.toString());
+    console.log("Expected hex:", expectedHex);
+    
+    // Compare with exact expected value
+    const resultBigInt = result ? hexToBigInt(result) : 0n;
+    const exactMatch = resultBigInt === expectedBigInt;
+    
+    return {
+      rawResult: result,
+      resultBigInt: resultBigInt.toString(),
+      expectedBigInt: expectedBigInt.toString(),
+      expectedHex: expectedHex,
+      actualHex: result,
+      exactMatch: exactMatch,
+      passed: exactMatch
+    };
+  } catch (error) {
+    console.error("Error in CRT test:", error);
+    return { error: String(error), passed: false };
   }
 };
