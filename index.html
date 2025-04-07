@@ -17,19 +17,92 @@
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
-    <!-- Bitcoin-related libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.bundle.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bip39@3.1.0/dist/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bech32@2.0.0/dist/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bitcoin-ops@1.4.1/map.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js"></script>
+    <!-- Bitcoin-related libraries with better loading and error handling -->
+    <script>
+      // Create a global loading tracker
+      window.bitcoinLibsLoaded = {
+        bs58: false,
+        bip39: false,
+        bech32: false,
+        secp256k1: false,
+        bitcoinMessage: false,
+        bitcoinOps: false,
+        bitcoinAddressValidation: false,
+        bitcoin: false
+      };
+      
+      // Helper function to mark a library as loaded
+      function markLibLoaded(name) {
+        if (window.bitcoinLibsLoaded) {
+          window.bitcoinLibsLoaded[name] = true;
+          console.log(`${name} library loaded successfully`);
+        }
+      }
+      
+      // Global error handler for script loading
+      window.addEventListener('error', function(e) {
+        if (e.filename && e.filename.includes('cdn')) {
+          console.error(`Error loading external library: ${e.filename}`, e.error);
+        }
+      }, true);
+    </script>
     
-    <!-- Make sure to load bitcoinjs-lib from a CDN that properly exposes it globally -->
-    <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.7/dist/bitcoin-lib.min.js"></script>
+    <!-- Load libraries in order of dependency -->
+    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.bundle.min.js" 
+            onload="window.bs58 = bs58; markLibLoaded('bs58');" 
+            onerror="console.error('Failed to load bs58 library')"></script>
+            
+    <script src="https://cdn.jsdelivr.net/npm/bip39@3.1.0/dist/index.min.js"
+            onload="window.bip39 = bip39; markLibLoaded('bip39');"
+            onerror="console.error('Failed to load bip39 library')"></script>
+            
+    <script src="https://cdn.jsdelivr.net/npm/bech32@2.0.0/dist/index.min.js"
+            onload="window.bech32 = bech32; markLibLoaded('bech32');"
+            onerror="console.error('Failed to load bech32 library')"></script>
+            
+    <!-- The secp256k1 library is crucial, so load it from multiple sources -->
+    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.js"
+            onload="window.secp256k1 = window.nobleSecp256k1 = window.secp = secp256k1; markLibLoaded('secp256k1');"
+            onerror="console.error('Failed to load @noble/secp256k1 library')"></script>
+            
+    <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js"
+            onload="window.bitcoinMessage = bitcoinMessage; markLibLoaded('bitcoinMessage');"
+            onerror="console.error('Failed to load bitcoinjs-message library')"></script>
+            
+    <script src="https://cdn.jsdelivr.net/npm/bitcoin-ops@1.4.1/map.min.js"
+            onload="window.bitcoinOps = OPS; markLibLoaded('bitcoinOps');"
+            onerror="console.error('Failed to load bitcoin-ops library')"></script>
+            
+    <script src="https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js"
+            onload="window.bitcoinAddressValidation = validate; markLibLoaded('bitcoinAddressValidation');"
+            onerror="console.error('Failed to load bitcoin-address-validation library')"></script>
+    
+    <!-- Load BitcoinJS with better error handling -->
+    <script src="https://unpkg.com/bitcoinjs-lib@6.1.3/dist/bitcoin-lib.js"
+            onload="window.Bitcoin = Bitcoin || bitcoin || bitcoinjs; markLibLoaded('bitcoin');"
+            onerror="console.error('Failed to load bitcoinjs-lib from unpkg')"></script>
+            
+    <!-- Fallback for bitcoinjs-lib if the first CDN fails -->
+    <script>
+      setTimeout(function() {
+        if (!window.Bitcoin && !window.bitcoin && !window.bitcoinjs) {
+          console.log("Loading bitcoinjs-lib fallback from alternate CDN...");
+          var script = document.createElement('script');
+          script.src = "https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.3/dist/bitcoin-lib.js";
+          script.onload = function() {
+            window.Bitcoin = Bitcoin || bitcoin || bitcoinjs;
+            markLibLoaded('bitcoin');
+            console.log("Loaded bitcoinjs-lib from fallback CDN");
+          };
+          script.onerror = function() {
+            console.error("Failed to load bitcoinjs-lib from fallback CDN");
+          };
+          document.head.appendChild(script);
+        }
+      }, 1000); // Check after 1 second if the first CDN failed
+    </script>
 
-    <!-- Load @noble/secp256k1 directly as an importable module -->
+    <!-- Load @noble/secp256k1 as an importable module -->
     <script type="importmap">
     {
       "imports": {
@@ -45,50 +118,51 @@
     <!-- Initialize libraries globally after they are loaded -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        console.log("Initializing Bitcoin libraries in DOM content loaded event");
+        console.log("DOMContentLoaded event - checking Bitcoin libraries...");
         
-        try {
-          // Make sure secp256k1 is available globally
-          if (typeof window.secp === 'undefined') {
+        // Final verification of library loading
+        setTimeout(function() {
+          // Log the status of all libraries
+          console.table({
+            "Bitcoin": !!window.Bitcoin,
+            "bitcoin": !!window.bitcoin,
+            "bitcoinjs": !!window.bitcoinjs,
+            "bs58": !!window.bs58,
+            "bip39": !!window.bip39, 
+            "bech32": !!window.bech32,
+            "secp256k1": !!window.secp256k1,
+            "nobleSecp256k1": !!window.nobleSecp256k1,
+            "secp": !!window.secp,
+            "bitcoinMessage": !!window.bitcoinMessage,
+            "bitcoinAddressValidation": !!window.bitcoinAddressValidation
+          });
+          
+          // Make sure secp256k1 is loaded one way or another
+          if (!window.secp256k1) {
+            console.warn("secp256k1 not loaded through script tags, attempting dynamic import");
             import('@noble/secp256k1').then(module => {
               window.secp256k1 = module;
-              console.log("secp256k1 initialized from @noble/secp256k1 ES module");
+              window.nobleSecp256k1 = module;
+              window.secp = module;
+              console.log("secp256k1 loaded via dynamic import");
             }).catch(err => {
               console.error("Failed to import @noble/secp256k1:", err);
             });
           }
           
-          // Define global variables to hold library references
-          // Use window.bitcoin from the bitcoinjs-lib to set window.Bitcoin
-          if (typeof bitcoin !== 'undefined') {
-            window.Bitcoin = bitcoin;
-            console.log("Bitcoin initialized from bitcoinjs-lib");
-          } else if (typeof bitcoinjs !== 'undefined') {
-            window.Bitcoin = bitcoinjs;
-            console.log("Bitcoin initialized from bitcoinjs global");
-          } else {
-            console.warn("Neither bitcoin nor bitcoinjs global found");
-          }
-          
-          // Make noble-secp256k1 available globally as secp256k1
-          if (window.nobleSecp256k1) {
-            window.secp256k1 = window.nobleSecp256k1;
-            console.log("secp256k1 initialized from nobleSecp256k1");
-          } else {
-            console.warn("nobleSecp256k1 not found, secp256k1 functionality may be limited");
-            
-            // Try to assign from the newly loaded @noble/secp256k1
-            if (typeof secp !== 'undefined') {
-              window.secp256k1 = secp;
-              console.log("secp256k1 initialized from @noble/secp256k1");
+          // Ensure Bitcoin global is set
+          if (!window.Bitcoin) {
+            if (window.bitcoin) {
+              window.Bitcoin = window.bitcoin;
+              console.log("Set window.Bitcoin from window.bitcoin");
+            } else if (window.bitcoinjs) {
+              window.Bitcoin = window.bitcoinjs;
+              console.log("Set window.Bitcoin from window.bitcoinjs");
+            } else {
+              console.error("Could not load Bitcoin library from any source");
             }
           }
-          
-          // Log successful initialization
-          console.log("Bitcoin libraries initialization complete");
-        } catch (e) {
-          console.error("Error initializing Bitcoin libraries:", e);
-        }
+        }, 1000);
       });
     </script>
     

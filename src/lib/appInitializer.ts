@@ -15,20 +15,19 @@ import * as secp256k1 from '@noble/secp256k1';
 export const initializeApplication = (): void => {
   console.log("Initializing application...");
   
-  // Make secp256k1 available globally
-  if (!window.secp256k1 && !window.secp && !window.nobleSecp256k1) {
-    try {
-      // Use the imported library
-      window.secp256k1 = secp256k1;
-      window.nobleSecp256k1 = secp256k1;
-      console.log("Made @noble/secp256k1 globally available");
-    } catch (error) {
-      console.warn("Failed to set up secp256k1:", error);
-    }
+  // Make secp256k1 available globally - ALWAYS set this up first
+  try {
+    // Use the imported library and ensure it's properly assigned
+    window.secp256k1 = secp256k1;
+    window.nobleSecp256k1 = secp256k1;
+    window.secp = secp256k1;
+    console.log("Made @noble/secp256k1 globally available via multiple references");
+  } catch (error) {
+    console.error("Failed to set up secp256k1:", error);
   }
   
-  // Wait a brief moment to ensure DOM content is loaded and libraries are initialized
-  setTimeout(() => {
+  // Set up a proper initialization sequence with retry mechanism
+  const initializeLibraries = () => {
     console.log("Initializing Bitcoin libraries...");
     
     // First check if alternate library names are available and map them
@@ -37,14 +36,57 @@ export const initializeApplication = (): void => {
       console.log("Mapped alternative Bitcoin library name to window.Bitcoin");
     }
     
-    if (!window.secp256k1) {
-      if (window.nobleSecp256k1) {
-        window.secp256k1 = window.nobleSecp256k1;
-        console.log("Mapped nobleSecp256k1 to window.secp256k1");
-      } else if (window.secp) {
-        window.secp256k1 = window.secp;
-        console.log("Mapped secp to window.secp256k1");
-      }
+    // Directly try to access elements from the DOM
+    try {
+      // Make sure the required libraries are loaded from CDN scripts
+      const checkLibs = () => {
+        // Force refresh of all library references
+        if (typeof window.bs58 === 'undefined' && typeof bs58 !== 'undefined') {
+          window.bs58 = bs58;
+          console.log("Mapped global bs58 to window.bs58");
+        }
+        
+        if (typeof window.bip39 === 'undefined' && typeof bip39 !== 'undefined') {
+          window.bip39 = bip39;
+          console.log("Mapped global bip39 to window.bip39");
+        }
+        
+        if (typeof window.bech32 === 'undefined' && typeof bech32 !== 'undefined') {
+          window.bech32 = bech32;
+          console.log("Mapped global bech32 to window.bech32");
+        }
+        
+        if (typeof window.bitcoinMessage === 'undefined' && typeof bitcoinMessage !== 'undefined') {
+          window.bitcoinMessage = bitcoinMessage;
+          console.log("Mapped global bitcoinMessage to window.bitcoinMessage");
+        }
+        
+        if (typeof window.bitcoinAddressValidation === 'undefined' && typeof validate !== 'undefined') {
+          window.bitcoinAddressValidation = validate;
+          console.log("Mapped global validate to window.bitcoinAddressValidation");
+        }
+        
+        if (typeof window.Bitcoin === 'undefined') {
+          if (typeof bitcoin !== 'undefined') {
+            window.Bitcoin = bitcoin;
+            console.log("Mapped global bitcoin to window.Bitcoin");
+          } else if (typeof bitcoinjs !== 'undefined') {
+            window.Bitcoin = bitcoinjs;
+            console.log("Mapped global bitcoinjs to window.Bitcoin");
+          } else if (typeof BitcoinLib !== 'undefined') {
+            window.Bitcoin = BitcoinLib;
+            console.log("Mapped global BitcoinLib to window.Bitcoin");
+          }
+        }
+      };
+      
+      // Run immediately
+      checkLibs();
+      
+      // Wait short time and check again in case of race conditions 
+      setTimeout(checkLibs, 500);
+    } catch (e) {
+      console.error("Error mapping global libraries:", e);
     }
     
     // Log detailed status of all libraries
@@ -55,7 +97,6 @@ export const initializeApplication = (): void => {
     
     if (!bitcoinLibStatus.loaded) {
       console.error(`Bitcoin libraries not loaded: Missing ${bitcoinLibStatus.missing.join(', ')}`);
-      // Fix: Change from passing an object to passing string first with options as second parameter
       toast(`Some Bitcoin libraries not detected: ${bitcoinLibStatus.missing.join(', ')}. Some features may not work correctly.`, {
         duration: 10000, 
         className: "bg-red-100"
@@ -63,18 +104,109 @@ export const initializeApplication = (): void => {
       
       // Force window refresh of library references
       refreshLibraryReferences();
+      
+      // Set up a retry mechanism
+      console.log("Will retry library initialization in 2 seconds...");
+      return false; // Not fully loaded
     } else {
       console.log("All Bitcoin libraries loaded successfully");
-      // Fix: Use proper toast API
       toast("All required libraries loaded successfully", {
         duration: 3000
       });
+      return true; // Successfully loaded
     }
-    
-    // Initialize any other application components here
-    
-    console.log("Application initialization completed");
-  }, 2000); // Increased delay to ensure libraries have time to initialize
+  };
+  
+  // First attempt at initialization
+  const initialSuccess = initializeLibraries();
+  
+  // If not successful, try again after a delay
+  if (!initialSuccess) {
+    setTimeout(() => {
+      console.log("Retrying Bitcoin libraries initialization...");
+      const retrySuccess = initializeLibraries();
+      
+      if (!retrySuccess) {
+        // Final attempt with direct dynamic loading
+        loadLibrariesDynamically();
+      }
+    }, 2000);
+  }
+  
+  console.log("Application initialization completed");
+};
+
+/**
+ * Last-resort dynamic loading of libraries
+ */
+const loadLibrariesDynamically = (): void => {
+  console.log("Attempting to dynamically load missing libraries...");
+  
+  const createScript = (src: string, globalName: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = src;
+      script.async = true;
+      script.onload = () => {
+        console.log(`Dynamically loaded ${globalName} library`);
+        resolve();
+      };
+      script.onerror = () => {
+        console.error(`Failed to load ${globalName} library`);
+        reject();
+      };
+      document.head.appendChild(script);
+    });
+  };
+  
+  // Try to load libraries that are missing
+  const bitcoinLibStatus = checkBitcoinLibsLoaded();
+  
+  // Dynamically load libraries if needed
+  const loadPromises = [];
+  
+  if (bitcoinLibStatus.missing.includes('bs58')) {
+    loadPromises.push(createScript('https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.bundle.min.js', 'bs58'));
+  }
+  
+  if (bitcoinLibStatus.missing.includes('bip39')) {
+    loadPromises.push(createScript('https://cdn.jsdelivr.net/npm/bip39@3.1.0/dist/index.min.js', 'bip39'));
+  }
+  
+  if (bitcoinLibStatus.missing.includes('bech32')) {
+    loadPromises.push(createScript('https://cdn.jsdelivr.net/npm/bech32@2.0.0/dist/index.min.js', 'bech32'));
+  }
+  
+  if (bitcoinLibStatus.missing.includes('bitcoinMessage')) {
+    loadPromises.push(createScript('https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js', 'bitcoinMessage'));
+  }
+  
+  if (bitcoinLibStatus.missing.includes('bitcoinAddressValidation')) {
+    loadPromises.push(createScript('https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js', 'bitcoinAddressValidation'));
+  }
+  
+  // Try one more Bitcoin library source as a fallback
+  if (bitcoinLibStatus.missing.includes('Bitcoin')) {
+    loadPromises.push(createScript('https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.3/dist/bitcoin-lib.js', 'Bitcoin'));
+  }
+  
+  // When all scripts are loaded, check status again
+  Promise.allSettled(loadPromises).then(() => {
+    setTimeout(() => {
+      // Check if we have all libraries now
+      const finalStatus = checkBitcoinLibsLoaded();
+      if (finalStatus.loaded) {
+        console.log("Successfully loaded all required libraries dynamically");
+        toast("Successfully loaded all required libraries", { duration: 3000 });
+      } else {
+        console.error(`Still missing libraries after dynamic loading: ${finalStatus.missing.join(', ')}`);
+        toast(`Some features may not work due to missing libraries: ${finalStatus.missing.join(', ')}`, {
+          duration: 10000,
+          className: "bg-red-100"
+        });
+      }
+    }, 1000); // Wait a bit for libraries to initialize
+  });
 };
 
 /**
@@ -89,7 +221,6 @@ export const checkFeatureLibraries = (feature: string, requiredLibs: string[]): 
   if (missing.length > 0) {
     const error = `${feature} requires libraries that are not loaded: ${missing.join(', ')}`;
     console.error(error);
-    // Fix: Use proper toast API - string first, options second
     toast(`${feature} unavailable: Missing required libraries: ${missing.join(', ')}`, {
       className: "bg-red-100"
     });

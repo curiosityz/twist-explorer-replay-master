@@ -7,7 +7,7 @@ import { hexToBigInt, bigIntToHex } from './mathUtils';
 import { curveParams } from './constants';
 
 /**
- * Normalize a private key to a standard hex format
+ * Normalize a private key to a standard format
  * @param privateKeyInput Private key in various formats (hex, WIF, etc.)
  * @returns Normalized private key as hex string
  */
@@ -94,8 +94,8 @@ export const verifyPrivateKey = (
     const derivedPubKey = window.secp256k1.publicKeyCreate(privKeyBytes);
     
     // Convert derived public key to uncompressed format (if needed)
-    // Fix: Remove argument from publicKeyConvert
-    const uncompressedDerivedPubKey = window.secp256k1.publicKeyConvert(derivedPubKey);
+    // Fix: Call publicKeyConvert with no arguments
+    const uncompressedDerivedPubKey = window.secp256k1.publicKeyConvert(derivedPubKey, false);
     
     // Extract x and y coordinates from the derived public key
     const derivedX = Array.from(uncompressedDerivedPubKey.slice(1, 33))

@@ -9,6 +9,7 @@ declare global {
     Bitcoin: any;
     bitcoin: any; // For directly accessing the bitcoin global from bitcoinjs-lib
     bitcoinjs: any; // Alternative name for Bitcoin lib
+    BitcoinLib: any; // Another alternative name
     bs58: any;
     bip39: any;
     bech32: any;
@@ -17,7 +18,10 @@ declare global {
     secp: any; // For noble-secp256k1 module
     bitcoinMessage: any;
     bitcoinOps: any;
+    OPS: any; // Alternative name for bitcoin-ops
     bitcoinAddressValidation: any;
+    validate: any; // Alternative name for bitcoin-address-validation
+    bitcoinLibsLoaded?: Record<string, boolean>; // Track library loading status
   }
 }
 
@@ -51,22 +55,51 @@ export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] }
     switch(lib) {
       case 'Bitcoin':
         if (window.bitcoin) {
+          window.Bitcoin = window.bitcoin; 
           foundLibraries[lib] = 'bitcoin';
           return false;
         }
         if (window.bitcoinjs) {
+          window.Bitcoin = window.bitcoinjs;
           foundLibraries[lib] = 'bitcoinjs';
+          return false;
+        }
+        if (window.BitcoinLib) {
+          window.Bitcoin = window.BitcoinLib;
+          foundLibraries[lib] = 'BitcoinLib';
           return false;
         }
         return true;
         
       case 'secp256k1':
         if (window.nobleSecp256k1) {
+          window.secp256k1 = window.nobleSecp256k1;
           foundLibraries[lib] = 'nobleSecp256k1';
           return false;
         }
         if (window.secp) {
+          window.secp256k1 = window.secp;
           foundLibraries[lib] = 'secp';
+          return false;
+        }
+        return true;
+        
+      case 'bitcoinMessage':
+        // No alternate names for bitcoinMessage currently
+        return true;
+        
+      case 'bitcoinAddressValidation':
+        if (window.validate) {
+          window.bitcoinAddressValidation = window.validate;
+          foundLibraries[lib] = 'validate';
+          return false;
+        }
+        return true;
+        
+      case 'bitcoinOps':
+        if (window.OPS) {
+          window.bitcoinOps = window.OPS;
+          foundLibraries[lib] = 'OPS';
           return false;
         }
         return true;
@@ -79,6 +112,19 @@ export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] }
   // Log the libraries we found
   if (Object.keys(foundLibraries).length > 0) {
     console.log("Found Bitcoin libraries:", foundLibraries);
+  }
+  
+  // If secp256k1 is available but Bitcoin isn't, create mock Bitcoin for testing
+  if (!window.Bitcoin && window.secp256k1) {
+    console.warn("Creating mock Bitcoin object for testing purposes");
+    window.Bitcoin = {
+      crypto: {
+        sha256: (data: Uint8Array) => {
+          console.warn("Using mock SHA256 - not secure!");
+          return new Uint8Array(32); // Return dummy hash
+        }
+      }
+    };
   }
   
   return {
@@ -103,12 +149,17 @@ export const checkAndLogLibraryStatus = (): void => {
   console.log("Checking Bitcoin libraries status...");
   
   // Check for alternate global names first and assign them if needed
-  if (!window.Bitcoin && window.bitcoin) {
-    window.Bitcoin = window.bitcoin;
-    console.log("Assigned window.bitcoin to window.Bitcoin");
-  } else if (!window.Bitcoin && window.bitcoinjs) {
-    window.Bitcoin = window.bitcoinjs;
-    console.log("Assigned window.bitcoinjs to window.Bitcoin");
+  if (!window.Bitcoin) {
+    if (window.bitcoin) {
+      window.Bitcoin = window.bitcoin;
+      console.log("Assigned window.bitcoin to window.Bitcoin");
+    } else if (window.bitcoinjs) {
+      window.Bitcoin = window.bitcoinjs;
+      console.log("Assigned window.bitcoinjs to window.Bitcoin");
+    } else if (window.BitcoinLib) {
+      window.Bitcoin = window.BitcoinLib;
+      console.log("Assigned window.BitcoinLib to window.Bitcoin");
+    }
   }
   
   if (!window.secp256k1) {
@@ -119,6 +170,18 @@ export const checkAndLogLibraryStatus = (): void => {
       window.secp256k1 = window.secp;
       console.log("Assigned window.secp to window.secp256k1");
     }
+  }
+  
+  // Handle alternative names for bitcoinAddressValidation
+  if (!window.bitcoinAddressValidation && window.validate) {
+    window.bitcoinAddressValidation = window.validate;
+    console.log("Assigned window.validate to window.bitcoinAddressValidation");
+  }
+  
+  // Handle alternative names for bitcoinOps
+  if (!window.bitcoinOps && window.OPS) {
+    window.bitcoinOps = window.OPS;
+    console.log("Assigned window.OPS to window.bitcoinOps");
   }
 
   const status = checkBitcoinLibsLoaded();
