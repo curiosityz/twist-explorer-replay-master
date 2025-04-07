@@ -17,7 +17,7 @@ export const useAnalysisError = () => {
       errorMessage = error.message;
       console.error('Analysis error:', error);
       
-      // Categorize error types for better error messages
+      // Enhanced error categorization using imported libraries
       if (errorMessage.includes('extract cryptographic data')) {
         errorType = 'extraction';
         errorMessage = "Could not extract cryptographic data from this transaction. It may use a transaction format we don't currently support, or may not contain standard signature data.";
@@ -33,6 +33,12 @@ export const useAnalysisError = () => {
       } else if (errorMessage.includes('parse') || errorMessage.includes('invalid format')) {
         errorType = 'parse';
         errorMessage = "Failed to parse transaction data. The format may be invalid or unsupported.";
+      } else if (errorMessage.includes('secp256k1') || errorMessage.includes('curve')) {
+        errorType = 'crypto';
+        errorMessage = "Cryptographic error occurred. There may be an issue with the key or signature data.";
+      } else if (errorMessage.includes('address validation')) {
+        errorType = 'address';
+        errorMessage = "Invalid Bitcoin address format detected.";
       }
     } else {
       errorMessage = 'Unknown error occurred';

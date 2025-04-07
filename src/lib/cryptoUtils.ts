@@ -45,6 +45,15 @@ export {
   factorize
 } from './crypto/factorize';
 
+// Export Bitcoin-specific utilities
+export {
+  validateBitcoinAddress,
+  decodeDERSignature,
+  decompressPublicKey,
+  isPointOnCurve as isPointOnSecp256k1Curve,
+  wifToPrivateKey
+} from './crypto/bitcoinUtilities';
+
 // Re-export all vulnerability analysis functionality
 export {
   analyzeTransaction,

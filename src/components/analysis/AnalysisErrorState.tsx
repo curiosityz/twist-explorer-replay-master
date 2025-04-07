@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { XCircle, RefreshCw, Settings, Globe, KeySquare, Database, Search, FileCode } from 'lucide-react';
+import { XCircle, RefreshCw, Settings, Globe, KeySquare, Database, Search, FileCode, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -11,7 +11,7 @@ interface AnalysisErrorStateProps {
 }
 
 const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, onRetry }) => {
-  // Check if error is related to network, connection, or CORS issues
+  // Enhanced error type detection
   const isNetworkError = error.includes('fetch') || 
                          error.includes('network') || 
                          error.includes('connection') ||
@@ -35,6 +35,14 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
   const isParseError = error.includes('parse') ||
                       error.includes('invalid format') ||
                       error.includes('unsupported');
+                      
+  const isCryptoError = error.includes('secp256k1') ||
+                       error.includes('curve') ||
+                       error.includes('key') ||
+                       error.includes('signature');
+
+  const isAddressError = error.includes('address validation') ||
+                        error.includes('invalid address');
 
   return (
     <div className="flex flex-col items-center justify-center h-full">
@@ -119,6 +127,32 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
             There was an issue parsing the transaction data. The format might be 
             unsupported or invalid. This tool currently supports P2PKH (legacy) 
             and P2WPKH (SegWit) transactions.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isCryptoError && (
+        <Alert className="mb-4 max-w-md">
+          <AlertTitle className="flex items-center">
+            <AlertTriangle className="mr-2 h-4 w-4" />
+            Cryptographic Operation Error
+          </AlertTitle>
+          <AlertDescription>
+            There was an issue performing a cryptographic operation.
+            This might indicate an issue with the elliptic curve operations or key validation.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isAddressError && (
+        <Alert className="mb-4 max-w-md">
+          <AlertTitle className="flex items-center">
+            <AlertTriangle className="mr-2 h-4 w-4" />
+            Address Validation Error
+          </AlertTitle>
+          <AlertDescription>
+            The Bitcoin address format is invalid or unsupported.
+            Please check the address format and try again.
           </AlertDescription>
         </Alert>
       )}
