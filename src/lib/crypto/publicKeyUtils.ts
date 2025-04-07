@@ -3,6 +3,8 @@
  * Bitcoin public key utilities
  */
 
+import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
+
 /**
  * Create compressed public key from x and y coordinates
  * @param x X coordinate (hex string)
@@ -159,8 +161,8 @@ export const isPointOnSecp256k1Curve = (xHex: string, yHex: string): boolean => 
 export const isPointOnCurve = isPointOnSecp256k1Curve;
 
 /**
- * Advanced validation of public key point - checks both that it's on the curve
- * and that it's a valid point order
+ * Advanced validation of public key point
+ * Checks if point is on curve and performs order validation when possible
  */
 export const validatePublicKey = (xHex: string, yHex: string): { 
   isValid: boolean; 
@@ -180,10 +182,38 @@ export const validatePublicKey = (xHex: string, yHex: string): {
       };
     }
     
-    // For a complete implementation, we would check that the point has the correct order
-    // by multiplying it by the curve order and verifying it equals the point at infinity
-    // This is a simplified check
+    // Check if secp256k1 library is available for more advanced validation
+    if (window.secp256k1) {
+      try {
+        // Convert to compressed format for validation
+        const compressedKey = createCompressedPublicKey(xHex, yHex);
+        
+        // Convert hex to Buffer/Uint8Array
+        const pubKeyBytes = new Uint8Array(
+          compressedKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+        );
+        
+        // Use secp256k1 library to validate the key
+        // This will throw if the key is invalid
+        const isValid = window.secp256k1.publicKeyVerify(pubKeyBytes);
+        
+        return {
+          isValid: isValid,
+          isOnCurve: true,
+          reason: isValid ? undefined : "Failed secp256k1 library validation"
+        };
+      } catch (error) {
+        console.error("Error in secp256k1 validation:", error);
+        return {
+          isValid: false,
+          isOnCurve: true, // It's on the curve but fails additional validation
+          reason: `secp256k1 validation error: ${error}`
+        };
+      }
+    }
     
+    // If we don't have the library for advanced validation,
+    // we'll trust the on-curve check
     return { 
       isValid: true, 
       isOnCurve: true 
