@@ -5,6 +5,7 @@
 
 import { areAllCoprime, modularInverse, hexToBigInt, bigIntToHex } from './mathUtils';
 import { curveParams } from './constants';
+import { normalizePrivateKey } from './keyUtils';
 
 /**
  * Chinese Remainder Theorem (CRT) to combine private key fragments
