@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { supabase, Tables } from '@/integrations/supabase/client';
 import { AnalysisResult, CryptographicPoint, Signature, VulnerabilityType } from '@/types';
 import { toast } from 'sonner';
+import { normalizeVulnerabilityAnalysis } from '@/lib/database';
 
 /**
  * Hook for checking if a transaction has been previously analyzed
@@ -36,7 +37,7 @@ export const useTransactionAnalysisCheck = () => {
     try {
       const { data: analysisData, error: loadError } = await supabase
         .from(Tables.vulnerability_analyses)
-        .select('*, recovered_private_key')
+        .select('*')
         .eq('id', analysisId)
         .maybeSingle();
           
@@ -49,26 +50,24 @@ export const useTransactionAnalysisCheck = () => {
         throw new Error("No analysis data found");
       }
       
-      const privateKeyModulo: Record<string, string> = {};
+      // Normalize the data using our helper function
+      const normalizedData = normalizeVulnerabilityAnalysis(analysisData);
       
-      if (analysisData.private_key_modulo && typeof analysisData.private_key_modulo === 'object') {
-        Object.entries(analysisData.private_key_modulo as Record<string, any>).forEach(([key, value]) => {
-          privateKeyModulo[key] = String(value);
-        });
+      if (!normalizedData) {
+        throw new Error("Failed to normalize analysis data");
       }
       
       const loadedResult: AnalysisResult = {
-        txid: analysisData.txid,
-        vulnerabilityType: analysisData.vulnerability_type as VulnerabilityType,
-        publicKey: analysisData.public_key as unknown as CryptographicPoint,
-        signature: analysisData.signature as unknown as Signature,
-        twistOrder: analysisData.twist_order,
-        primeFactors: Array.isArray(analysisData.prime_factors) ? 
-          analysisData.prime_factors.map(String) : [],
-        privateKeyModulo: privateKeyModulo,
-        status: analysisData.status as "completed" | "analyzing" | "failed" | "pending",
-        message: analysisData.message,
-        recoveredPrivateKey: analysisData.recovered_private_key || null
+        txid: normalizedData.txid,
+        vulnerabilityType: normalizedData.vulnerability_type as VulnerabilityType,
+        publicKey: normalizedData.public_key as unknown as CryptographicPoint,
+        signature: normalizedData.signature as unknown as Signature,
+        twistOrder: normalizedData.twist_order,
+        primeFactors: normalizedData.prime_factors || [],
+        privateKeyModulo: normalizedData.private_key_modulo || {},
+        status: normalizedData.status as "completed" | "analyzing" | "failed" | "pending",
+        message: normalizedData.message,
+        recoveredPrivateKey: normalizedData.recovered_private_key || null
       };
       
       setIsDuplicate(true);

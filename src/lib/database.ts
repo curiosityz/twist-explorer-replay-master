@@ -1,3 +1,4 @@
+
 // Type definitions for our database
 
 export interface BlockchainTransaction {
