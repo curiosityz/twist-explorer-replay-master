@@ -67,7 +67,7 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Call publicKeyConvert without passing any additional arguments
+      // Call publicKeyConvert with no additional options
       const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
       
       if (!decompressedKey || decompressedKey.length !== 65) {
