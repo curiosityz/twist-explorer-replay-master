@@ -19,16 +19,32 @@ declare global {
 
 /**
  * Check if Bitcoin libraries are loaded
+ * @returns Result object with status and missing libraries
+ */
+export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] } => {
+  const requiredLibraries = [
+    'Bitcoin',
+    'bs58',
+    'bip39',
+    'bech32',
+    'secp256k1',
+    'bitcoinMessage',
+    'bitcoinAddressValidation'
+  ];
+  
+  const missing = requiredLibraries.filter(lib => !window[lib as keyof Window]);
+  
+  return {
+    loaded: missing.length === 0,
+    missing
+  };
+};
+
+/**
+ * Legacy check for backward compatibility
  * @returns Boolean indicating if all required libraries are available
  */
-export const checkBitcoinLibsLoaded = (): boolean => {
-  return !!(
-    window.Bitcoin && 
-    window.bs58 && 
-    window.bip39 && 
-    window.bech32 && 
-    window.secp256k1 && 
-    window.bitcoinMessage && 
-    window.bitcoinAddressValidation
-  );
+export const isLibrariesLoaded = (): boolean => {
+  return checkBitcoinLibsLoaded().loaded;
 };
+

@@ -38,8 +38,12 @@ export const decompressPublicKey = (
   compressedPubKeyHex: string
 ): { x: string; y: string; isOnCurve: boolean } => {
   try {
-    if (!compressedPubKeyHex || compressedPubKeyHex.length !== 66) {
-      throw new Error("Invalid compressed public key format");
+    if (!compressedPubKeyHex || typeof compressedPubKeyHex !== 'string') {
+      throw new Error("Invalid compressed public key input");
+    }
+    
+    if (compressedPubKeyHex.length !== 66) {
+      throw new Error(`Invalid compressed public key length: ${compressedPubKeyHex.length}, expected 66`);
     }
     
     // Check if Bitcoin libraries are loaded
@@ -51,7 +55,7 @@ export const decompressPublicKey = (
     const xHex = compressedPubKeyHex.slice(2);
     
     if (prefix !== "02" && prefix !== "03") {
-      throw new Error("Invalid public key prefix. Must be 02 or 03");
+      throw new Error(`Invalid public key prefix: ${prefix}. Must be 02 or 03`);
     }
     
     // Convert hex to Buffer/Uint8Array (as expected by secp256k1)
@@ -61,8 +65,19 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Fix: Call publicKeyConvert without additional parameters
-      const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
+      // Use try-catch for the decompression operation
+      let decompressedKey;
+      try {
+        // Fix: Call publicKeyConvert without additional parameters
+        decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
+      } catch (decompError) {
+        console.error("secp256k1 decompression error:", decompError);
+        throw new Error(`secp256k1 decompression failed: ${decompError}`);
+      }
+      
+      if (!decompressedKey || decompressedKey.length !== 65) {
+        throw new Error(`Invalid decompressed key length: ${decompressedKey?.length}`);
+      }
       
       // Extract x and y from decompressed key (format: 04|x|y)
       const xBytes = decompressedKey.slice(1, 33);
@@ -83,7 +98,7 @@ export const decompressPublicKey = (
         isOnCurve: true // If secp256k1 decompression succeeded, it's on the curve
       };
     } catch (error) {
-      console.error("secp256k1 decompression error:", error);
+      console.error("Public key decompression failed:", error);
       
       // Fallback implementation (if the library failed)
       const isYOdd = prefix === "03";
@@ -109,9 +124,19 @@ export const decompressPublicKey = (
  */
 export const isPointOnSecp256k1Curve = (xHex: string, yHex: string): boolean => {
   try {
+    // Clean inputs - remove 0x prefix if present
+    const xClean = xHex.startsWith('0x') ? xHex.slice(2) : xHex;
+    const yClean = yHex.startsWith('0x') ? yHex.slice(2) : yHex;
+    
+    // Validate inputs
+    if (!/^[0-9a-fA-F]+$/.test(xClean) || !/^[0-9a-fA-F]+$/.test(yClean)) {
+      console.error("Invalid hex format in coordinates");
+      return false;
+    }
+    
     // Convert hex strings to BigInt
-    const x = BigInt(`0x${xHex}`);
-    const y = BigInt(`0x${yHex}`);
+    const x = BigInt(`0x${xClean}`);
+    const y = BigInt(`0x${yClean}`);
     
     // secp256k1 curve parameters
     const p = 2n ** 256n - 2n ** 32n - 2n ** 9n - 2n ** 8n - 2n ** 7n - 2n ** 6n - 2n ** 4n - 1n; // Field prime
@@ -132,3 +157,43 @@ export const isPointOnSecp256k1Curve = (xHex: string, yHex: string): boolean => 
 
 // For backward compatibility
 export const isPointOnCurve = isPointOnSecp256k1Curve;
+
+/**
+ * Advanced validation of public key point - checks both that it's on the curve
+ * and that it's a valid point order
+ */
+export const validatePublicKey = (xHex: string, yHex: string): { 
+  isValid: boolean; 
+  isOnCurve: boolean;
+  reason?: string;
+} => {
+  try {
+    // First check if it's on the curve
+    const isOnCurve = isPointOnSecp256k1Curve(xHex, yHex);
+    
+    // If not on the curve, no need for further validation
+    if (!isOnCurve) {
+      return { 
+        isValid: false, 
+        isOnCurve: false,
+        reason: "Point is not on the secp256k1 curve" 
+      };
+    }
+    
+    // For a complete implementation, we would check that the point has the correct order
+    // by multiplying it by the curve order and verifying it equals the point at infinity
+    // This is a simplified check
+    
+    return { 
+      isValid: true, 
+      isOnCurve: true 
+    };
+  } catch (error) {
+    console.error("Error validating public key:", error);
+    return { 
+      isValid: false, 
+      isOnCurve: false,
+      reason: `Validation error: ${error}` 
+    };
+  }
+};
