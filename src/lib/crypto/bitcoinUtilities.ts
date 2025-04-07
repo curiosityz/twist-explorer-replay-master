@@ -4,6 +4,8 @@
  * Uses imported libraries for reliable cryptographic operations
  */
 
+import { CryptographicPoint } from '@/types';
+
 /**
  * Validates a Bitcoin address using the bitcoin-address-validation library
  * @param address Bitcoin address to validate
