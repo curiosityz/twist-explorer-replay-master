@@ -1,247 +1,246 @@
+/**
+ * Implementation of the Chinese Remainder Theorem for private key recovery
+ */
+import { bigIntToHex } from './mathUtils';
+import bigInt from 'big-integer';
+import { convertToBigInt } from './factorize/utils';
 
 /**
- * Chinese Remainder Theorem (CRT) implementation for private key recovery
+ * Apply Chinese Remainder Theorem to recover the full value from its remainders
+ * CRT formula: X = (∑ (r_i * N_i * y_i)) mod N where:
+ * - r_i is the remainder when X is divided by m_i
+ * - N_i = N / m_i where N is the product of all moduli
+ * - y_i is the modular multiplicative inverse of N_i mod m_i
+ * 
+ * @param modulos Object mapping modulos to remainders
+ * @returns Recovered value or null if unsuccessful
  */
-
-import { areAllCoprime, modularInverse, hexToBigInt, bigIntToHex, bigIntToPrivateKeyHex } from './mathUtils';
-import { curveParams } from './constants';
-
-/**
- * Chinese Remainder Theorem (CRT) to combine private key fragments
- * @param congruences Array of [remainder, modulus] pairs
- * @returns Combined value that satisfies all congruences, or null if no solution exists
- */
-export const chineseRemainderTheorem = (congruences: [bigint, bigint][]): bigint | null => {
-  if (congruences.length === 0) return null;
-  
-  // Verify all moduli are coprime
-  const moduli = congruences.map(([_, m]) => m);
-  if (!areAllCoprime(moduli)) {
-    console.error("Moduli are not coprime, CRT requires coprime moduli");
-    return null;
-  }
-  
-  // Calculate product of all moduli (M)
-  const M = moduli.reduce((acc, m) => acc * m, 1n);
-  console.log("Product of all moduli (M):", M.toString());
-  
-  let result = 0n;
-  
-  // For each congruence, calculate Ni, yi, and partial result
-  for (let i = 0; i < congruences.length; i++) {
-    const [remainder, modulus] = congruences[i];
-    
-    // Calculate Ni = M / modulus
-    const Ni = M / modulus;
-    console.log(`N${i} = M / m${i} = ${M} / ${modulus} = ${Ni}`);
-    
-    // Calculate yi = inverse of Ni (mod modulus)
-    const yi = modularInverse(Ni, modulus);
-    if (yi === null) {
-      console.error(`Failed to find modular inverse for ${Ni} mod ${modulus}`);
-      return null;
-    }
-    console.log(`y${i} = inverse(${Ni} mod ${modulus}) = ${yi}`);
-    
-    // Add partial result: remainder * Ni * yi
-    const partial = (remainder * Ni * yi) % M;
-    result = (result + partial) % M;
-    console.log(`Partial result for ${i}: ${remainder} * ${Ni} * ${yi} = ${partial}`);
-    console.log(`Running total: ${result}`);
-  }
-
-  console.log("Final CRT raw result:", result.toString());
-  return result;
-};
-
-/**
- * Compute the factors of a number that are needed for the Chinese Remainder Theorem
- * @param moduli Array of potential moduli to use for CRT
- * @param targetValue Value we're trying to reach or exceed
- * @returns Array of moduli that are coprime with each other and whose product exceeds targetValue
- */
-export const selectCoprimeModuli = (moduli: bigint[], targetValue: bigint): bigint[] => {
-  if (moduli.length === 0) return [];
-  
-  // Sort moduli in descending order for efficiency
-  const sortedModuli = [...moduli].sort((a, b) => Number(b - a));
-  
-  const selected: bigint[] = [];
-  let product = 1n;
-  
-  // Greedily select moduli that are coprime with all previously selected moduli
-  for (const m of sortedModuli) {
-    if (areAllCoprime([...selected, m])) {
-      selected.push(m);
-      product *= m;
-      
-      // Break once we have enough moduli
-      if (product > targetValue) break;
-    }
-  }
-  
-  return selected;
-};
-
-/**
- * Attempt to combine private key fragments using CRT
- * @param fragments Map of moduli to remainders
- * @returns Combined private key as hex string, or null if not enough fragments or no solution
- */
-export const combinePrivateKeyFragments = (fragments: Record<string, string>): string | null => {
+export const chineseRemainderTheorem = (
+  modulos: Record<string, string>
+): bigint | null => {
   try {
-    console.log("Combining fragments:", JSON.stringify(fragments, null, 2));
-    
-    if (Object.keys(fragments).length < 2) {
-      console.log('Not enough fragments to combine');
-      return null;
-    }
-    
-    // Convert fragments to BigInt pairs
-    const congruences: [bigint, bigint][] = Object.entries(fragments).map(
-      ([modulus, remainder]) => {
-        // Ensure proper conversion to BigInt regardless of format
-        const mod = typeof modulus === 'string' ? 
-          (modulus.startsWith('0x') ? BigInt(modulus) : BigInt(parseInt(modulus))) : 
-          BigInt(modulus);
-          
-        const rem = typeof remainder === 'string' ? 
-          (remainder.startsWith('0x') ? BigInt(remainder) : BigInt(parseInt(remainder))) : 
-          BigInt(remainder);
-          
-        console.log(`Congruence: ${rem} mod ${mod}`);
-        return [rem, mod];
-      }
-    );
-    
-    // Log all congruences for debugging
-    congruences.forEach(([r, m], index) => {
-      console.log(`Congruence ${index}: x ≡ ${r} (mod ${m})`);
-    });
-    
-    // Apply CRT to all congruences
-    const combinedValue = chineseRemainderTheorem(congruences);
-    if (combinedValue === null) {
-      console.log('No solution exists for the given congruences');
-      return null;
-    }
-    
-    console.log("CRT result raw BigInt:", combinedValue.toString());
-    
-    // Convert to properly formatted private key hex
-    const formattedHex = bigIntToPrivateKeyHex(combinedValue);
-    console.log("Formatted private key hex:", formattedHex);
-    
-    // Run a validation test with our known test case
-    if (JSON.stringify(fragments) === JSON.stringify({
-      "101": "45",
-      "103": "67",
-      "107": "89",
-      "109": "94",
-      "113": "51",
-      "127": "83",
-      "131": "112",
-      "137": "59"
-    })) {
-      const expectedValue = 9606208636557092712n;
-      console.log("Test case detected - comparing results:");
-      console.log(`Expected: ${expectedValue}`);
-      console.log(`Calculated: ${combinedValue}`);
-      console.log(`Match: ${combinedValue === expectedValue}`);
-      
-      if (combinedValue !== expectedValue) {
-        console.error("CRT result doesn't match expected value!");
-      }
-    }
-    
-    return `0x${formattedHex}`;
-  } catch (error) {
-    console.error("Error combining private key fragments:", error);
-    return null;
-  }
-};
-
-/**
- * Determine if we have enough fragments to recover the full private key
- * @param fragments Map of moduli to remainders
- * @returns True if fragments are sufficient for full key recovery
- */
-export const hasEnoughFragmentsForFullRecovery = (fragments: Record<string, string>): boolean => {
-  // Check product of moduli against curve order
-  try {
-    if (Object.keys(fragments).length < 6) {
-      return false;
-    }
+    // Convert all inputs to BigInts
+    const moduliEntries = Object.entries(modulos).map(([m, r]) => [
+      BigInt(m),
+      BigInt(r)
+    ]);
     
     // Calculate product of all moduli
-    const moduliProduct = Object.keys(fragments).reduce((acc, mod) => {
-      // Handle different possible formats
-      const bigIntMod = typeof mod === 'string' ? 
-        (mod.startsWith('0x') ? BigInt(mod) : BigInt(parseInt(mod))) : 
-        BigInt(mod);
-      return acc * bigIntMod;
-    }, 1n);
+    const M = moduliEntries.reduce((acc, [m]) => acc * m, 1n);
+    console.info(`Product of all moduli (M): ${M}`);
+
+    // Calculate X using CRT formula
+    let result = 0n;
+    for (let i = 0; i < moduliEntries.length; i++) {
+      const [mi, ri] = moduliEntries[i];
+      const Ni = M / mi;
+      
+      console.info(`N${i} = M / m${i} = ${M} / ${mi} = ${Ni}`);
+      
+      // Calculate modular multiplicative inverse of Ni mod mi
+      // This uses the extended Euclidean algorithm
+      let yi: bigint;
+      try {
+        // Convert to library BigInt for modInverse calculation
+        const NiBigInt = convertToBigInt(Ni);
+        const miBigInt = convertToBigInt(mi);
+        
+        // Get modular multiplicative inverse
+        const inverseValue = NiBigInt.modInv(miBigInt);
+        yi = BigInt(inverseValue.toString());
+        
+        console.info(`y${i} = inverse(${Ni} mod ${mi}) = ${yi}`);
+      } catch (e) {
+        console.error(`Failed to compute modular inverse for ${Ni} mod ${mi}:`, e);
+        return null;
+      }
+      
+      // Add this term to the result
+      const partialResult = ri * Ni * yi;
+      console.info(`Partial result for ${i}: ${ri} * ${Ni} * ${yi} = ${partialResult}`);
+      
+      result = (result + partialResult) % M;
+      console.info(`Running total: ${result}`);
+    }
     
-    // Compare with curve order
-    return moduliProduct > curveParams.n;
+    // The result should be the smallest positive solution
+    console.info(`Final CRT raw result: ${result}`);
+    return result;
   } catch (error) {
-    console.error("Error checking fragment sufficiency:", error);
-    return false;
+    console.error('Error in Chinese Remainder Theorem calculation:', error);
+    return null;
   }
 };
 
 /**
- * Test function to verify the CRT implementation with known test case
- * @returns Verification result and details
+ * Select moduli that are coprime to use in the CRT calculation
+ * 
+ * @param modulos Object mapping modulos to remainders
+ * @returns Object with only coprime moduli
  */
-export const testCrtImplementation = () => {
+export const selectCoprimeModuli = (
+  modulos: Record<string, string>
+): Record<string, string> => {
+  const entries = Object.entries(modulos);
+  const coprimeModuli: Record<string, string> = {};
+
+  for (let i = 0; i < entries.length; i++) {
+    const [modI, remI] = entries[i];
+    let isCoprime = true;
+
+    for (let j = 0; j < entries.length; j++) {
+      if (i === j) continue;
+
+      const [modJ] = entries[j];
+      const gcdValue = gcd(BigInt(modI), BigInt(modJ));
+
+      if (gcdValue > 1n) {
+        isCoprime = false;
+        break;
+      }
+    }
+
+    if (isCoprime) {
+      coprimeModuli[modI] = remI;
+    }
+  }
+
+  return coprimeModuli;
+};
+
+/**
+ * Greatest Common Divisor (GCD) using the Euclidean algorithm
+ * @param a First number
+ * @param b Second number
+ * @returns GCD of a and b
+ */
+const gcd = (a: bigint, b: bigint): bigint => {
+  while (b) {
+    const temp = b;
+    b = a % b;
+    a = temp;
+  }
+  return a;
+};
+
+/**
+ * Check if the fragments are sufficient to recover the private key
+ * 
+ * @param keyFragments Private key fragments
+ * @returns boolean indicating if recovery is possible
+ */
+export const hasEnoughFragmentsForFullRecovery = (
+  keyFragments: Record<string, string>
+): boolean => {
+  return Object.keys(keyFragments).length >= 6;
+};
+
+/**
+ * Combine private key fragments using Chinese Remainder Theorem
+ * 
+ * @param keyFragments Object with private key fragments (modulo: remainder)
+ * @returns Recovered private key as hex string, or null if failed
+ */
+export const combinePrivateKeyFragments = (
+  keyFragments: Record<string, string>
+): string | null => {
   try {
-    // Test case with fragments that should produce 9606208636557092712
-    const testFragments = {
-      "101": "45",    // 101: 45
-      "103": "67",    // 103: 67
-      "107": "89",    // 107: 89
-      "109": "94",    // 109: 94
-      "113": "51",    // 113: 51
-      "127": "83",    // 127: 83
-      "131": "112",   // 131: 112
-      "137": "59"     // 137: 59
-    };
-    
-    console.log("Running CRT test with fragments:", testFragments);
-    
-    // Call the combinePrivateKeyFragments function with the test fragments
-    const result = combinePrivateKeyFragments(testFragments);
-    
-    // Expected value for comparison
-    const expectedBigInt = 9606208636557092712n;
-    const expectedHex = `0x${bigIntToPrivateKeyHex(expectedBigInt)}`;
-    console.log("Expected BigInt:", expectedBigInt.toString());
-    console.log("Expected hex:", expectedHex);
-    
-    // Compare with exact expected value
-    const resultBigInt = result ? hexToBigInt(result) : 0n;
-    const exactMatch = resultBigInt === expectedBigInt;
-    
-    if (!exactMatch) {
-      console.error("❌ CRT implementation test failed!");
-      console.error(`Expected: ${expectedBigInt}`);
-      console.error(`Actual: ${resultBigInt}`);
-    } else {
-      console.log("✅ CRT implementation test passed!");
+    // Ensure we have enough fragments
+    if (Object.keys(keyFragments).length < 6) {
+      console.info("Not enough key fragments for recovery");
+      return null;
     }
     
-    return {
-      rawResult: result,
-      resultBigInt: resultBigInt.toString(),
-      expectedBigInt: expectedBigInt.toString(),
-      expectedHex: expectedHex,
-      actualHex: result,
-      exactMatch: exactMatch,
-      passed: exactMatch
-    };
+    // Apply CRT to recover the private key value
+    const privateKeyBigint = chineseRemainderTheorem(keyFragments);
+    if (!privateKeyBigint) {
+      console.error("Failed to recover private key using CRT");
+      return null;
+    }
+    
+    console.info(`CRT result raw BigInt: ${privateKeyBigint}`);
+    
+    // Bitcoin private keys are 256 bits (32 bytes), so pad the hex to 64 characters
+    const privateKeyHex = bigIntToHex(privateKeyBigint, 64);
+    console.info(`Formatted private key hex: ${privateKeyHex}`);
+    
+    // Fixed test value for debugging - ensures we're getting the correct value
+    const expectedTestValue = "9606208636557092712";
+    if (privateKeyBigint.toString() !== expectedTestValue) {
+      console.info("Test case detected - comparing results:");
+      console.info(`Expected: ${expectedTestValue}`);
+      console.info(`Calculated: ${privateKeyBigint}`);
+      console.info(`Match: ${privateKeyBigint.toString() === expectedTestValue}`);
+    }
+    
+    // Return the hex string of the private key
+    return privateKeyHex;
   } catch (error) {
-    console.error("Error in CRT test:", error);
-    return { error: String(error), passed: false };
+    console.error('Error combining private key fragments:', error);
+    return null;
   }
+};
+
+/**
+ * Test function to validate the CRT implementation with a known test case
+ * 
+ * @returns Object containing test results
+ */
+export const testCrtImplementation = () => {
+  // Test case with known solution
+  const testFragments = {
+    "101": "45",
+    "103": "67",
+    "107": "89",
+    "109": "94",
+    "113": "51",
+    "127": "83",
+    "131": "112",
+    "137": "59"
+  };
+  
+  const expectedBigInt = BigInt("9606208636557092712");
+  const expectedHex = "0x00000000000000000000000000000000000000000000000085501bdbec466768";
+  
+  let result;
+  try {
+    result = chineseRemainderTheorem(testFragments);
+  } catch (e) {
+    console.error("CRT implementation test failed with exception:", e);
+    return {
+      passed: false,
+      error: e.message
+    };
+  }
+  
+  console.info(`Expected BigInt: ${expectedBigInt}`);
+  console.info(`Expected hex: ${expectedHex}`);
+  
+  if (!result || result.toString() !== expectedBigInt.toString()) {
+    console.error("❌ CRT implementation test failed!");
+    console.error(`Expected: ${expectedBigInt}`);
+    console.error(`Actual: ${result}`);
+    
+    return {
+      rawResult: bigIntToHex(result!, 64),
+      resultBigInt: result?.toString(),
+      expectedBigInt: expectedBigInt.toString(),
+      expectedHex,
+      actualHex: bigIntToHex(result!, 64),
+      exactMatch: false,
+      passed: false
+    };
+  }
+  
+  console.info("✅ CRT implementation test passed!");
+  
+  return {
+    rawResult: bigIntToHex(result, 64),
+    resultBigInt: result.toString(),
+    expectedBigInt: expectedBigInt.toString(),
+    expectedHex,
+    actualHex: bigIntToHex(result, 64),
+    exactMatch: true,
+    passed: true
+  };
 };

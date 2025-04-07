@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
@@ -29,9 +29,9 @@ const TransactionDetailView: React.FC<TransactionDetailViewProps> = ({
   totalInputValue = 0,
   keyVerificationStatus = null
 }) => {
-  // For debugging purposes
-  React.useEffect(() => {
-    console.log("TransactionDetailView props:", {
+  // Debug component props on each render
+  useEffect(() => {
+    console.log("TransactionDetailView rendering with props:", {
       txid,
       hasTransaction: !!transaction,
       hasAnalysis: !!analysis,

@@ -2,10 +2,9 @@
 import { Lock, Unlock, Key, CheckCircle2, XCircle, DollarSign, Bitcoin, AlertCircle } from 'lucide-react';
 import { formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { hasEnoughFragmentsForFullRecovery } from '@/lib/cryptoUtils';
+import { hasEnoughFragmentsForFullRecovery, combinePrivateKeyFragments } from '@/lib/cryptoUtils';
 import { hexToBigInt } from '@/lib/crypto/mathUtils';
 import { useEffect, useState } from 'react';
-import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
 
 interface KeyFragmentsTabProps {
   keyFragment: any;
@@ -19,6 +18,7 @@ export function KeyFragmentsTab({
   keyVerificationStatus
 }: KeyFragmentsTabProps) {
   const [decimalValue, setDecimalValue] = useState("");
+  const [recoveredKey, setRecoveredKey] = useState<string | null>(null);
 
   // Handle null or undefined keyFragment safely
   if (!keyFragment) {
@@ -42,33 +42,40 @@ export function KeyFragmentsTab({
   const hasEnoughFragments = fragmentCount >= 6 || 
     (fragmentValues && hasEnoughFragmentsForFullRecovery(fragmentValues));
     
-  console.log("KeyFragmentsTab props:", { 
-    fragmentCount, 
-    hasEnoughFragments, 
-    combinedFragments: keyFragment.combined_fragments 
-  });
-  
   // Format the private key to display properly
-  let displayKey = keyFragment.combined_fragments;
+  let displayKey = keyFragment.combined_fragments || recoveredKey;
   
   // If we have fragments but no combined key, try to combine them
   useEffect(() => {
+    console.log("KeyFragmentsTab effect running with:", { 
+      fragmentCount, 
+      hasEnoughFragments, 
+      combinedFragments: keyFragment.combined_fragments,
+      fragmentValues
+    });
+    
     if (!displayKey && fragmentValues && Object.keys(fragmentValues).length >= 6) {
       console.log("Attempting to recover key from fragments in KeyFragmentsTab");
-      const recovered = combinePrivateKeyFragments(fragmentValues);
-      if (recovered) {
-        console.log("Successfully recovered key in KeyFragmentsTab:", recovered);
-        displayKey = recovered;
-        
-        // Convert to raw BigInt to show actual decimal value
-        try {
-          const keyBigInt = hexToBigInt(recovered);
-          if (keyBigInt) {
-            setDecimalValue(keyBigInt.toString());
+      try {
+        const recovered = combinePrivateKeyFragments(fragmentValues);
+        if (recovered) {
+          console.log("Successfully recovered key in KeyFragmentsTab:", recovered);
+          setRecoveredKey(recovered);
+          
+          // Convert to raw BigInt to show actual decimal value
+          try {
+            const keyBigInt = hexToBigInt(recovered);
+            if (keyBigInt) {
+              setDecimalValue(keyBigInt.toString());
+            }
+          } catch (e) {
+            console.error("Error converting key to decimal:", e);
           }
-        } catch (e) {
-          console.error("Error converting key to decimal:", e);
+        } else {
+          console.error("Failed to recover key from fragments");
         }
+      } catch (e) {
+        console.error("Error recovering key:", e);
       }
     } else if (displayKey) {
       // Convert to raw BigInt to show actual decimal value
@@ -81,7 +88,7 @@ export function KeyFragmentsTab({
         console.error("Error converting key to decimal:", e);
       }
     }
-  }, [keyFragment, fragmentValues]);
+  }, [keyFragment, fragmentValues, displayKey]);
 
   return (
     <div className="space-y-6">
