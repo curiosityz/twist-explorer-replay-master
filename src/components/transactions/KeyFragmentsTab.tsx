@@ -4,6 +4,8 @@ import { formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { hasEnoughFragmentsForFullRecovery } from '@/lib/cryptoUtils';
 import { hexToBigInt } from '@/lib/crypto/mathUtils';
+import { useEffect, useState } from 'react';
+import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
 
 interface KeyFragmentsTabProps {
   keyFragment: any;
@@ -16,6 +18,8 @@ export function KeyFragmentsTab({
   totalInputValue,
   keyVerificationStatus
 }: KeyFragmentsTabProps) {
+  const [decimalValue, setDecimalValue] = useState("");
+
   // Handle null or undefined keyFragment safely
   if (!keyFragment) {
     return (
@@ -47,18 +51,37 @@ export function KeyFragmentsTab({
   // Format the private key to display properly
   let displayKey = keyFragment.combined_fragments;
   
-  // Convert to raw BigInt to show actual decimal value for verification
-  let decimalValue = "";
-  if (displayKey && typeof displayKey === 'string') {
-    try {
-      const keyBigInt = hexToBigInt(displayKey);
-      if (keyBigInt) {
-        decimalValue = keyBigInt.toString();
+  // If we have fragments but no combined key, try to combine them
+  useEffect(() => {
+    if (!displayKey && fragmentValues && Object.keys(fragmentValues).length >= 6) {
+      console.log("Attempting to recover key from fragments in KeyFragmentsTab");
+      const recovered = combinePrivateKeyFragments(fragmentValues);
+      if (recovered) {
+        console.log("Successfully recovered key in KeyFragmentsTab:", recovered);
+        displayKey = recovered;
+        
+        // Convert to raw BigInt to show actual decimal value
+        try {
+          const keyBigInt = hexToBigInt(recovered);
+          if (keyBigInt) {
+            setDecimalValue(keyBigInt.toString());
+          }
+        } catch (e) {
+          console.error("Error converting key to decimal:", e);
+        }
       }
-    } catch (e) {
-      console.error("Error converting key to decimal:", e);
+    } else if (displayKey) {
+      // Convert to raw BigInt to show actual decimal value
+      try {
+        const keyBigInt = hexToBigInt(displayKey);
+        if (keyBigInt) {
+          setDecimalValue(keyBigInt.toString());
+        }
+      } catch (e) {
+        console.error("Error converting key to decimal:", e);
+      }
     }
-  }
+  }, [keyFragment, fragmentValues]);
 
   return (
     <div className="space-y-6">
@@ -99,7 +122,7 @@ export function KeyFragmentsTab({
               : `${fragmentCount}/6 fragments - need ${fragmentsNeeded} more for complete recovery`}
           </div>
           
-          {keyFragment.combined_fragments && (
+          {displayKey && (
             <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-md">
               <h4 className="font-medium text-green-500 flex items-center mb-2">
                 <Unlock className="h-4 w-4 mr-2" />

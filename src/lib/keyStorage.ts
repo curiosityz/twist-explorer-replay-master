@@ -74,6 +74,11 @@ export const saveKeyFragments = (
     
     localStorage.setItem(RECOVERED_KEYS_STORAGE_KEY, JSON.stringify(recoveredKeys));
     console.log(`Saved key fragments for transaction ${txid}`);
+    
+    // Log the combined key if available
+    if (combinedKey) {
+      console.log(`Stored recovered key: ${combinedKey}`);
+    }
   } catch (error) {
     console.error('Error saving key fragments to local storage:', error);
   }
@@ -90,6 +95,14 @@ export const loadKeyFragments = (txid: string) => {
     if (!storedData) return null;
     
     const recoveredKeys = JSON.parse(storedData);
+    
+    if (recoveredKeys[txid]) {
+      console.log(`Loaded key fragments for transaction ${txid}`);
+      if (recoveredKeys[txid].combined_fragments) {
+        console.log(`Found recovered key: ${recoveredKeys[txid].combined_fragments}`);
+      }
+    }
+    
     return recoveredKeys[txid] || null;
   } catch (error) {
     console.error('Error loading key fragments from local storage:', error);
@@ -98,9 +111,26 @@ export const loadKeyFragments = (txid: string) => {
 };
 
 /**
- * Test function to verify the CRT implementation with known values
+ * Run a test of the CRT implementation to verify it's working correctly
  * @returns Test result object
  */
 export const runCrtTest = () => {
-  return testCrtImplementation();
+  const result = testCrtImplementation();
+  console.log("CRT test result:", result);
+  
+  if (result.passed) {
+    console.log("✅ CRT implementation test passed!");
+    console.log(`Expected: ${result.expectedBigInt}`);
+    console.log(`Actual: ${result.resultBigInt}`);
+    console.log(`Hex: ${result.actualHex}`);
+  } else {
+    console.error("❌ CRT implementation test failed!");
+    console.error(`Expected: ${result.expectedBigInt}`);
+    console.error(`Actual: ${result.resultBigInt}`);
+  }
+  
+  return result;
 };
+
+// Run a CRT test when this module is loaded to verify the implementation is working
+runCrtTest();

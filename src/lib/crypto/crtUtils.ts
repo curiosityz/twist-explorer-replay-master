@@ -36,7 +36,7 @@ export const chineseRemainderTheorem = (congruences: [bigint, bigint][]): bigint
     console.log(`N${i} = M / m${i} = ${M} / ${modulus} = ${Ni}`);
     
     // Calculate yi = inverse of Ni (mod modulus)
-    const yi = modularInverse(Ni, modulus);
+    const yi = modularInverse(Ni % modulus, modulus);
     if (yi === null) {
       console.error(`Failed to find modular inverse for ${Ni} mod ${modulus}`);
       return null;
@@ -44,16 +44,30 @@ export const chineseRemainderTheorem = (congruences: [bigint, bigint][]): bigint
     console.log(`y${i} = inverse(${Ni} mod ${modulus}) = ${yi}`);
     
     // Add partial result: remainder * Ni * yi
-    const partialResult = remainder * Ni * yi;
+    const partialResult = (remainder * Ni * yi) % M;
     console.log(`Partial result for ${i}: ${remainder} * ${Ni} * ${yi} = ${partialResult}`);
     
-    result += partialResult;
+    result = (result + partialResult) % M;
+  }
+
+  console.log("Final CRT raw result:", result.toString());
+  
+  // For the test case verification
+  if (congruences.some(([_, m]) => m === 101n)) {
+    const expected = 9606208636557092712n;
+    console.log(`Expected test value: ${expected}`);
+    console.log(`CRT output: ${result}`);
+    console.log(`Match: ${result === expected}`);
+    
+    // If not matching, print congruence details
+    if (result !== expected) {
+      console.error("CRT result doesn't match expected value!");
+      congruences.forEach(([r, m], i) => {
+        console.log(`Congruence ${i}: x ≡ ${r} (mod ${m})`);
+      });
+    }
   }
   
-  // Take the final result modulo M
-  result = result % M;
-  
-  console.log("Final CRT raw result:", result.toString());
   return result;
 };
 
@@ -103,8 +117,15 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
     // Convert fragments to BigInt pairs
     const congruences: [bigint, bigint][] = Object.entries(fragments).map(
       ([modulus, remainder]) => {
-        const mod = hexToBigInt(modulus);
-        const rem = hexToBigInt(remainder);
+        // Ensure proper conversion to BigInt regardless of format
+        const mod = typeof modulus === 'string' ? 
+          (modulus.startsWith('0x') ? BigInt(modulus) : BigInt(parseInt(modulus))) : 
+          BigInt(modulus);
+          
+        const rem = typeof remainder === 'string' ? 
+          (remainder.startsWith('0x') ? BigInt(remainder) : BigInt(parseInt(remainder))) : 
+          BigInt(remainder);
+          
         console.log(`Congruence: ${rem} mod ${mod}`);
         return [rem, mod];
       }
@@ -116,7 +137,8 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
     });
     
     // Test case specific log
-    if (congruences.some(([_, m]) => m === 101n)) {
+    const hasTestCase = congruences.some(([_, m]) => m === 101n);
+    if (hasTestCase) {
       console.log("TEST CASE DETECTED: Verifying against expected output 9606208636557092712");
     }
     
@@ -131,7 +153,7 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
     
     // For the test case, verify against the expected value
     const expectedTestValue = 9606208636557092712n;
-    if (congruences.some(([_, m]) => m === 101n)) {
+    if (hasTestCase) {
       console.log("Comparing with expected test value:");
       console.log(`Expected: ${expectedTestValue}`);
       console.log(`Actual  : ${combinedValue}`);
@@ -163,7 +185,11 @@ export const hasEnoughFragmentsForFullRecovery = (fragments: Record<string, stri
     
     // Calculate product of all moduli
     const moduliProduct = Object.keys(fragments).reduce((acc, mod) => {
-      return acc * hexToBigInt(mod);
+      // Handle different possible formats
+      const bigIntMod = typeof mod === 'string' ? 
+        (mod.startsWith('0x') ? BigInt(mod) : BigInt(parseInt(mod))) : 
+        BigInt(mod);
+      return acc * bigIntMod;
     }, 1n);
     
     // Compare with curve order
@@ -182,14 +208,14 @@ export const testCrtImplementation = () => {
   try {
     // Test case with fragments that should produce 9606208636557092712
     const testFragments = {
-      "0x65": "0x2d",    // 101: 45
-      "0x67": "0x43",    // 103: 67
-      "0x6b": "0x59",    // 107: 89
-      "0x6d": "0x5e",    // 109: 94
-      "0x71": "0x33",    // 113: 51
-      "0x7f": "0x53",    // 127: 83
-      "0x83": "0x70",    // 131: 112
-      "0x89": "0x3b"     // 137: 59
+      "101": "45",    // 101: 45
+      "103": "67",    // 103: 67
+      "107": "89",    // 107: 89
+      "109": "94",    // 109: 94
+      "113": "51",    // 113: 51
+      "127": "83",    // 127: 83
+      "131": "112",   // 131: 112
+      "137": "59"     // 137: 59
     };
     
     console.log("Running CRT test with fragments:", testFragments);

@@ -66,6 +66,11 @@ export const verifyPrivateKey = (
       return false;
     }
     
+    // Special case for our test value
+    if (privateKey === 9606208636557092712n) {
+      console.log("Test case detected! Verifying key 9606208636557092712...");
+    }
+    
     // Calculate public key as privateKey * G
     const calculatedPoint = scalarMultiply(privateKey);
     

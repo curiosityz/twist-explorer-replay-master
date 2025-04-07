@@ -34,11 +34,13 @@ export const modularInverse = (a: bigint, m: bigint): bigint | null => {
   // Extended Euclidean Algorithm
   let [old_r, r] = [a, m];
   let [old_s, s] = [1n, 0n];
+  let [old_t, t] = [0n, 1n];
   
   while (r !== 0n) {
     const quotient = old_r / r;
     [old_r, r] = [r, old_r - quotient * r];
     [old_s, s] = [s, old_s - quotient * s];
+    [old_t, t] = [t, old_t - quotient * t];
   }
   
   // GCD must be 1 for the inverse to exist
@@ -128,6 +130,20 @@ export const bigIntToPrivateKeyHex = (num: bigint): string => {
   // Pad with leading zeros to ensure 64 characters (32 bytes)
   while (hexString.length < 64) {
     hexString = '0' + hexString;
+  }
+  
+  // Test value verification
+  if (num === 9606208636557092712n) {
+    const expected = "856e73450d30e568";
+    const actual = hexString.slice(-16); // Last 16 characters
+    console.log(`Hex for test value 9606208636557092712n:
+Expected suffix: ${expected}
+Actual suffix: ${actual}
+Match: ${expected === actual}`);
+    
+    if (expected !== actual) {
+      console.error("Formatted hex string doesn't match expected format!");
+    }
   }
   
   return hexString;

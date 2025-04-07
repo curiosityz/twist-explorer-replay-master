@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { Check, Copy, Cpu } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AnalysisResult } from '@/types';
-import { toast } from 'sonner';
 
 interface AnalysisResultDisplayProps {
   analysisResult: AnalysisResult;
@@ -23,6 +22,9 @@ const AnalysisResultDisplay: React.FC<AnalysisResultDisplayProps> = ({
   copyPrivateKey,
   copied
 }) => {
+  // Use the private key from props or the recovered key from the analysis result
+  const displayKey = privateKey || analysisResult.recoveredPrivateKey || null;
+
   return (
     <div className="space-y-4">
       <div className={`${isDuplicate ? 'bg-blue-500/10 border-blue-500/20' : 'bg-amber-500/10 border-amber-500/20'} border rounded-md p-3`}>
@@ -91,7 +93,7 @@ const AnalysisResultDisplay: React.FC<AnalysisResultDisplayProps> = ({
               : `${Object.keys(analysisResult.privateKeyModulo).length}/6 fragments recovered - partial key information`}
           </div>
           
-          {Object.keys(analysisResult.privateKeyModulo).length >= 6 && privateKey && (
+          {displayKey && (
             <div className="mt-2 p-3 bg-green-500/10 border border-green-500/20 rounded">
               <div className="flex items-center justify-between">
                 <div className="font-medium text-sm text-green-500 flex items-center">
@@ -108,7 +110,7 @@ const AnalysisResultDisplay: React.FC<AnalysisResultDisplayProps> = ({
                 </Button>
               </div>
               <div className="font-mono text-xs mt-1 break-all">
-                {privateKey}
+                {displayKey}
               </div>
               
               {verificationResult !== null && (

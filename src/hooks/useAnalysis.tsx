@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase, Tables } from '@/integrations/supabase/client';
 import { AnalysisResult, CryptographicPoint, Signature } from '@/types';
@@ -9,6 +8,7 @@ import {
 } from '@/lib/cryptoUtils';
 import { toast } from 'sonner';
 import { analyzeTransaction } from '@/lib/vulnerabilityUtils';
+import { saveKeyFragments } from '@/lib/keyStorage';
 
 export const useAnalysis = (txid?: string, startAnalysis = false) => {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
@@ -26,36 +26,70 @@ export const useAnalysis = (txid?: string, startAnalysis = false) => {
   }, [txid, startAnalysis]);
 
   useEffect(() => {
+    if (analysisResult?.recoveredPrivateKey) {
+      setPrivateKey(analysisResult.recoveredPrivateKey);
+      
+      if (analysisResult.publicKey) {
+        console.log("Verifying pre-recovered private key against public key...");
+        const isValid = verifyPrivateKey(
+          analysisResult.recoveredPrivateKey,
+          analysisResult.publicKey.x,
+          analysisResult.publicKey.y
+        );
+        setVerificationResult(isValid);
+        
+        if (isValid) {
+          toast.success("Private key successfully verified!", {
+            description: "The key matches the public key in this transaction."
+          });
+        } else {
+          toast.warning("Private key verification failed", {
+            description: "The recovered key does not match the public key."
+          });
+        }
+      }
+      return;
+    }
+    
     if (analysisResult?.privateKeyModulo) {
       const fragmentCount = Object.keys(analysisResult.privateKeyModulo).length;
       console.log(`Found ${fragmentCount} key fragments`);
       
       if (fragmentCount >= 2) {
-        // Even with fewer than 6 fragments, we might be able to recover a key
-        // if the moduli product exceeds the curve order
         if (hasEnoughFragmentsForFullRecovery(analysisResult.privateKeyModulo) || fragmentCount >= 6) {
           console.log("Attempting to recover private key from fragments...");
           const calculatedKey = combinePrivateKeyFragments(analysisResult.privateKeyModulo);
-          setPrivateKey(calculatedKey);
           
-          if (calculatedKey && analysisResult.publicKey) {
-            console.log("Verifying recovered private key against public key...");
-            const isValid = verifyPrivateKey(
-              calculatedKey, 
-              analysisResult.publicKey.x, 
-              analysisResult.publicKey.y
-            );
-            setVerificationResult(isValid);
+          if (calculatedKey) {
+            console.log("Successfully calculated private key:", calculatedKey);
+            setPrivateKey(calculatedKey);
             
-            if (isValid) {
-              toast.success("Private key successfully recovered and verified!", {
-                description: "The key matches the public key in this transaction."
-              });
-            } else {
-              toast.warning("Private key recovery failed verification", {
-                description: "The recovered key does not match the public key."
-              });
+            if (txid) {
+              saveKeyFragments(txid, analysisResult.privateKeyModulo, calculatedKey);
             }
+            
+            if (analysisResult.publicKey) {
+              console.log("Verifying recovered private key against public key...");
+              const isValid = verifyPrivateKey(
+                calculatedKey, 
+                analysisResult.publicKey.x, 
+                analysisResult.publicKey.y
+              );
+              setVerificationResult(isValid);
+              
+              if (isValid) {
+                toast.success("Private key successfully recovered and verified!", {
+                  description: "The key matches the public key in this transaction."
+                });
+              } else {
+                toast.warning("Private key recovery failed verification", {
+                  description: "The recovered key does not match the public key."
+                });
+              }
+            }
+          } else {
+            console.error("Failed to recover private key from fragments");
+            setPrivateKey(null);
           }
         } else {
           console.log("Not enough fragments for full key recovery");
@@ -67,7 +101,7 @@ export const useAnalysis = (txid?: string, startAnalysis = false) => {
     } else {
       setPrivateKey(null);
     }
-  }, [analysisResult]);
+  }, [analysisResult, txid]);
 
   const checkIfTransactionIsAnalyzed = async (txidToCheck: string) => {
     const { data, error } = await supabase
@@ -134,26 +168,19 @@ export const useAnalysis = (txid?: string, startAnalysis = false) => {
               analysisData.prime_factors.map(String) : [],
             privateKeyModulo: privateKeyModulo,
             status: analysisData.status as "completed" | "analyzing" | "failed" | "pending",
-            message: analysisData.message
+            message: analysisData.message,
+            recoveredPrivateKey: analysisData.recovered_private_key
           };
           
           setAnalysisResult(loadedResult);
           
-          if (loadedResult.publicKey) {
-            const publicKeyHex = loadedResult.publicKey.x + loadedResult.publicKey.y;
+          if (loadedResult.recoveredPrivateKey) {
+            setPrivateKey(loadedResult.recoveredPrivateKey);
             
-            const { data: keyData, error: keyError } = await supabase
-              .from(Tables.private_key_fragments)
-              .select('*')
-              .eq('public_key_hex', publicKeyHex)
-              .maybeSingle();
-              
-            if (!keyError && keyData && keyData.combined_fragments) {
-              setPrivateKey(keyData.combined_fragments);
-              
+            if (loadedResult.publicKey) {
               const isValid = verifyPrivateKey(
-                keyData.combined_fragments, 
-                loadedResult.publicKey.x, 
+                loadedResult.recoveredPrivateKey,
+                loadedResult.publicKey.x,
                 loadedResult.publicKey.y
               );
               setVerificationResult(isValid);
@@ -165,7 +192,6 @@ export const useAnalysis = (txid?: string, startAnalysis = false) => {
         }
       }
 
-      // If not a duplicate, analyze the transaction
       const result = await analyzeTransaction(txid);
       
       if (result) {

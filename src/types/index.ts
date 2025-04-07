@@ -1,4 +1,3 @@
-
 // Transaction related types
 export interface Transaction {
   txid: string;
@@ -69,14 +68,15 @@ export type VulnerabilityTypeString = keyof typeof VulnerabilityType | string;
 
 export interface AnalysisResult {
   txid: string;
-  vulnerabilityType: VulnerabilityTypeString;
+  vulnerabilityType: VulnerabilityType;
   publicKey: CryptographicPoint;
-  signature?: Signature;
+  signature: Signature;
   twistOrder?: string;
   primeFactors?: string[];
   privateKeyModulo?: Record<string, string>;
-  status: 'pending' | 'analyzing' | 'completed' | 'failed';
-  message?: string;
+  status: "completed" | "analyzing" | "failed" | "pending";
+  message: string;
+  recoveredPrivateKey?: string; // Added field to store the recovered private key
 }
 
 // Expanded secp256k1 curve parameters
