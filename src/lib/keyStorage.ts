@@ -106,26 +106,39 @@ export const testCrtImplementation = () => {
     
     // Test case with fragments that should produce 9606208636557092712
     const testFragments = {
-      "0x11": "0x5",
-      "0x13": "0x3",
-      "0x17": "0xc",
-      "0x19": "0x10"
+      "0x11": "0x5",    // 17: 5
+      "0x13": "0x3",    // 19: 3
+      "0x17": "0xc",    // 23: 12
+      "0x19": "0x10"    // 25: 16
     };
     
     console.log("Running CRT test with fragments:", testFragments);
     
+    // Call the combinePrivateKeyFragments function with the test fragments
     const result = combinePrivateKeyFragments(testFragments);
-    console.log("CRT test result:", result);
+    console.log("CRT test raw result:", result);
     
-    // Convert expected value to normalized key format for comparison
+    // Convert expected value for comparison
     const expectedBigInt = 9606208636557092712n;
-    const expectedHex = normalizePrivateKey(`0x${expectedBigInt.toString(16)}`);
-    console.log("Expected normalized key:", expectedHex);
+    const expectedHex = `0x${expectedBigInt.toString(16)}`;
+    console.log("Expected hex:", expectedHex);
+    
+    // Now format the result for comparison with expected output
+    const normalizedResult = normalizePrivateKey(result || '');
+    console.log("Normalized result:", normalizedResult);
+    
+    // Compare with exact expected value
+    const resultBigInt = BigInt(result || '0');
+    const exactMatch = resultBigInt === expectedBigInt;
     
     return {
-      actualResult: result,
+      rawResult: result,
+      normalizedResult: normalizedResult,
       expectedResult: expectedHex,
-      passed: result === expectedHex
+      resultBigInt: resultBigInt.toString(),
+      expectedBigInt: expectedBigInt.toString(),
+      exactMatch: exactMatch,
+      passed: exactMatch
     };
   } catch (error) {
     console.error("Error in CRT test:", error);

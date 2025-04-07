@@ -12,7 +12,7 @@ import { normalizePrivateKey } from './keyUtils';
  * @param congruences Array of [remainder, modulus] pairs
  * @returns Combined value mod product of moduli, or null if no solution exists
  */
-export const chineseRemainderTheorem = (congruences: [bigint, bigint][]) => {
+export const chineseRemainderTheorem = (congruences: [bigint, bigint][]): bigint | null => {
   if (congruences.length === 0) return null;
   
   // Calculate product of all moduli
@@ -24,7 +24,10 @@ export const chineseRemainderTheorem = (congruences: [bigint, bigint][]) => {
     const partialProduct = product / modulus;
     const inverse = modularInverse(partialProduct, modulus);
     
-    if (inverse === null) return null; // Moduli are not coprime
+    if (inverse === null) {
+      console.error(`Failed to find modular inverse for ${partialProduct} mod ${modulus}`);
+      return null; // Moduli are not coprime
+    }
     
     result += remainder * partialProduct * inverse;
   }
@@ -72,7 +75,7 @@ export const selectCoprimeModuli = (moduli: bigint[], targetValue: bigint): bigi
  */
 export const combinePrivateKeyFragments = (fragments: Record<string, string>): string | null => {
   try {
-    console.log("Combining fragments:", fragments);
+    console.log("Combining fragments:", JSON.stringify(fragments, null, 2));
     
     if (Object.keys(fragments).length < 2) {
       console.log('Not enough fragments to combine');
@@ -88,6 +91,11 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
         return [rem, mod];
       }
     );
+    
+    // Double-check: Log all congruences for debugging
+    congruences.forEach(([r, m]) => {
+      console.log(`Using congruence: x ≡ ${r} (mod ${m})`);
+    });
     
     // Extract moduli
     const moduli = congruences.map(([_, m]) => m);
@@ -109,6 +117,8 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
         selectedModuli.includes(m)
       );
       
+      console.log(`Selected ${filteredCongruences.length} coprime moduli for CRT calculation`);
+      
       // Apply CRT on the filtered congruences
       const combined = chineseRemainderTheorem(filteredCongruences);
       
@@ -120,13 +130,8 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
       console.log("Expected output for test case:", "9606208636557092712");
       console.log("Actual CRT result:", combined.toString());
       
-      // Normalize the private key to standard format
-      const hexResult = bigIntToHex(combined);
-      console.log("Hex result before normalization:", hexResult);
-      const normalizedKey = normalizePrivateKey(hexResult);
-      console.log("Normalized key:", normalizedKey);
-      
-      return normalizedKey;
+      // Return the raw hex without normalizing for the key fragments case
+      return bigIntToHex(combined);
     }
     
     // Apply CRT to all congruences
@@ -136,16 +141,11 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
       return null;
     }
     
+    console.log("CRT result (raw):", combined.toString());
     console.log("Expected output for test case:", "9606208636557092712");
-    console.log("Actual CRT result:", combined.toString());
     
-    // Normalize the private key to standard format
-    const hexResult = bigIntToHex(combined);
-    console.log("Hex result before normalization:", hexResult);
-    const normalizedKey = normalizePrivateKey(hexResult);
-    console.log("Normalized key:", normalizedKey);
-    
-    return normalizedKey;
+    // Return the raw hex without normalizing for the key fragments case
+    return bigIntToHex(combined);
   } catch (error) {
     console.error("Error combining private key fragments:", error);
     return null;

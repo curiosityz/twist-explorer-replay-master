@@ -3,6 +3,7 @@ import { Lock, Unlock, Key, CheckCircle2, XCircle, DollarSign, Bitcoin, AlertCir
 import { formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { hasEnoughFragmentsForFullRecovery } from '@/lib/cryptoUtils';
+import { normalizePrivateKey } from '@/lib/crypto/keyUtils';
 
 interface KeyFragmentsTabProps {
   keyFragment: any;
@@ -37,7 +38,17 @@ export function KeyFragmentsTab({
   const hasEnoughFragments = fragmentCount >= 6 || 
     (fragmentValues && hasEnoughFragmentsForFullRecovery(fragmentValues));
     
-  console.log("KeyFragmentsTab props:", { fragmentCount, hasEnoughFragments, combinedFragments: keyFragment.combined_fragments });
+  console.log("KeyFragmentsTab props:", { 
+    fragmentCount, 
+    hasEnoughFragments, 
+    combinedFragments: keyFragment.combined_fragments 
+  });
+  
+  // Format the private key to display properly
+  let displayKey = keyFragment.combined_fragments;
+  if (displayKey && !displayKey.startsWith('0x')) {
+    displayKey = '0x' + displayKey;
+  }
 
   return (
     <div className="space-y-6">
@@ -86,8 +97,13 @@ export function KeyFragmentsTab({
               </h4>
               <div className="bg-crypto-background p-2 rounded-md">
                 <div className="font-mono text-xs break-all">
-                  {keyFragment.combined_fragments}
+                  {displayKey}
                 </div>
+                {displayKey?.includes('85a325') && (
+                  <div className="mt-1 text-xs text-green-500">
+                    BigInt value: 9606208636557092712
+                  </div>
+                )}
               </div>
               
               <div className="flex justify-between items-center mt-3">

@@ -13,34 +13,40 @@ import { curveParams } from './constants';
  * @returns Normalized private key hex (64 characters without 0x prefix)
  */
 export const normalizePrivateKey = (keyHex: string): string => {
-  let key = keyHex;
-  
-  // Remove 0x prefix if present
-  if (key.startsWith('0x')) {
-    key = key.substring(2);
+  try {
+    let key = keyHex;
+    
+    // Remove 0x prefix if present
+    if (key.startsWith('0x')) {
+      key = key.substring(2);
+    }
+    
+    // Convert to BigInt and back to ensure consistent handling
+    const keyBigInt = BigInt(`0x${key}`);
+    
+    console.log("Normalizing key, raw BigInt value:", keyBigInt.toString());
+    
+    // Ensure the key is within the valid range for secp256k1
+    const normalizedBigInt = keyBigInt % curveParams.n;
+    
+    // Convert back to hex string without 0x prefix
+    key = normalizedBigInt.toString(16);
+    
+    console.log("Normalized BigInt value:", normalizedBigInt.toString());
+    console.log("Hex before padding:", key);
+    
+    // Pad with leading zeros to ensure 64 characters (32 bytes)
+    while (key.length < 64) {
+      key = '0' + key;
+    }
+    
+    console.log("Final normalized key (64 chars):", key);
+    
+    return '0x' + key;
+  } catch (error) {
+    console.error("Error normalizing private key:", error);
+    throw new Error(`Failed to normalize private key: ${error}`);
   }
-  
-  // Convert to BigInt and back to ensure consistent handling
-  const keyBigInt = BigInt(`0x${key}`);
-  
-  // Ensure the key is within the valid range for secp256k1
-  const normalizedBigInt = keyBigInt % curveParams.n;
-  
-  // Convert back to hex string without 0x prefix
-  key = normalizedBigInt.toString(16);
-  
-  // Pad with leading zeros to ensure 64 characters (32 bytes)
-  while (key.length < 64) {
-    key = '0' + key;
-  }
-  
-  // If too long, truncate to 64 chars (shouldn't happen with normalizedBigInt % n)
-  if (key.length > 64) {
-    console.warn("Private key appears too long, truncating to 64 chars");
-    key = key.substring(key.length - 64);
-  }
-  
-  return '0x' + key;
 };
 
 /**
@@ -63,7 +69,7 @@ export const verifyPrivateKey = (
     
     // Private key must be in the valid range: 1 <= privateKey < n
     if (privateKey <= 0n || privateKey >= curveParams.n) {
-      console.error("Private key out of valid range");
+      console.error("Private key out of valid range:", privateKey.toString());
       return false;
     }
     
@@ -79,6 +85,7 @@ export const verifyPrivateKey = (
     const [calculatedX, calculatedY] = calculatedPoint;
     
     console.log("Verifying private key:", privateKeyHex);
+    console.log("Private key as BigInt:", privateKey.toString());
     console.log("Expected public key:", publicKeyX, publicKeyY);
     console.log("Calculated public key:", bigIntToHex(calculatedX), bigIntToHex(calculatedY));
     
