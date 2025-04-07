@@ -1,4 +1,3 @@
-
 /**
  * Bitcoin public key utilities
  */
@@ -72,7 +71,7 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // secp256k1.publicKeyConvert accepts compressed key as Uint8Array
+      // Fix: Remove argument from publicKeyConvert call
       // When decompressing, the boolean parameter should be false
       const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey, false);
       
