@@ -14,6 +14,7 @@ declare global {
     bech32: any;
     secp256k1: any;
     nobleSecp256k1: any;
+    secp: any; // For noble-secp256k1 module
     bitcoinMessage: any;
     bitcoinOps: any;
     bitcoinAddressValidation: any;
@@ -45,7 +46,7 @@ export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] }
       case 'Bitcoin':
         return !window.bitcoin && !window.bitcoinjs;
       case 'secp256k1':
-        return !window.nobleSecp256k1;
+        return !window.nobleSecp256k1 && !window.secp;
       default:
         return true;
     }
@@ -81,9 +82,14 @@ export const checkAndLogLibraryStatus = (): void => {
     console.log("Assigned window.bitcoinjs to window.Bitcoin");
   }
   
-  if (!window.secp256k1 && window.nobleSecp256k1) {
-    window.secp256k1 = window.nobleSecp256k1;
-    console.log("Assigned window.nobleSecp256k1 to window.secp256k1");
+  if (!window.secp256k1) {
+    if (window.nobleSecp256k1) {
+      window.secp256k1 = window.nobleSecp256k1;
+      console.log("Assigned window.nobleSecp256k1 to window.secp256k1");
+    } else if (window.secp) {
+      window.secp256k1 = window.secp;
+      console.log("Assigned window.secp to window.secp256k1");
+    }
   }
 
   const status = checkBitcoinLibsLoaded();
@@ -95,6 +101,8 @@ export const checkAndLogLibraryStatus = (): void => {
   console.log("- bip39:", window.bip39 ? "Loaded" : "Not loaded");
   console.log("- bech32:", window.bech32 ? "Loaded" : "Not loaded");
   console.log("- secp256k1:", window.secp256k1 ? "Loaded" : "Not loaded");
+  console.log("- nobleSecp256k1:", window.nobleSecp256k1 ? "Loaded" : "Not loaded");
+  console.log("- secp:", window.secp ? "Loaded" : "Not loaded");
   console.log("- bitcoinMessage:", window.bitcoinMessage ? "Loaded" : "Not loaded");
   console.log("- bitcoinAddressValidation:", window.bitcoinAddressValidation ? "Loaded" : "Not loaded");
   

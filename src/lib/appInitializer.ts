@@ -23,9 +23,14 @@ export const initializeApplication = (): void => {
       console.log("Mapped alternative Bitcoin library name to window.Bitcoin");
     }
     
-    if (!window.secp256k1 && window.nobleSecp256k1) {
-      window.secp256k1 = window.nobleSecp256k1;
-      console.log("Mapped nobleSecp256k1 to window.secp256k1");
+    if (!window.secp256k1) {
+      if (window.nobleSecp256k1) {
+        window.secp256k1 = window.nobleSecp256k1;
+        console.log("Mapped nobleSecp256k1 to window.secp256k1");
+      } else if (window.secp) {
+        window.secp256k1 = window.secp;
+        console.log("Mapped secp to window.secp256k1");
+      }
     }
     
     // Log detailed status of all libraries
@@ -82,9 +87,14 @@ export const checkFeatureLibraries = (feature: string, requiredLibs: string[]): 
  */
 const refreshLibraryReferences = (): void => {
   // Try to assign noble-secp256k1 to secp256k1 if it loaded later
-  if (window.nobleSecp256k1 && !window.secp256k1) {
-    window.secp256k1 = window.nobleSecp256k1;
-    console.log("Refreshed secp256k1 reference from nobleSecp256k1");
+  if (!window.secp256k1) {
+    if (window.nobleSecp256k1) {
+      window.secp256k1 = window.nobleSecp256k1;
+      console.log("Refreshed secp256k1 reference from nobleSecp256k1");
+    } else if (window.secp) {
+      window.secp256k1 = window.secp;
+      console.log("Refreshed secp256k1 reference from secp");
+    }
   }
   
   // Check for Bitcoin global object and try to find it from different sources

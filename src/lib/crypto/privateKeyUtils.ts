@@ -1,218 +1,191 @@
+
 /**
- * Private key utilities for Bitcoin
+ * Private key utilities for Bitcoin cryptography
  */
 
+import { hexToBigInt, bigIntToHex } from './mathUtils';
+import { curveParams } from './constants';
+import { createHash } from 'crypto';
 import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
 
 /**
- * Check if a string is a valid WIF (Wallet Import Format) private key
- * @param wif The WIF string to validate
- * @returns Boolean indicating if the WIF is valid
+ * Normalize a private key to a standard hex format
+ * @param privateKeyInput Private key in various formats (hex, WIF, etc.)
+ * @returns Normalized private key as hex string
  */
-export const isValidWIF = (wif: string): boolean => {
+export const normalizePrivateKey = (privateKeyInput: string): string => {
   try {
-    // Basic validation - WIF should be base58 encoded string
-    // with specific lengths: 51-52 characters for mainnet
-    if (!wif || typeof wif !== 'string') {
-      return false;
+    // Remove whitespace and common prefixes
+    let privateKey = privateKeyInput.trim();
+    
+    // Handle common prefixes
+    if (privateKey.toLowerCase().startsWith('0x')) {
+      privateKey = privateKey.substring(2);
     }
     
-    // Check length (mainnet compressed: 52 chars, uncompressed: 51 chars)
-    // Testnet has different lengths but similar structure
-    if (wif.length < 50 || wif.length > 54) {
-      return false;
+    // Check if it's a WIF format (Wallet Import Format)
+    if (privateKey.length >= 50 && (privateKey.startsWith('5') || 
+                                   privateKey.startsWith('K') || 
+                                   privateKey.startsWith('L'))) {
+      return wifToPrivateKey(privateKey);
     }
     
-    // Check for valid prefix - mainnet WIFs start with '5', 'K', or 'L'
-    const validMainnetPrefixes = ['5', 'K', 'L'];
-    // Testnet WIFs start with '9' or 'c'
-    const validTestnetPrefixes = ['9', 'c'];
-    
-    // Combined valid prefixes
-    const validPrefixes = [...validMainnetPrefixes, ...validTestnetPrefixes];
-    if (!validPrefixes.includes(wif.charAt(0))) {
-      return false;
+    // Validate as hex
+    if (!/^[0-9a-fA-F]+$/.test(privateKey)) {
+      throw new Error("Private key must be in hexadecimal format");
     }
     
-    // Check if bitcoinjs library is available for full validation
-    const libCheck = checkBitcoinLibsLoaded();
-    if (!libCheck.loaded) {
-      console.warn("Bitcoin libraries not fully loaded, performing basic WIF validation only");
-      return true; // Return true based on prefix and length checks if libraries not available
+    // Ensure correct length (32 bytes = 64 hex chars)
+    if (privateKey.length < 64) {
+      privateKey = privateKey.padStart(64, '0');
+    } else if (privateKey.length > 64) {
+      privateKey = privateKey.substring(privateKey.length - 64);
+      console.warn("Private key was truncated to 32 bytes");
     }
     
-    // If we have the BS58 library, we can do proper checksum validation
-    if (window.bs58) {
-      try {
-        // Decode the base58 string
-        const decoded = window.bs58.decode(wif);
-        
-        // Check length of decoded data
-        // WIF format: [1 byte version][32 bytes private key][optional 1 byte compression flag][4 bytes checksum]
-        // So valid lengths are 37 bytes (uncompressed) or 38 bytes (compressed)
-        if (decoded.length !== 37 && decoded.length !== 38) {
-          return false;
-        }
-        
-        return true;
-      } catch (e) {
-        return false; // Decoding failed, invalid Base58
-      }
+    // Validate key is in valid range for secp256k1
+    const keyValue = hexToBigInt(privateKey);
+    if (keyValue <= 0n || keyValue >= curveParams.n) {
+      throw new Error("Private key out of valid range");
     }
     
-    // If bs58 is not available, return true based on prefix and length checks
-    return true;
-  } catch (error) {
-    console.error("Error validating WIF:", error);
-    return false;
+    return privateKey;
+  } catch (error: any) {
+    console.error("Error normalizing private key:", error);
+    throw new Error(`Invalid private key: ${error.message}`);
   }
 };
 
 /**
- * Convert WIF format private key to raw hex
- * @param wif Private key in WIF format
- * @returns Private key as hex string or null if invalid
+ * Verify a private key against a public key
+ * @param privateKeyHex Private key in hex format
+ * @param publicKeyXHex Public key X coordinate in hex format
+ * @param publicKeyYHex Public key Y coordinate in hex format
+ * @returns Boolean indicating if the private key matches the public key
  */
-export const wifToPrivateKey = (wif: string): string | null => {
+export const verifyPrivateKey = (
+  privateKeyHex: string, 
+  publicKeyXHex: string, 
+  publicKeyYHex: string
+): boolean => {
   try {
-    if (!wif || typeof wif !== 'string') {
-      throw new Error("Invalid WIF format");
-    }
-    
-    // Check if Bitcoin libraries are loaded
+    // Check if libraries are loaded
     const libCheck = checkBitcoinLibsLoaded();
     if (!libCheck.loaded) {
       throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
     }
     
-    // Validate WIF format before decoding
-    if (!/^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]{51,52}$/.test(wif)) {
-      throw new Error("Invalid WIF format - should be 51-52 Base58 characters");
+    if (!window.secp256k1) {
+      throw new Error("secp256k1 library not loaded");
     }
     
-    // Call bs58.decode - it expects just the string, without any parameters
-    const bytes = window.bs58.decode(wif);
+    // Normalize inputs
+    const privKey = privateKeyHex.startsWith('0x') 
+      ? privateKeyHex.substring(2) 
+      : privateKeyHex;
+      
+    const pubX = publicKeyXHex.startsWith('0x') 
+      ? publicKeyXHex.substring(2) 
+      : publicKeyXHex;
+      
+    const pubY = publicKeyYHex.startsWith('0x') 
+      ? publicKeyYHex.substring(2) 
+      : publicKeyYHex;
+      
+    // Convert private key to bytes
+    const privKeyBytes = new Uint8Array(
+      privKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+    );
     
-    // WIF format: version(1) + key(32) + [compressed-flag(1)] + checksum(4)
-    // Validate length (37 for uncompressed, 38 for compressed)
-    if (bytes.length !== 37 && bytes.length !== 38) {
-      throw new Error(`Invalid WIF length: ${bytes.length}`);
+    // Derive public key from private key using secp256k1 library
+    const derivedPubKey = window.secp256k1.publicKeyCreate(privKeyBytes);
+    
+    // Convert derived public key to uncompressed format (if needed)
+    const uncompressedDerivedPubKey = window.secp256k1.publicKeyConvert(derivedPubKey, false);
+    
+    // Extract x and y coordinates from the derived public key
+    const derivedX = Array.from(uncompressedDerivedPubKey.slice(1, 33))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+      
+    const derivedY = Array.from(uncompressedDerivedPubKey.slice(33, 65))
+      .map(b => b.toString(16).padStart(2, "0"))
+      .join("");
+    
+    // Compare the derived public key coordinates with the provided ones
+    const xMatches = derivedX.toLowerCase() === pubX.toLowerCase();
+    const yMatches = derivedY.toLowerCase() === pubY.toLowerCase();
+    
+    return xMatches && yMatches;
+  } catch (error: any) {
+    console.error("Error verifying private key:", error);
+    return false;
+  }
+};
+
+/**
+ * Convert WIF format to private key hex
+ * @param wif WIF (Wallet Import Format) private key
+ * @returns Private key as hex string
+ */
+export const wifToPrivateKey = (wif: string): string => {
+  try {
+    // Check if bs58 library is loaded
+    if (!window.bs58) {
+      throw new Error("bs58 library not loaded");
     }
     
-    // Extract private key (skip version byte, take 32 bytes)
-    const privateKeyBytes = bytes.slice(1, 33);
+    // Decode the Base58Check encoding
+    const decoded = window.bs58.decode(wif);
+    
+    // Verify checksum if possible (if SHA256 is available)
+    if (window.Bitcoin && window.Bitcoin.crypto) {
+      const payload = decoded.slice(0, -4);
+      const checksum = decoded.slice(-4);
+      
+      // Double SHA256 hash for checksum verification
+      const sha256 = window.Bitcoin.crypto.sha256;
+      const calculatedChecksum = sha256(sha256(payload)).slice(0, 4);
+      
+      // Check if checksums match
+      const checksumMatches = calculatedChecksum.every((b: number, i: number) => b === checksum[i]);
+      if (!checksumMatches) {
+        throw new Error("Invalid WIF checksum");
+      }
+    }
+    
+    // Check version byte and extract private key
+    // Version byte is usually:
+    // - 0x80 for mainnet
+    // - 0xef for testnet
+    const versionByte = decoded[0];
+    
+    let privateKeyBytes;
+    // Check for compressed key format (has extra 0x01 byte at the end)
+    if (decoded.length === 34) {
+      const compressionByte = decoded[decoded.length - 5];
+      if (compressionByte !== 0x01) {
+        throw new Error("Invalid compression byte in WIF");
+      }
+      privateKeyBytes = decoded.slice(1, -5);
+    } else {
+      // Uncompressed format
+      privateKeyBytes = decoded.slice(1, -4);
+    }
+    
+    // Ensure we have the right key length (32 bytes)
+    if (privateKeyBytes.length !== 32) {
+      throw new Error(`Invalid private key length: ${privateKeyBytes.length} bytes`);
+    }
     
     // Convert to hex
     const privateKeyHex = Array.from(privateKeyBytes)
       .map(b => b.toString(16).padStart(2, "0"))
       .join("");
       
-    // Basic validation of the extracted key
-    if (privateKeyHex.length !== 64 || !/^[0-9a-f]+$/i.test(privateKeyHex)) {
-      throw new Error("Invalid private key hex format after extraction");
-    }
-    
     return privateKeyHex;
   } catch (error: any) {
     console.error("Error converting WIF to private key:", error);
-    return null;
+    throw new Error(`Failed to convert WIF to private key: ${error.message}`);
   }
 };
-
-/**
- * Validate a private key is within the valid range for secp256k1
- * @param privateKey Private key as hex string
- * @returns Boolean indicating if the key is valid
- */
-export const validatePrivateKey = (privateKey: string): boolean => {
-  try {
-    // Clean input - remove 0x prefix if present
-    const keyClean = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
-    
-    // Validate hex format
-    if (!/^[0-9a-fA-F]+$/.test(keyClean)) {
-      console.error("Invalid hex format in private key");
-      return false;
-    }
-    
-    // Convert to BigInt
-    const keyValue = BigInt(`0x${keyClean}`);
-    
-    // secp256k1 curve order
-    const n = BigInt("0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141");
-    
-    // Check if in range: 0 < key < n
-    return keyValue > 0n && keyValue < n;
-  } catch (error) {
-    console.error("Error validating private key:", error);
-    return false;
-  }
-};
-
-/**
- * Convert private key from raw hex to WIF format
- * @param privateKeyHex Private key in hex format
- * @param compressed Whether to use compressed format
- * @returns WIF formatted private key
- */
-export const privateKeyToWif = (privateKeyHex: string, compressed = true): string | null => {
-  try {
-    // Check if Bitcoin libraries are loaded
-    const libCheck = checkBitcoinLibsLoaded();
-    if (!libCheck.loaded) {
-      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
-    }
-    
-    // Clean input - remove 0x prefix if present
-    const keyClean = privateKeyHex.startsWith('0x') ? privateKeyHex.slice(2) : privateKeyHex;
-    
-    // Validate hex format
-    if (!/^[0-9a-fA-F]{64}$/.test(keyClean)) {
-      throw new Error("Invalid hex format or length in private key");
-    }
-    
-    // Convert hex to bytes
-    const keyBytes = new Uint8Array(32);
-    for (let i = 0; i < 32; i++) {
-      keyBytes[i] = parseInt(keyClean.substr(i * 2, 2), 16);
-    }
-    
-    // Create WIF format:
-    // 1. Create array with version byte (0x80 for mainnet)
-    const wifBytes = [0x80];
-    
-    // 2. Append key bytes
-    for (let i = 0; i < keyBytes.length; i++) {
-      wifBytes.push(keyBytes[i]);
-    }
-    
-    // 3. Append compressed flag if needed
-    if (compressed) {
-      wifBytes.push(0x01);
-    }
-    
-    // 4. Calculate checksum (SHA256(SHA256(version + key + [compressed])))
-    const checksum = sha256(new Uint8Array(wifBytes));
-    
-    // 5. Append first 4 bytes of checksum
-    for (let i = 0; i < 4; i++) {
-      wifBytes.push(checksum[i]);
-    }
-    
-    // 6. Convert to Base58
-    return window.bs58.encode(new Uint8Array(wifBytes));
-  } catch (error: any) {
-    console.error("Error converting private key to WIF:", error);
-    return null;
-  }
-};
-
-// Helper function for SHA256 (if window.Bitcoin is available)
-function sha256(data: Uint8Array): Uint8Array {
-  if (window.Bitcoin && window.Bitcoin.crypto) {
-    return window.Bitcoin.crypto.sha256(data);
-  }
-  
-  // Fallback - in a real implementation we'd have a pure JS SHA256
-  throw new Error("Bitcoin crypto library not available for SHA256");
-}

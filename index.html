@@ -18,16 +18,16 @@
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
     <!-- Bitcoin-related libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.bundle.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bip39@3.1.0/src/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bip39@3.1.0/dist/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bech32@2.0.0/dist/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-ops@1.4.1/map.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js"></script>
     
     <!-- Make sure to load bitcoinjs-lib from a CDN that properly exposes it globally -->
-    <script src="https://unpkg.com/bitcoinjs-lib@6.1.0/dist/bitcoin-lib.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.7/dist/bitcoin-lib.min.js"></script>
   </head>
 
   <body>
@@ -57,6 +57,12 @@
             console.log("secp256k1 initialized from nobleSecp256k1");
           } else {
             console.warn("nobleSecp256k1 not found, secp256k1 functionality may be limited");
+            
+            // Try to assign from the newly loaded @noble/secp256k1
+            if (typeof secp !== 'undefined') {
+              window.secp256k1 = secp;
+              console.log("secp256k1 initialized from @noble/secp256k1");
+            }
           }
           
           // Log successful initialization
@@ -66,6 +72,9 @@
         }
       });
     </script>
+    
+    <!-- Load @noble/secp256k1 from CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.min.js"></script>
     
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
