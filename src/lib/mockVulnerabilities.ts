@@ -1,8 +1,7 @@
 
 import { VulnerabilityCase } from '@/types';
 
-// These are example cases for the UI to help discover real vulnerabilities
-// They point to real transactions that may contain vulnerabilities to analyze
+// These point to real transactions that may contain vulnerabilities to analyze
 export const MOCK_VULNERABILITY_CASES: VulnerabilityCase[] = [
   {
     name: "Twisted Curve Vulnerability",
@@ -16,14 +15,14 @@ export const MOCK_VULNERABILITY_CASES: VulnerabilityCase[] = [
     details: "The vulnerability occurs when a wallet implementation doesn't properly validate that a public key point lies on the secp256k1 curve. When a signature is verified against a point on a different curve (the twist), it can leak information about the private key."
   },
   {
-    name: "Cross-Chain Replay Vulnerability",
-    description: "Transactions intended for one blockchain can be replayed on another chain, potentially leading to unintended fund movement across chains.",
+    name: "ECDSA Signature Analysis",
+    description: "Real blockchain transactions that may contain signature vulnerabilities for exploitation testing.",
     transactions: [
       "4494271c6a1696cd4da64706fac1c3b4501438a97301b3a3cd144db01f324e8a",
-      "7ac1c3b4501696cd4da647064494271c6a38a97301b3a3cd144db01f324e8a44",
-      "a38a97301b3a3cd144db01f324e8a447ac1c3b4501696cd4da647064494271c6"
+      "7e83f474d7a6b3a5719897e3e1446fd5f9a024147b878a4a291eef97cb441e62",
+      "1d7eb3e6385f57e24e3f3497953907a20a9d8f11182a95e0b30901d1d1975da3"
     ],
-    impact: "Medium - Could result in duplicate transactions across multiple chains",
-    details: "This vulnerability typically affects chains that share a common codebase or signing scheme but have different network identifiers. Without proper replay protection, transactions from one chain can be submitted to another chain."
+    impact: "Medium - Could reveal private key information through signature analysis",
+    details: "These are real blockchain transactions that may contain cryptographic vulnerabilities. Use them to test the vulnerability scanner's capabilities with genuine blockchain data."
   }
 ];

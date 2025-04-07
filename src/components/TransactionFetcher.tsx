@@ -3,7 +3,6 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { MOCK_VULNERABILITY_CASES } from '@/lib/mockVulnerabilities';
 import { Search, Loader2 } from 'lucide-react';
 import { Transaction, VulnerabilityCase } from '@/types';
@@ -15,29 +14,32 @@ interface TransactionFetcherProps {
 
 const TransactionFetcher = ({ onFetch }: TransactionFetcherProps) => {
   const [txid, setTxid] = useState('');
-  const [selectedVulnerability, setSelectedVulnerability] = useState<VulnerabilityCase | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handleManualFetch = () => {
     if (!txid.trim()) return;
     setIsLoading(true);
     
-    // Simulate fetching delay
-    setTimeout(() => {
+    try {
       onFetch(txid);
+    } catch (error) {
+      console.error("Error in fetch handler:", error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
-  const handlePresetFetch = (txid: string) => {
+  const handleExampleFetch = (txid: string) => {
     setTxid(txid);
     setIsLoading(true);
     
-    // Simulate fetching delay
-    setTimeout(() => {
+    try {
       onFetch(txid);
+    } catch (error) {
+      console.error("Error in example fetch:", error);
+    } finally {
       setIsLoading(false);
-    }, 1000);
+    }
   };
 
   return (
@@ -45,14 +47,14 @@ const TransactionFetcher = ({ onFetch }: TransactionFetcherProps) => {
       <CardHeader>
         <CardTitle className="text-crypto-foreground">Transaction Explorer</CardTitle>
         <CardDescription className="text-crypto-foreground/70">
-          Fetch and analyze vulnerable transactions
+          Fetch and analyze Bitcoin transactions
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="manual" className="w-full">
           <TabsList className="grid grid-cols-2 mb-4 bg-crypto-background">
             <TabsTrigger value="manual">Manual Entry</TabsTrigger>
-            <TabsTrigger value="presets">Known Vulnerabilities</TabsTrigger>
+            <TabsTrigger value="examples">Known Transactions</TabsTrigger>
           </TabsList>
           
           <TabsContent value="manual" className="space-y-4">
@@ -73,12 +75,12 @@ const TransactionFetcher = ({ onFetch }: TransactionFetcherProps) => {
             </div>
             
             <div className="text-xs text-crypto-foreground/60 terminal-text">
-              <p>Enter a transaction ID to analyze for cryptographic vulnerabilities.</p>
+              <p>Enter a valid Bitcoin transaction ID to analyze for cryptographic vulnerabilities.</p>
               <p>Example: 9ec4bc49e828d924af1d1029cacf709431abbde46d59554b62bc270e3b29c4b1</p>
             </div>
           </TabsContent>
           
-          <TabsContent value="presets" className="space-y-4">
+          <TabsContent value="examples" className="space-y-4">
             {MOCK_VULNERABILITY_CASES.map((vulnerability, index) => (
               <div key={index} className="mb-4">
                 <h3 className="text-sm font-medium mb-2 text-crypto-primary">{vulnerability.name}</h3>
@@ -89,7 +91,7 @@ const TransactionFetcher = ({ onFetch }: TransactionFetcherProps) => {
                         variant="outline"
                         size="sm"
                         className="bg-crypto-background border-crypto-border hover:border-crypto-primary text-xs w-full justify-start font-mono overflow-hidden"
-                        onClick={() => handlePresetFetch(tx)}
+                        onClick={() => handleExampleFetch(tx)}
                       >
                         {tx.substring(0, 8)}...{tx.substring(tx.length - 8)}
                       </Button>

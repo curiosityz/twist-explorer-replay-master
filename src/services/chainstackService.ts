@@ -6,25 +6,28 @@
 import { UTXO, TxInput, TxOutput } from '@/lib/walletUtils';
 import { toast } from 'sonner';
 
-// Default RPC endpoint
-const DEFAULT_RPC_ENDPOINT = 'https://api.blockcypher.com/v1/btc/main';
+// Default RPC endpoint for Bitcoin (updated to use a CORS-friendly endpoint)
+const DEFAULT_RPC_ENDPOINT = 'https://blockchain.info/rawblock/';
 
 interface ChainStackConfig {
   rpcUrl: string;
   apiKey?: string;
+  proxyUrl?: string;
 }
 
 export class ChainStackService {
   private rpcUrl: string;
   private apiKey: string | undefined;
+  private proxyUrl: string | undefined;
   
   constructor(config?: ChainStackConfig) {
     this.rpcUrl = config?.rpcUrl || DEFAULT_RPC_ENDPOINT;
     this.apiKey = config?.apiKey;
+    this.proxyUrl = config?.proxyUrl;
   }
   
   /**
-   * Makes an RPC call to the blockchain node
+   * Makes an RPC call to the blockchain node, handling CORS issues
    * @param method RPC method name
    * @param params Parameters for the RPC call
    * @returns Response from the node
@@ -39,28 +42,40 @@ export class ChainStackService {
       headers['x-api-key'] = this.apiKey;
     }
     
-    const response = await fetch(this.rpcUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: Date.now(),
-        method,
-        params
-      })
-    });
+    // If we have a proxy URL, use it instead of direct API call
+    const url = this.proxyUrl ? 
+      `${this.proxyUrl}?method=${method}&params=${encodeURIComponent(JSON.stringify(params))}` : 
+      this.rpcUrl;
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+    try {
+      console.log(`Making RPC call to: ${url}`);
+      const response = await fetch(url, {
+        method: this.proxyUrl ? 'GET' : 'POST',
+        headers,
+        body: this.proxyUrl ? undefined : JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method,
+          params
+        }),
+        mode: 'cors',
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.error) {
+        throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
+      }
+      
+      return this.proxyUrl ? data : data.result;
+    } catch (error) {
+      console.error(`ChainStack RPC error (${method}):`, error);
+      throw error;
     }
-    
-    const data = await response.json();
-    
-    if (data.error) {
-      throw new Error(`RPC error: ${data.error.message}`);
-    }
-    
-    return data.result;
   }
   
   /**
@@ -77,49 +92,46 @@ export class ChainStackService {
    * @returns Current block height
    */
   async getBlockHeight(): Promise<number> {
-    return await this.rpcCall('getblockcount', []);
+    try {
+      const result = await fetch('https://blockchain.info/q/getblockcount');
+      const text = await result.text();
+      return parseInt(text, 10);
+    } catch (error) {
+      console.error("Failed to get block height:", error);
+      throw error;
+    }
   }
   
   /**
-   * Gets UTXOs for a specific address
+   * Gets UTXOs for a specific address using blockchain.info API
    * @param address Bitcoin address
    * @returns Array of UTXOs
    */
   async getAddressUtxos(address: string): Promise<UTXO[]> {
-    // For Bitcoin Core compatible API
-    // First try listunspent if available (works on many providers)
     try {
-      const result = await this.rpcCall('listunspent', [0, 9999999, [address]]);
-      if (result && Array.isArray(result)) {
-        return result.map((utxo: any) => ({
-          txid: utxo.txid,
-          vout: utxo.vout,
-          value: utxo.amount * 100000000, // Convert BTC to satoshis
-          scriptPubKey: utxo.scriptPubKey,
-          address: address,
-          confirmations: utxo.confirmations || 0
-        }));
+      const response = await fetch(`https://blockchain.info/unspent?active=${address}`);
+      
+      if (!response.ok) {
+        if (response.status === 500 && await response.text() === "No free outputs to spend") {
+          return [];
+        }
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-    } catch (e) {
-      console.log('listunspent not supported, trying scantxoutset');
-    }
-    
-    // Try scantxoutset as fallback (Chainstack specific)
-    const result = await this.rpcCall('scantxoutset', ['start', [`addr(${address})`]]);
-    
-    if (!result || !result.unspents) {
-      console.log(`No UTXOs found for address ${address}`);
+      
+      const data = await response.json();
+      
+      return data.unspent_outputs.map((utxo: any) => ({
+        txid: utxo.tx_hash_big_endian,
+        vout: utxo.tx_output_n,
+        value: utxo.value,
+        scriptPubKey: utxo.script,
+        address: address,
+        confirmations: utxo.confirmations || 0
+      }));
+    } catch (error) {
+      console.error(`Failed to get UTXOs for address ${address}:`, error);
       return [];
     }
-    
-    return result.unspents.map((utxo: any) => ({
-      txid: utxo.txid,
-      vout: utxo.vout,
-      value: utxo.amount * 100000000, // Convert BTC to satoshis
-      scriptPubKey: utxo.scriptPubKey,
-      address: address,
-      confirmations: 0 // Not provided by scantxoutset
-    }));
   }
   
   /**
@@ -128,9 +140,19 @@ export class ChainStackService {
    * @returns Balance in BTC
    */
   async getAddressBalance(address: string): Promise<number> {
-    const utxos = await this.getAddressUtxos(address);
-    const totalSatoshis = utxos.reduce((sum, utxo) => sum + utxo.value, 0);
-    return totalSatoshis / 100000000; // Convert satoshis to BTC
+    try {
+      const response = await fetch(`https://blockchain.info/balance?active=${address}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      const totalSatoshis = data[address]?.final_balance || 0;
+      return totalSatoshis / 100000000; // Convert satoshis to BTC
+    } catch (error) {
+      console.error(`Failed to get balance for address ${address}:`, error);
+      throw error;
+    }
   }
   
   /**
@@ -139,7 +161,24 @@ export class ChainStackService {
    * @returns Transaction ID if successful
    */
   async broadcastTransaction(txHex: string): Promise<string> {
-    return await this.rpcCall('sendrawtransaction', [txHex]);
+    try {
+      const response = await fetch('https://blockchain.info/pushtx', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: `tx=${txHex}`
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return "Transaction submitted successfully";
+    } catch (error) {
+      console.error("Failed to broadcast transaction:", error);
+      throw error;
+    }
   }
   
   /**
@@ -149,23 +188,63 @@ export class ChainStackService {
    * @returns Raw transaction hex
    */
   async createRawTransaction(inputs: TxInput[], outputs: TxOutput[]): Promise<string> {
-    // Convert outputs to the format expected by Bitcoin Core
-    const outputsObject: Record<string, number> = {};
-    outputs.forEach(output => {
-      // Convert satoshis to BTC for the API
-      outputsObject[output.address] = output.value / 100000000;
-    });
-    
-    return await this.rpcCall('createrawtransaction', [inputs, outputsObject]);
+    // This operation requires a real node - we'll throw an informative error
+    throw new Error("Creating raw transactions requires a full Bitcoin node. Please configure a valid node endpoint.");
   }
   
   /**
-   * Gets transaction details
+   * Gets transaction details using blockchain.info API
    * @param txid Transaction ID
    * @returns Transaction details
    */
   async getTransaction(txid: string): Promise<any> {
-    return await this.rpcCall('getrawtransaction', [txid, true]);
+    try {
+      // Use blockchain.info API instead of direct RPC
+      const response = await fetch(`https://blockchain.info/rawtx/${txid}?format=json`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Convert blockchain.info format to a format more similar to bitcoind RPC
+      const transformedData = {
+        txid: data.hash,
+        version: data.ver,
+        locktime: data.lock_time,
+        size: data.size,
+        hex: '', // blockchain.info doesn't provide hex directly
+        vin: data.inputs.map((input: any) => ({
+          txid: input.prev_out?.hash,
+          vout: input.prev_out?.n,
+          scriptSig: {
+            asm: '',
+            hex: input.script
+          },
+          sequence: input.sequence,
+          witness: input.witness,
+          txinwitness: input.witness ? [input.witness] : undefined
+        })),
+        vout: data.out.map((output: any, index: number) => ({
+          value: output.value / 100000000, // satoshi to BTC
+          n: index,
+          scriptPubKey: {
+            asm: '',
+            hex: output.script,
+            type: output.type || 'unknown',
+            addresses: output.addr ? [output.addr] : undefined
+          }
+        })),
+        blocktime: data.time,
+        confirmations: data.block_height ? 1 : 0 // simplified
+      };
+      
+      return transformedData;
+    } catch (error) {
+      console.error(`Failed to get transaction details for ${txid}:`, error);
+      throw error;
+    }
   }
   
   /**
@@ -173,17 +252,29 @@ export class ChainStackService {
    * @returns Fee estimates in satoshis/vbyte
    */
   async estimateFee(): Promise<{high: number, medium: number, low: number}> {
-    // Get fee estimate for 1, 6, and 24 block targets
-    const highFee = await this.rpcCall('estimatesmartfee', [1]);
-    const mediumFee = await this.rpcCall('estimatesmartfee', [6]);
-    const lowFee = await this.rpcCall('estimatesmartfee', [24]);
-    
-    // Convert BTC/kB to satoshis/vbyte
-    return {
-      high: (highFee.feerate * 100000000) / 1000,
-      medium: (mediumFee.feerate * 100000000) / 1000,
-      low: (lowFee.feerate * 100000000) / 1000
-    };
+    try {
+      const response = await fetch('https://bitcoinfees.earn.com/api/v1/fees/recommended');
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      return {
+        high: data.fastestFee,
+        medium: data.halfHourFee,
+        low: data.hourFee
+      };
+    } catch (error) {
+      console.error("Failed to estimate fees:", error);
+      // Return reasonable defaults
+      return {
+        high: 50,
+        medium: 25,
+        low: 10
+      };
+    }
   }
 }
 

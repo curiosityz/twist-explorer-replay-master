@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase, Tables } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
-import { Database } from '@/lib/database';
+import { chainstackService } from '@/services/chainstackService';
 
 const Index = () => {
   const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
@@ -41,7 +41,41 @@ const Index = () => {
     setStartAnalysis(false);
     
     try {
-      // First check if the transaction exists in our database
+      // First try to fetch the transaction directly from the blockchain
+      console.log("Fetching transaction from blockchain:", txid);
+      const txData = await chainstackService.getTransaction(txid);
+      
+      if (txData) {
+        setTransaction(txData);
+        setAnalyzingTxid(txid);
+        
+        toast({
+          title: "Transaction Fetched",
+          description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded from blockchain`,
+        });
+        
+        // After successfully fetching, store in database for future retrieval
+        try {
+          await supabase
+            .from(Tables.blockchain_transactions)
+            .upsert({
+              txid: txid,
+              chain: 'BTC',
+              decoded_json: txData,
+              raw_hex: txData.hex || '',
+              processed: true
+            }, {
+              onConflict: 'txid'
+            });
+        } catch (dbError) {
+          console.error("Error saving transaction to database:", dbError);
+          // Non-critical error, don't show to user
+        }
+        
+        return;
+      }
+      
+      // If fetching directly fails, check our database
       const { data, error } = await supabase
         .from(Tables.blockchain_transactions)
         .select('*')
@@ -50,19 +84,16 @@ const Index = () => {
       
       if (data && !error) {
         // Use the transaction from database
-        const txData = data.decoded_json as unknown as Transaction;
-        setTransaction(txData);
+        setTransaction(data.decoded_json as unknown as Transaction);
         setAnalyzingTxid(txid);
         toast({
           title: "Transaction Fetched",
           description: `Transaction ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)} loaded from database`,
         });
       } else {
-        // If transaction not found in database, fetch it from blockchain
-        // This would normally call your blockchain service
         toast({
           title: "Transaction Not Found",
-          description: "Transaction not found in database. Please use a real blockchain connection to fetch data.",
+          description: "Could not retrieve transaction from blockchain or database",
           variant: "destructive"
         });
         setTransaction(null);
@@ -71,7 +102,7 @@ const Index = () => {
       console.error("Error fetching transaction:", error);
       toast({
         title: "Error Fetching Transaction",
-        description: "Could not fetch the transaction. Please try again or check your connection.",
+        description: "Could not fetch the transaction. Try configuring a different blockchain connection.",
         variant: "destructive"
       });
     }
@@ -145,7 +176,6 @@ const Index = () => {
           <div className="text-xs text-crypto-foreground/70">
             <p className="font-mono">
               NOTE: This application connects to real blockchain data to analyze real cryptographic vulnerabilities.
-              No mock data is used for vulnerability detection and cryptographic analysis.
             </p>
           </div>
         </Card>
