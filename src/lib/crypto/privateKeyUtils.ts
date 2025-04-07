@@ -27,7 +27,7 @@ export const wifToPrivateKey = (wif: string): string | null => {
       throw new Error("Invalid WIF format - should be 51-52 Base58 characters");
     }
     
-    // Call bs58.decode - it expects just the string
+    // Call bs58.decode - it expects just the string, without any parameters
     const bytes = window.bs58.decode(wif);
     
     // WIF format: version(1) + key(32) + [compressed-flag(1)] + checksum(4)
