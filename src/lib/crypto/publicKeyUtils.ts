@@ -67,7 +67,7 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Call publicKeyConvert without additional parameters
+      // Call publicKeyConvert without passing any options - the function infers what to do
       const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
       
       if (!decompressedKey || decompressedKey.length !== 65) {
@@ -181,7 +181,6 @@ export const validatePublicKey = (xHex: string, yHex: string): {
         
         // Use secp256k1 library to validate the key
         // This checks both that the point is on the curve AND that it has the correct order
-        // (i.e., multiplying by the curve order results in the point at infinity)
         const isValid = window.secp256k1.publicKeyVerify(pubKeyBytes);
         
         return {
@@ -216,4 +215,3 @@ export const validatePublicKey = (xHex: string, yHex: string): {
     };
   }
 };
-
