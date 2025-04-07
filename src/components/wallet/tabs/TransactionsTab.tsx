@@ -1,12 +1,12 @@
 
 import React from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { AlertCircle, Button } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { RefreshCw, Send } from 'lucide-react';
+import { AlertCircle, RefreshCw, Send } from 'lucide-react';
 import { UTXO, formatBtcValue } from '@/lib/walletUtils';
 import { WalletKey } from '@/lib/walletUtils';
 
