@@ -36,7 +36,7 @@ export const useTransactionAnalysisCheck = () => {
     try {
       const { data: analysisData, error: loadError } = await supabase
         .from(Tables.vulnerability_analyses)
-        .select('*')
+        .select('*, recovered_private_key')
         .eq('id', analysisId)
         .single();
           
@@ -53,10 +53,6 @@ export const useTransactionAnalysisCheck = () => {
         });
       }
       
-      // Using type assertion to handle the recovered_private_key field
-      // as it may not be defined in the database schema type
-      const analysisWithRecoveredKey = analysisData as any;
-      
       const loadedResult: AnalysisResult = {
         txid: analysisData.txid,
         vulnerabilityType: analysisData.vulnerability_type as VulnerabilityType,
@@ -68,8 +64,7 @@ export const useTransactionAnalysisCheck = () => {
         privateKeyModulo: privateKeyModulo,
         status: analysisData.status as "completed" | "analyzing" | "failed" | "pending",
         message: analysisData.message,
-        // Access recovered_private_key safely using type assertion
-        recoveredPrivateKey: analysisWithRecoveredKey.recovered_private_key || null
+        recoveredPrivateKey: analysisData.recovered_private_key || null
       };
       
       setIsDuplicate(true);
