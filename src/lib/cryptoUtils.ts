@@ -40,3 +40,7 @@ export {
   curveParams, 
   twistParams 
 } from './crypto/constants';
+
+export {
+  factorize
+} from './crypto/factorizeUtils';
