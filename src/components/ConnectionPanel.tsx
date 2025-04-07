@@ -82,7 +82,6 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
       
       // Connection successful
       toast({
-        title: "Connection Successful",
         description: `Connected to ${blockchainInfo.chain} (height: ${blockchainInfo.blocks})`,
       });
       
@@ -108,7 +107,6 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
       }
       
       toast({
-        title: "Connection Failed",
         description: isCorsError ? 
           "CORS policy prevents direct connection. Try using a CORS proxy or provide CORS headers on your endpoint." :
           `Failed to connect: ${errorMessage}`,

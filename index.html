@@ -28,6 +28,15 @@
     
     <!-- Make sure to load bitcoinjs-lib from a CDN that properly exposes it globally -->
     <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.7/dist/bitcoin-lib.min.js"></script>
+
+    <!-- Load @noble/secp256k1 directly as an importable module -->
+    <script type="importmap">
+    {
+      "imports": {
+        "@noble/secp256k1": "https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.min.js"
+      }
+    }
+    </script>
   </head>
 
   <body>
@@ -39,6 +48,16 @@
         console.log("Initializing Bitcoin libraries in DOM content loaded event");
         
         try {
+          // Make sure secp256k1 is available globally
+          if (typeof window.secp === 'undefined') {
+            import('@noble/secp256k1').then(module => {
+              window.secp256k1 = module;
+              console.log("secp256k1 initialized from @noble/secp256k1 ES module");
+            }).catch(err => {
+              console.error("Failed to import @noble/secp256k1:", err);
+            });
+          }
+          
           // Define global variables to hold library references
           // Use window.bitcoin from the bitcoinjs-lib to set window.Bitcoin
           if (typeof bitcoin !== 'undefined') {
@@ -72,9 +91,6 @@
         }
       });
     </script>
-    
-    <!-- Load @noble/secp256k1 from CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.min.js"></script>
     
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>

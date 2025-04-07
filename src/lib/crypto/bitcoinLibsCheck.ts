@@ -36,21 +36,50 @@ export const checkBitcoinLibsLoaded = (): { loaded: boolean; missing: string[] }
     'bitcoinAddressValidation'
   ];
   
+  // For logging which library variants we actually found
+  const foundLibraries: Record<string, string> = {};
+  
   // Check both direct library names and alternate global names
   const missing = requiredLibraries.filter(lib => {
-    // If the library is directly available, it's not missing
-    if (window[lib as keyof Window]) return false;
+    // Direct check for the primary library name
+    if (window[lib as keyof Window]) {
+      foundLibraries[lib] = lib;
+      return false;
+    }
     
     // Check for alternate global names
     switch(lib) {
       case 'Bitcoin':
-        return !window.bitcoin && !window.bitcoinjs;
+        if (window.bitcoin) {
+          foundLibraries[lib] = 'bitcoin';
+          return false;
+        }
+        if (window.bitcoinjs) {
+          foundLibraries[lib] = 'bitcoinjs';
+          return false;
+        }
+        return true;
+        
       case 'secp256k1':
-        return !window.nobleSecp256k1 && !window.secp;
+        if (window.nobleSecp256k1) {
+          foundLibraries[lib] = 'nobleSecp256k1';
+          return false;
+        }
+        if (window.secp) {
+          foundLibraries[lib] = 'secp';
+          return false;
+        }
+        return true;
+        
       default:
         return true;
     }
   });
+  
+  // Log the libraries we found
+  if (Object.keys(foundLibraries).length > 0) {
+    console.log("Found Bitcoin libraries:", foundLibraries);
+  }
   
   return {
     loaded: missing.length === 0,

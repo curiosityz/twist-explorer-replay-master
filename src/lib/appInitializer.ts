@@ -13,6 +13,21 @@ import { toast } from 'sonner';
 export const initializeApplication = (): void => {
   console.log("Initializing application...");
   
+  // Try dynamic import of @noble/secp256k1 if needed
+  if (!window.secp256k1 && !window.secp && !window.nobleSecp256k1) {
+    try {
+      // @ts-ignore - Dynamic import
+      import('@noble/secp256k1').then(module => {
+        window.secp256k1 = module;
+        console.log("Dynamically imported @noble/secp256k1");
+      }).catch(err => {
+        console.error("Failed to dynamically import @noble/secp256k1:", err);
+      });
+    } catch (error) {
+      console.warn("Dynamic import not supported:", error);
+    }
+  }
+  
   // Wait a brief moment to ensure DOM content is loaded and libraries are initialized
   setTimeout(() => {
     console.log("Initializing Bitcoin libraries...");
@@ -41,16 +56,18 @@ export const initializeApplication = (): void => {
     
     if (!bitcoinLibStatus.loaded) {
       console.error(`Bitcoin libraries not loaded: Missing ${bitcoinLibStatus.missing.join(', ')}`);
-      toast.error(`Some Bitcoin libraries not detected: ${bitcoinLibStatus.missing.join(', ')}`, {
-        description: "Some features may not work correctly. Please check console logs for details.",
-        duration: 10000
+      toast({
+        description: `Some Bitcoin libraries not detected: ${bitcoinLibStatus.missing.join(', ')}. Some features may not work correctly.`,
+        duration: 10000,
+        variant: "destructive"
       });
       
       // Force window refresh of library references
       refreshLibraryReferences();
     } else {
       console.log("All Bitcoin libraries loaded successfully");
-      toast.success("All required libraries loaded successfully", {
+      toast({
+        description: "All required libraries loaded successfully",
         duration: 3000
       });
     }
@@ -73,8 +90,9 @@ export const checkFeatureLibraries = (feature: string, requiredLibs: string[]): 
   if (missing.length > 0) {
     const error = `${feature} requires libraries that are not loaded: ${missing.join(', ')}`;
     console.error(error);
-    toast.error(`${feature} unavailable`, {
-      description: `Missing required libraries: ${missing.join(', ')}`
+    toast({
+      description: `${feature} unavailable: Missing required libraries: ${missing.join(', ')}`,
+      variant: "destructive"
     });
     return false;
   }
