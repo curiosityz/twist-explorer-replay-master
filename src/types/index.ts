@@ -1,4 +1,3 @@
-
 // Transaction related types
 export interface Transaction {
   txid: string;
@@ -62,7 +61,9 @@ export enum VulnerabilityType {
   TWISTED_CURVE = 'twisted_curve',
   NONCE_REUSE = 'nonce_reuse',
   WEAK_SIGNATURE = 'weak_signature',
-  UNKNOWN = 'unknown'
+  UNKNOWN = 'unknown',
+  NONE = 'none',
+  INVALID = 'invalid'
 }
 
 export type VulnerabilityTypeString = keyof typeof VulnerabilityType | string;

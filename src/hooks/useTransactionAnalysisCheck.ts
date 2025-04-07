@@ -38,11 +38,15 @@ export const useTransactionAnalysisCheck = () => {
         .from(Tables.vulnerability_analyses)
         .select('*, recovered_private_key')
         .eq('id', analysisId)
-        .single();
+        .maybeSingle();
           
       if (loadError) {
         console.error("Error loading existing analysis:", loadError);
         throw new Error("Failed to load existing analysis");
+      }
+      
+      if (!analysisData) {
+        throw new Error("No analysis data found");
       }
       
       const privateKeyModulo: Record<string, string> = {};
