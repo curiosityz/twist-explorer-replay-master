@@ -41,40 +41,40 @@ export const initializeApplication = (): void => {
       // Make sure the required libraries are loaded from CDN scripts
       const checkLibs = () => {
         // Force refresh of all library references
-        if (typeof window.bs58 === 'undefined' && typeof bs58 !== 'undefined') {
-          window.bs58 = bs58;
+        if (typeof window.bs58 === 'undefined' && typeof window['bs58' as any] !== 'undefined') {
+          window.bs58 = (window as any).bs58;
           console.log("Mapped global bs58 to window.bs58");
         }
         
-        if (typeof window.bip39 === 'undefined' && typeof bip39 !== 'undefined') {
-          window.bip39 = bip39;
+        if (typeof window.bip39 === 'undefined' && typeof window['bip39' as any] !== 'undefined') {
+          window.bip39 = (window as any).bip39;
           console.log("Mapped global bip39 to window.bip39");
         }
         
-        if (typeof window.bech32 === 'undefined' && typeof bech32 !== 'undefined') {
-          window.bech32 = bech32;
+        if (typeof window.bech32 === 'undefined' && typeof window['bech32' as any] !== 'undefined') {
+          window.bech32 = (window as any).bech32;
           console.log("Mapped global bech32 to window.bech32");
         }
         
-        if (typeof window.bitcoinMessage === 'undefined' && typeof bitcoinMessage !== 'undefined') {
-          window.bitcoinMessage = bitcoinMessage;
+        if (typeof window.bitcoinMessage === 'undefined' && typeof window['bitcoinMessage' as any] !== 'undefined') {
+          window.bitcoinMessage = (window as any).bitcoinMessage;
           console.log("Mapped global bitcoinMessage to window.bitcoinMessage");
         }
         
-        if (typeof window.bitcoinAddressValidation === 'undefined' && typeof validate !== 'undefined') {
-          window.bitcoinAddressValidation = validate;
+        if (typeof window.bitcoinAddressValidation === 'undefined' && typeof window['validate' as any] !== 'undefined') {
+          window.bitcoinAddressValidation = (window as any).validate;
           console.log("Mapped global validate to window.bitcoinAddressValidation");
         }
         
         if (typeof window.Bitcoin === 'undefined') {
-          if (typeof bitcoin !== 'undefined') {
-            window.Bitcoin = bitcoin;
+          if (typeof window['bitcoin' as any] !== 'undefined') {
+            window.Bitcoin = (window as any).bitcoin;
             console.log("Mapped global bitcoin to window.Bitcoin");
-          } else if (typeof bitcoinjs !== 'undefined') {
-            window.Bitcoin = bitcoinjs;
+          } else if (typeof window['bitcoinjs' as any] !== 'undefined') {
+            window.Bitcoin = (window as any).bitcoinjs;
             console.log("Mapped global bitcoinjs to window.Bitcoin");
-          } else if (typeof BitcoinLib !== 'undefined') {
-            window.Bitcoin = BitcoinLib;
+          } else if (typeof window['BitcoinLib' as any] !== 'undefined') {
+            window.Bitcoin = (window as any).BitcoinLib;
             console.log("Mapped global BitcoinLib to window.Bitcoin");
           }
         }
