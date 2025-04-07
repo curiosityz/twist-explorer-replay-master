@@ -19,7 +19,7 @@ export const wifToPrivateKey = (wif: string): string | null => {
       throw new Error("bs58 library not loaded");
     }
     
-    // Fix: Call bs58.decode with just the wif string, no format parameter
+    // Fix: Call bs58.decode without format parameter
     const bytes = window.bs58.decode(wif);
     
     // WIF format: version(1) + key(32) + [compressed-flag(1)] + checksum(4)

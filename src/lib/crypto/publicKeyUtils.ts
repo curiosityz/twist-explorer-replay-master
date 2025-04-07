@@ -61,7 +61,7 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Fix: Call publicKeyConvert correctly without arguments other than the key
+      // Fix: Call publicKeyConvert without additional parameters
       const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
       
       // Extract x and y from decompressed key (format: 04|x|y)
