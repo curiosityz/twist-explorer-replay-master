@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { AnalysisResult } from '@/types';
-import { analyzeTransaction } from '@/lib/vulnerabilityUtils';
-import { recoverPrivateKeyFromFragments, verifyRecoveredPrivateKey } from '@/lib/analysis/keyRecoveryUtils';
+import { analyzeTransaction, verifyRecoveredKey } from '@/lib/vulnerability';
+import { recoverPrivateKeyFromFragments } from '@/lib/analysis/keyRecoveryUtils';
 import { useClipboard } from '@/hooks/useClipboard';
 import { useAnalysisError } from '@/hooks/useAnalysisError';
 import { useTransactionAnalysisCheck } from '@/hooks/useTransactionAnalysisCheck';
@@ -33,7 +33,7 @@ export const useAnalysis = (txid?: string, startAnalysis = false) => {
         
         if (analysisResult.publicKey) {
           console.log("Verifying pre-recovered private key against public key...");
-          const isValid = verifyRecoveredPrivateKey(
+          const isValid = verifyRecoveredKey(
             analysisResult.recoveredPrivateKey,
             analysisResult.publicKey
           );
