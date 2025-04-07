@@ -10,6 +10,9 @@
  * @returns GCD of a and b
  */
 export const gcd = (a: bigint, b: bigint): bigint => {
+  a = a < 0n ? -a : a; // Ensure positive values
+  b = b < 0n ? -b : b;
+  
   while (b !== 0n) {
     [a, b] = [b, a % b];
   }
@@ -25,6 +28,10 @@ export const gcd = (a: bigint, b: bigint): bigint => {
 export const modularInverse = (a: bigint, m: bigint): bigint | null => {
   if (m === 1n) return 0n;
   
+  // Ensure positive value for a
+  a = ((a % m) + m) % m;
+  
+  // Extended Euclidean Algorithm
   let [old_r, r] = [a, m];
   let [old_s, s] = [1n, 0n];
   let [old_t, t] = [0n, 1n];
@@ -37,9 +44,13 @@ export const modularInverse = (a: bigint, m: bigint): bigint | null => {
   }
   
   // GCD must be 1 for the inverse to exist
-  if (old_r !== 1n) return null;
+  if (old_r !== 1n) {
+    console.error(`No modular inverse exists for ${a} mod ${m}. GCD is ${old_r}`);
+    return null;
+  }
   
-  return (old_s % m + m) % m;
+  // Make sure the result is positive
+  return ((old_s % m) + m) % m;
 };
 
 /**
@@ -50,7 +61,9 @@ export const modularInverse = (a: bigint, m: bigint): bigint | null => {
 export const areAllCoprime = (values: bigint[]): boolean => {
   for (let i = 0; i < values.length; i++) {
     for (let j = i + 1; j < values.length; j++) {
-      if (gcd(values[i], values[j]) !== 1n) {
+      const gcdValue = gcd(values[i], values[j]);
+      if (gcdValue !== 1n) {
+        console.log(`Found non-coprime pair: gcd(${values[i]}, ${values[j]}) = ${gcdValue}`);
         return false;
       }
     }
@@ -64,10 +77,23 @@ export const areAllCoprime = (values: bigint[]): boolean => {
  * @returns BigInt representation
  */
 export const hexToBigInt = (hex: string): bigint => {
-  if (hex.startsWith('0x')) {
-    return BigInt(hex);
-  } else {
-    return BigInt(`0x${hex}`);
+  let hexString = hex.trim();
+  
+  if (hexString.startsWith('0x')) {
+    hexString = hexString.substring(2);
+  }
+  
+  // Handle empty or invalid hex strings
+  if (!hexString || !/^[0-9a-fA-F]+$/.test(hexString)) {
+    console.error("Invalid hex string:", hex);
+    return 0n;
+  }
+  
+  try {
+    return BigInt(`0x${hexString}`);
+  } catch (error) {
+    console.error("Error converting hex to BigInt:", error);
+    return 0n;
   }
 };
 
@@ -77,5 +103,10 @@ export const hexToBigInt = (hex: string): bigint => {
  * @returns Hexadecimal string with 0x prefix
  */
 export const bigIntToHex = (num: bigint): string => {
+  if (num < 0n) {
+    console.warn("Negative BigInt being converted to hex. Taking absolute value.");
+    num = -num;
+  }
+  
   return `0x${num.toString(16)}`;
 };

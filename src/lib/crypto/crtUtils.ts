@@ -27,9 +27,12 @@ export const chineseRemainderTheorem = (congruences: [bigint, bigint][]) => {
     if (inverse === null) return null; // Moduli are not coprime
     
     result += remainder * partialProduct * inverse;
-    result %= product;
   }
   
+  // Take modulo of the result with the product of all moduli
+  result = ((result % product) + product) % product;
+  
+  console.log("CRT calculation result:", result.toString());
   return result;
 };
 
@@ -69,6 +72,8 @@ export const selectCoprimeModuli = (moduli: bigint[], targetValue: bigint): bigi
  */
 export const combinePrivateKeyFragments = (fragments: Record<string, string>): string | null => {
   try {
+    console.log("Combining fragments:", fragments);
+    
     if (Object.keys(fragments).length < 2) {
       console.log('Not enough fragments to combine');
       return null;
@@ -76,7 +81,12 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
     
     // Convert fragments to BigInt pairs
     const congruences: [bigint, bigint][] = Object.entries(fragments).map(
-      ([modulus, remainder]) => [hexToBigInt(remainder), hexToBigInt(modulus)]
+      ([modulus, remainder]) => {
+        const mod = hexToBigInt(modulus);
+        const rem = hexToBigInt(remainder);
+        console.log(`Congruence: ${rem} mod ${mod}`);
+        return [rem, mod];
+      }
     );
     
     // Extract moduli
@@ -107,8 +117,16 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
         return null;
       }
       
+      console.log("Expected output for test case:", "9606208636557092712");
+      console.log("Actual CRT result:", combined.toString());
+      
       // Normalize the private key to standard format
-      return normalizePrivateKey(bigIntToHex(combined));
+      const hexResult = bigIntToHex(combined);
+      console.log("Hex result before normalization:", hexResult);
+      const normalizedKey = normalizePrivateKey(hexResult);
+      console.log("Normalized key:", normalizedKey);
+      
+      return normalizedKey;
     }
     
     // Apply CRT to all congruences
@@ -118,8 +136,16 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
       return null;
     }
     
+    console.log("Expected output for test case:", "9606208636557092712");
+    console.log("Actual CRT result:", combined.toString());
+    
     // Normalize the private key to standard format
-    return normalizePrivateKey(bigIntToHex(combined));
+    const hexResult = bigIntToHex(combined);
+    console.log("Hex result before normalization:", hexResult);
+    const normalizedKey = normalizePrivateKey(hexResult);
+    console.log("Normalized key:", normalizedKey);
+    
+    return normalizedKey;
   } catch (error) {
     console.error("Error combining private key fragments:", error);
     return null;

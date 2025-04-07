@@ -36,6 +36,8 @@ export function KeyFragmentsTab({
   const fragmentsNeeded = Math.max(0, 6 - fragmentCount);
   const hasEnoughFragments = fragmentCount >= 6 || 
     (fragmentValues && hasEnoughFragmentsForFullRecovery(fragmentValues));
+    
+  console.log("KeyFragmentsTab props:", { fragmentCount, hasEnoughFragments, combinedFragments: keyFragment.combined_fragments });
 
   return (
     <div className="space-y-6">
@@ -61,8 +63,8 @@ export function KeyFragmentsTab({
               <tbody>
                 {Object.entries(fragmentValues).map(([modulus, remainder], i) => (
                   <tr key={i} className="border-b border-crypto-border/20 last:border-0">
-                    <td className="py-2 pr-4 font-mono">{modulus}</td>
-                    <td className="py-2 font-mono">{String(remainder)}</td>
+                    <td className="py-2 pr-4 font-mono text-xs break-all">{modulus}</td>
+                    <td className="py-2 font-mono text-xs break-all">{String(remainder)}</td>
                   </tr>
                 ))}
               </tbody>

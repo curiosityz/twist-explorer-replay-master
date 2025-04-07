@@ -20,12 +20,21 @@ export const normalizePrivateKey = (keyHex: string): string => {
     key = key.substring(2);
   }
   
+  // Convert to BigInt and back to ensure consistent handling
+  const keyBigInt = BigInt(`0x${key}`);
+  
+  // Ensure the key is within the valid range for secp256k1
+  const normalizedBigInt = keyBigInt % curveParams.n;
+  
+  // Convert back to hex string without 0x prefix
+  key = normalizedBigInt.toString(16);
+  
   // Pad with leading zeros to ensure 64 characters (32 bytes)
   while (key.length < 64) {
     key = '0' + key;
   }
   
-  // If too long, truncate to 64 chars (shouldn't happen with valid keys)
+  // If too long, truncate to 64 chars (shouldn't happen with normalizedBigInt % n)
   if (key.length > 64) {
     console.warn("Private key appears too long, truncating to 64 chars");
     key = key.substring(key.length - 64);
