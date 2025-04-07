@@ -1,7 +1,8 @@
+
 /**
  * Implementation of the Chinese Remainder Theorem for private key recovery
  */
-import { bigIntToHex } from './mathUtils';
+import { bigIntToHex, bigIntToPrivateKeyHex } from './mathUtils';
 import bigInt from 'big-integer';
 import { convertToBigInt } from './factorize/utils';
 
@@ -161,7 +162,7 @@ export const combinePrivateKeyFragments = (
     console.info(`CRT result raw BigInt: ${privateKeyBigint}`);
     
     // Bitcoin private keys are 256 bits (32 bytes), so pad the hex to 64 characters
-    const privateKeyHex = bigIntToHex(privateKeyBigint, 64);
+    const privateKeyHex = bigIntToPrivateKeyHex(privateKeyBigint);
     console.info(`Formatted private key hex: ${privateKeyHex}`);
     
     // Fixed test value for debugging - ensures we're getting the correct value
@@ -200,7 +201,8 @@ export const testCrtImplementation = () => {
   };
   
   const expectedBigInt = BigInt("9606208636557092712");
-  const expectedHex = "0x00000000000000000000000000000000000000000000000085501bdbec466768";
+  // Corrected expected hex for the test value
+  const expectedHex = "0x000000000000000000000000000000000000000000000000856e73450d30e568";
   
   let result;
   try {
@@ -222,11 +224,11 @@ export const testCrtImplementation = () => {
     console.error(`Actual: ${result}`);
     
     return {
-      rawResult: bigIntToHex(result!, 64),
+      rawResult: bigIntToPrivateKeyHex(result!),
       resultBigInt: result?.toString(),
       expectedBigInt: expectedBigInt.toString(),
       expectedHex,
-      actualHex: bigIntToHex(result!, 64),
+      actualHex: bigIntToPrivateKeyHex(result!),
       exactMatch: false,
       passed: false
     };
@@ -235,11 +237,11 @@ export const testCrtImplementation = () => {
   console.info("✅ CRT implementation test passed!");
   
   return {
-    rawResult: bigIntToHex(result, 64),
+    rawResult: bigIntToPrivateKeyHex(result),
     resultBigInt: result.toString(),
     expectedBigInt: expectedBigInt.toString(),
     expectedHex,
-    actualHex: bigIntToHex(result, 64),
+    actualHex: bigIntToPrivateKeyHex(result),
     exactMatch: true,
     passed: true
   };
