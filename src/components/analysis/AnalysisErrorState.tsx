@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { XCircle, RefreshCw, Settings, Globe } from 'lucide-react';
+import { XCircle, RefreshCw, Settings, Globe, KeySquare, Database } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -20,6 +20,13 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
   const isCorsError = error.includes('CORS') || 
                       error.includes('blocked by CORS policy') || 
                       error.includes('Access-Control-Allow-Origin');
+
+  const isAuthError = error.includes('401') || 
+                      error.includes('Unauthorized') || 
+                      error.includes('Authentication');
+                      
+  const isDataExtractionError = error.includes('extract') && 
+                               error.includes('cryptographic data');
 
   return (
     <div className="flex flex-col items-center justify-center h-full">
@@ -50,6 +57,33 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
             There appears to be an issue connecting to the blockchain node.
             Please verify your network connection or configure a different node endpoint
             to continue with transaction analysis.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isAuthError && (
+        <Alert className="mb-4 max-w-md">
+          <AlertTitle className="flex items-center">
+            <Database className="mr-2 h-4 w-4" />
+            Database Authentication Error
+          </AlertTitle>
+          <AlertDescription>
+            There was an issue authenticating with the database. This could be due to
+            invalid or expired API keys. Please check your database configuration.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {isDataExtractionError && (
+        <Alert className="mb-4 max-w-md">
+          <AlertTitle className="flex items-center">
+            <KeySquare className="mr-2 h-4 w-4" />
+            Cryptographic Data Extraction Issue
+          </AlertTitle>
+          <AlertDescription>
+            The system was unable to extract valid cryptographic data from this transaction.
+            This may be because the transaction doesn't contain the specific signature format
+            we're looking for, or the data structure is different from what's expected.
           </AlertDescription>
         </Alert>
       )}
