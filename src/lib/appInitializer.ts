@@ -21,9 +21,12 @@ export const initializeApplication = (): void => {
     if (!bitcoinLibStatus.loaded) {
       console.error(`Bitcoin libraries not loaded: Missing ${bitcoinLibStatus.missing.join(', ')}`);
       toast.error(`Some Bitcoin libraries not detected: ${bitcoinLibStatus.missing.join(', ')}`, {
-        description: "Some features may not work correctly. Please check your internet connection and refresh the page.",
-        duration: 6000
+        description: "Some features may not work correctly. Please check console logs for details.",
+        duration: 10000
       });
+      
+      // Force window refresh of library references
+      refreshLibraryReferences();
     } else {
       console.log("All Bitcoin libraries loaded successfully");
       toast.success("All required libraries loaded successfully", {
@@ -34,7 +37,7 @@ export const initializeApplication = (): void => {
     // Initialize any other application components here
     
     console.log("Application initialization completed");
-  }, 300); // Small delay to ensure libraries have time to initialize
+  }, 1000); // Increased delay to ensure libraries have time to initialize
 };
 
 /**
@@ -56,4 +59,26 @@ export const checkFeatureLibraries = (feature: string, requiredLibs: string[]): 
   }
   
   return true;
+};
+
+/**
+ * Attempt to refresh references to libraries that might have loaded later
+ */
+const refreshLibraryReferences = (): void => {
+  // Try to assign noble-secp256k1 to secp256k1 if it loaded later
+  if (window.nobleSecp256k1 && !window.secp256k1) {
+    window.secp256k1 = window.nobleSecp256k1;
+    console.log("Refreshed secp256k1 reference from nobleSecp256k1");
+  }
+  
+  // Check for Bitcoin global object and try to find it from different sources
+  if (!window.Bitcoin && typeof window.bitcoinjs !== 'undefined') {
+    window.Bitcoin = window.bitcoinjs;
+    console.log("Refreshed Bitcoin reference from bitcoinjs");
+  }
+  
+  // Log updated status
+  console.log("Library references refreshed. Current status:");
+  console.log("- Bitcoin:", typeof window.Bitcoin !== 'undefined' ? "Available" : "Missing");
+  console.log("- secp256k1:", typeof window.secp256k1 !== 'undefined' ? "Available" : "Missing");
 };

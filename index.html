@@ -18,20 +18,24 @@
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
     
     <!-- Bitcoin-related libraries -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/bitcoinjs-lib/0.2.0-1/bitcoinjs-min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.bundle.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bip39@3.1.0/src/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bech32@2.0.0/dist/index.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.2.3/lib/index.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-ops@1.4.1/map.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@tchainstack/chainstack.js@0.4.35/build/main/index.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bitcoinjs-lib/6.1.0/bitcoinjs-lib.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js"></script>
 
     <!-- Initialize libraries globally -->
     <script>
       document.addEventListener('DOMContentLoaded', function() {
-        // Make noble-secp256k1 available globally under window.secp256k1
+        console.log("Initializing Bitcoin libraries in DOM content loaded event");
+        
+        // Define global variables to hold library references
+        window.Bitcoin = window.Bitcoin || bitcoinjs;
+        
+        // Make noble-secp256k1 available globally as secp256k1
         if (window.nobleSecp256k1) {
           window.secp256k1 = window.nobleSecp256k1;
           console.log("secp256k1 initialized from nobleSecp256k1");
@@ -39,13 +43,17 @@
           console.warn("nobleSecp256k1 not found, secp256k1 functionality may be limited");
         }
 
-        // Ensure all libraries are properly initialized
-        if (window.bs58) console.log("bs58 library loaded successfully");
-        if (window.bip39) console.log("bip39 library loaded successfully");
-        if (window.bech32) console.log("bech32 library loaded successfully");
-        if (window.Bitcoin) console.log("Bitcoin library loaded successfully");
-        if (window.bitcoinMessage) console.log("bitcoinMessage library loaded successfully");
-        if (window.bitcoinAddressValidation) console.log("bitcoinAddressValidation library loaded successfully");
+        // Log library availability for debugging
+        setTimeout(function() {
+          console.log("Checking Bitcoin libraries after initialization:");
+          console.log("- Bitcoin (bitcoinjs-lib):", typeof window.Bitcoin !== 'undefined' ? "Available" : "Missing");
+          console.log("- bs58:", typeof window.bs58 !== 'undefined' ? "Available" : "Missing");
+          console.log("- bip39:", typeof window.bip39 !== 'undefined' ? "Available" : "Missing");
+          console.log("- bech32:", typeof window.bech32 !== 'undefined' ? "Available" : "Missing");
+          console.log("- secp256k1:", typeof window.secp256k1 !== 'undefined' ? "Available" : "Missing");
+          console.log("- bitcoinMessage:", typeof window.bitcoinMessage !== 'undefined' ? "Available" : "Missing");
+          console.log("- bitcoinAddressValidation:", typeof window.bitcoinAddressValidation !== 'undefined' ? "Available" : "Missing");
+        }, 500);
       });
     </script>
   </head>
