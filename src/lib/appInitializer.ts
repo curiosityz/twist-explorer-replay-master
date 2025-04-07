@@ -5,6 +5,8 @@
 
 import { checkAndLogLibraryStatus, checkBitcoinLibsLoaded } from './crypto/bitcoinLibsCheck';
 import { toast } from 'sonner';
+// Import the library directly so it's bundled with the application
+import * as secp256k1 from '@noble/secp256k1';
 
 /**
  * Initialize the application and required libraries
@@ -13,18 +15,15 @@ import { toast } from 'sonner';
 export const initializeApplication = (): void => {
   console.log("Initializing application...");
   
-  // Try dynamic import of @noble/secp256k1 if needed
+  // Make secp256k1 available globally
   if (!window.secp256k1 && !window.secp && !window.nobleSecp256k1) {
     try {
-      // @ts-ignore - Dynamic import
-      import('@noble/secp256k1').then(module => {
-        window.secp256k1 = module;
-        console.log("Dynamically imported @noble/secp256k1");
-      }).catch(err => {
-        console.error("Failed to dynamically import @noble/secp256k1:", err);
-      });
+      // Use the imported library
+      window.secp256k1 = secp256k1;
+      window.nobleSecp256k1 = secp256k1;
+      console.log("Made @noble/secp256k1 globally available");
     } catch (error) {
-      console.warn("Dynamic import not supported:", error);
+      console.warn("Failed to set up secp256k1:", error);
     }
   }
   
