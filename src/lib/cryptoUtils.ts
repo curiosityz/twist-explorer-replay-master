@@ -44,3 +44,13 @@ export {
 export {
   factorize
 } from './crypto/factorizeUtils';
+
+// Re-export all vulnerability analysis functionality
+export {
+  analyzeTransaction,
+  fetchAnalysisForTransaction,
+  prepareAnalysisResult,
+  verifyRecoveredKey,
+  saveKeyFragments,
+  fetchKeyFragmentsForPublicKey
+} from './vulnerability';
