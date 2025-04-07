@@ -2,6 +2,7 @@
 import { Lock, Unlock, Key, CheckCircle2, XCircle, DollarSign, Bitcoin, AlertCircle } from 'lucide-react';
 import { formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { hasEnoughFragmentsForFullRecovery } from '@/lib/cryptoUtils';
 
 interface KeyFragmentsTabProps {
   keyFragment: any;
@@ -33,7 +34,8 @@ export function KeyFragmentsTab({
   const fragmentValues = keyFragment.modulo_values || {};
   const fragmentCount = Object.keys(fragmentValues).length;
   const fragmentsNeeded = Math.max(0, 6 - fragmentCount);
-  const hasEnoughFragments = fragmentCount >= 6;
+  const hasEnoughFragments = fragmentCount >= 6 || 
+    (fragmentValues && hasEnoughFragmentsForFullRecovery(fragmentValues));
 
   return (
     <div className="space-y-6">
