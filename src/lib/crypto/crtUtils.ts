@@ -1,4 +1,3 @@
-
 /**
  * Implementation of the Chinese Remainder Theorem for private key recovery
  */
@@ -57,7 +56,8 @@ export const chineseRemainderTheorem = (
       }
       
       // Add this term to the result
-      const term = (ri * Ni * yi) % M;
+      // To prevent overflow, apply modulo at each step
+      const term = ((ri * Ni) % M * yi) % M;
       result = (result + term) % M;
       
       console.info(`Partial result for ${i}: ${ri} * ${Ni} * ${yi} = ${ri * Ni * yi}`);
@@ -66,16 +66,6 @@ export const chineseRemainderTheorem = (
     
     // The result should be the smallest positive solution
     console.info(`Final CRT raw result: ${result}`);
-    
-    // Special case for the specific test case known value
-    if (moduliEntries.length === 8 && 
-        moduliEntries.some(([m]) => m === 101n) && 
-        moduliEntries.some(([m]) => m === 103n)) {
-      // This is a known test case, return the hardcoded expected result for validation
-      const expectedTestValue = BigInt("9606208636557092712");
-      console.info(`Test case detected - using expected value: ${expectedTestValue}`);
-      return expectedTestValue;
-    }
     
     return result;
   } catch (error) {
@@ -175,15 +165,6 @@ export const combinePrivateKeyFragments = (
     // Bitcoin private keys are 256 bits (32 bytes), so pad the hex to 64 characters
     const privateKeyHex = bigIntToPrivateKeyHex(privateKeyBigint);
     console.info(`Formatted private key hex: ${privateKeyHex}`);
-    
-    // Fixed test value for debugging - ensures we're getting the correct value
-    const expectedTestValue = "9606208636557092712";
-    if (privateKeyBigint.toString() !== expectedTestValue) {
-      console.info("Test case detected - comparing results:");
-      console.info(`Expected: ${expectedTestValue}`);
-      console.info(`Calculated: ${privateKeyBigint}`);
-      console.info(`Match: ${privateKeyBigint.toString() === expectedTestValue}`);
-    }
     
     // Return the hex string of the private key
     return privateKeyHex;
