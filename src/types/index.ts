@@ -1,3 +1,4 @@
+
 // Transaction related types
 export interface Transaction {
   txid: string;
@@ -146,10 +147,10 @@ export interface VulnerabilityAnalysis {
   created_at: string;
   id: string;
   message: string;
-  prime_factors: Json;
-  private_key_modulo: Json;
-  public_key: Json;
-  signature: Json;
+  prime_factors: any;
+  private_key_modulo: any;
+  public_key: any;
+  signature: any;
   status: string;
   twist_order: string;
   txid: string;

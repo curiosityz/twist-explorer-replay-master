@@ -64,7 +64,7 @@ export const useTransactionAnalysisCheck = () => {
         privateKeyModulo: privateKeyModulo,
         status: analysisData.status as "completed" | "analyzing" | "failed" | "pending",
         message: analysisData.message,
-        // For recovered_private_key field, use optional access since it might not exist in the schema
+        // For recovered_private_key field, adapt based on database schema
         recoveredPrivateKey: analysisData.recovered_private_key || null
       };
       

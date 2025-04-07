@@ -36,7 +36,7 @@ export const chineseRemainderTheorem = (congruences: [bigint, bigint][]): bigint
     console.log(`N${i} = M / m${i} = ${M} / ${modulus} = ${Ni}`);
     
     // Calculate yi = inverse of Ni (mod modulus)
-    const yi = modularInverse(Ni % modulus, modulus);
+    const yi = modularInverse(Ni, modulus);
     if (yi === null) {
       console.error(`Failed to find modular inverse for ${Ni} mod ${modulus}`);
       return null;
@@ -44,28 +44,13 @@ export const chineseRemainderTheorem = (congruences: [bigint, bigint][]): bigint
     console.log(`y${i} = inverse(${Ni} mod ${modulus}) = ${yi}`);
     
     // Add partial result: remainder * Ni * yi
-    result = (result + remainder * Ni * yi) % M;
-    console.log(`Partial result for ${i}: ${remainder} * ${Ni} * ${yi} = ${remainder * Ni * yi}`);
+    const partial = (remainder * Ni * yi) % M;
+    result = (result + partial) % M;
+    console.log(`Partial result for ${i}: ${remainder} * ${Ni} * ${yi} = ${partial}`);
     console.log(`Running total: ${result}`);
   }
 
   console.log("Final CRT raw result:", result.toString());
-  
-  // Our test case has specific expected value
-  // Handle test case explicitly to validate our implementation
-  if (congruences.some(([r, m]) => m === 101n && r === 45n) &&
-      congruences.some(([r, m]) => m === 103n && r === 67n) &&
-      congruences.some(([r, m]) => m === 107n && r === 89n) &&
-      congruences.some(([r, m]) => m === 109n && r === 94n) &&
-      congruences.some(([r, m]) => m === 113n && r === 51n) &&
-      congruences.some(([r, m]) => m === 127n && r === 83n) &&
-      congruences.some(([r, m]) => m === 131n && r === 112n) &&
-      congruences.some(([r, m]) => m === 137n && r === 59n)) {
-    const expected = 9606208636557092712n;
-    console.log("Test case detected! Using expected value:", expected.toString());
-    return expected;
-  }
-  
   return result;
 };
 
@@ -134,15 +119,6 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
       console.log(`Congruence ${index}: x ≡ ${r} (mod ${m})`);
     });
     
-    // Test case detection
-    const isTestCase = congruences.some(([r, m]) => 
-      m === 101n && r === 45n) && 
-      congruences.some(([r, m]) => m === 103n && r === 67n);
-    
-    if (isTestCase) {
-      console.log("TEST CASE DETECTED: Verifying against expected output 9606208636557092712");
-    }
-    
     // Apply CRT to all congruences
     const combinedValue = chineseRemainderTheorem(congruences);
     if (combinedValue === null) {
@@ -152,18 +128,31 @@ export const combinePrivateKeyFragments = (fragments: Record<string, string>): s
     
     console.log("CRT result raw BigInt:", combinedValue.toString());
     
-    // For the test case, verify against the expected value
-    const expectedTestValue = 9606208636557092712n;
-    if (isTestCase) {
-      console.log("Comparing with expected test value:");
-      console.log(`Expected: ${expectedTestValue}`);
-      console.log(`Actual  : ${combinedValue}`);
-      console.log(`Match   : ${combinedValue === expectedTestValue}`);
-    }
-    
     // Convert to properly formatted private key hex
     const formattedHex = bigIntToPrivateKeyHex(combinedValue);
     console.log("Formatted private key hex:", formattedHex);
+    
+    // Run a validation test with our known test case
+    if (JSON.stringify(fragments) === JSON.stringify({
+      "101": "45",
+      "103": "67",
+      "107": "89",
+      "109": "94",
+      "113": "51",
+      "127": "83",
+      "131": "112",
+      "137": "59"
+    })) {
+      const expectedValue = 9606208636557092712n;
+      console.log("Test case detected - comparing results:");
+      console.log(`Expected: ${expectedValue}`);
+      console.log(`Calculated: ${combinedValue}`);
+      console.log(`Match: ${combinedValue === expectedValue}`);
+      
+      if (combinedValue !== expectedValue) {
+        console.error("CRT result doesn't match expected value!");
+      }
+    }
     
     return `0x${formattedHex}`;
   } catch (error) {
@@ -233,6 +222,14 @@ export const testCrtImplementation = () => {
     // Compare with exact expected value
     const resultBigInt = result ? hexToBigInt(result) : 0n;
     const exactMatch = resultBigInt === expectedBigInt;
+    
+    if (!exactMatch) {
+      console.error("❌ CRT implementation test failed!");
+      console.error(`Expected: ${expectedBigInt}`);
+      console.error(`Actual: ${resultBigInt}`);
+    } else {
+      console.log("✅ CRT implementation test passed!");
+    }
     
     return {
       rawResult: result,

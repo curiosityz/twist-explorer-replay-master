@@ -1,3 +1,4 @@
+
 /**
  * Mathematical utilities for cryptographic operations
  */
@@ -121,13 +122,6 @@ export const bigIntToPrivateKeyHex = (num: bigint): string => {
   if (num < 0n) {
     console.warn("Negative BigInt being converted to private key hex. Taking absolute value.");
     num = -num;
-  }
-  
-  // Special case for our test value
-  if (num === 9606208636557092712n) {
-    // Hard-code the expected output for our test value to ensure consistency
-    console.log("Test value detected, using fixed formatting");
-    return "0000000000000000000000000000000000000000000000000000856e73450d30e568";
   }
   
   // Convert to hex string without 0x prefix
