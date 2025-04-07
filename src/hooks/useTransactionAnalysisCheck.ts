@@ -64,8 +64,8 @@ export const useTransactionAnalysisCheck = () => {
         privateKeyModulo: privateKeyModulo,
         status: analysisData.status as "completed" | "analyzing" | "failed" | "pending",
         message: analysisData.message,
-        // Use optional chaining to safely access recovered_private_key which might not exist
-        recoveredPrivateKey: analysisData.recovered_private_key ?? null
+        // For recovered_private_key field, use optional access since it might not exist in the schema
+        recoveredPrivateKey: analysisData.recovered_private_key || null
       };
       
       setIsDuplicate(true);

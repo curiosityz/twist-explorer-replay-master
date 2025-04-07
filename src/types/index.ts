@@ -138,3 +138,22 @@ export interface SecurityWarning {
   actionRequired: boolean;
   actionDescription?: string;
 }
+
+/**
+ * Vulnerability analysis data structure
+ */
+export interface VulnerabilityAnalysis {
+  created_at: string;
+  id: string;
+  message: string;
+  prime_factors: Json;
+  private_key_modulo: Json;
+  public_key: Json;
+  signature: Json;
+  status: string;
+  twist_order: string;
+  txid: string;
+  updated_at: string;
+  vulnerability_type: string;
+  recovered_private_key?: string;
+}
