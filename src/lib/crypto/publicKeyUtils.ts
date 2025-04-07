@@ -1,8 +1,7 @@
+
 /**
  * Bitcoin public key utilities
  */
-
-import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
 
 /**
  * Create compressed public key from x and y coordinates
@@ -48,11 +47,6 @@ export const decompressPublicKey = (
     }
     
     // Check if Bitcoin libraries are loaded
-    const libCheck = checkBitcoinLibsLoaded();
-    if (!libCheck.loaded) {
-      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
-    }
-    
     if (!window.secp256k1) {
       throw new Error("secp256k1 library not loaded");
     }
@@ -169,13 +163,6 @@ export const validatePublicKey = (xHex: string, yHex: string): {
         isOnCurve: false,
         reason: "Point is not on the secp256k1 curve" 
       };
-    }
-    
-    // Check if libraries are loaded
-    const libCheck = checkBitcoinLibsLoaded();
-    if (!libCheck.loaded) {
-      console.warn(`Bitcoin libraries not fully loaded: Missing ${libCheck.missing.join(', ')}`);
-      // Continue with partial validation
     }
     
     // Check if secp256k1 library is available for more advanced validation

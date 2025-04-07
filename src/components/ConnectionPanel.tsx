@@ -81,9 +81,7 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
       const blockchainInfo = data.result;
       
       // Connection successful
-      toast({
-        description: `Connected to ${blockchainInfo.chain} (height: ${blockchainInfo.blocks})`,
-      });
+      toast(`Connected to ${blockchainInfo.chain} (height: ${blockchainInfo.blocks})`);
       
       // Pass the connection info back to the parent component
       onConnect({ 
@@ -106,12 +104,10 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
         setError(`Connection failed: ${errorMessage}`);
       }
       
-      toast({
-        description: isCorsError ? 
-          "CORS policy prevents direct connection. Try using a CORS proxy or provide CORS headers on your endpoint." :
-          `Failed to connect: ${errorMessage}`,
-        variant: "destructive"
-      });
+      toast(isCorsError ? 
+        "CORS policy prevents direct connection. Try using a CORS proxy or provide CORS headers on your endpoint." :
+        `Failed to connect: ${errorMessage}`
+      );
     } finally {
       setIsLoading(false);
     }

@@ -5,7 +5,6 @@
 
 import { hexToBigInt, bigIntToHex } from './mathUtils';
 import { curveParams } from './constants';
-import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
 
 /**
  * Normalize a private key to a standard hex format
@@ -69,11 +68,6 @@ export const verifyPrivateKey = (
 ): boolean => {
   try {
     // Check if libraries are loaded
-    const libCheck = checkBitcoinLibsLoaded();
-    if (!libCheck.loaded) {
-      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
-    }
-    
     if (!window.secp256k1) {
       throw new Error("secp256k1 library not loaded");
     }
