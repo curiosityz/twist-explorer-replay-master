@@ -1,4 +1,3 @@
-
 /**
  * Bitcoin public key utilities
  */
@@ -65,7 +64,7 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
+      const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey, false);
       
       if (!decompressedKey || decompressedKey.length !== 65) {
         throw new Error(`Invalid decompressed key length: ${decompressedKey?.length}`);
