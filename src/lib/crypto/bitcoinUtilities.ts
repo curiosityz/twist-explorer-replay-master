@@ -199,8 +199,7 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Fix: Call secp256k1.publicKeyConvert without passing false explicitly
-      // as it will use the library's default
+      // Fix: Call secp256k1.publicKeyConvert without any extra parameters
       const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
       
       // Extract x and y from decompressed key (format: 04|x|y)
@@ -312,4 +311,3 @@ export const wifToPrivateKey = (wif: string): string | null => {
 // For backward compatibility
 export const validateBitcoinAddress = isValidBitcoinAddress;
 export const isPointOnCurve = isPointOnSecp256k1Curve;
-
