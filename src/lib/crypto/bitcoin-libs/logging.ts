@@ -49,7 +49,7 @@ export const mapLibraryAliases = (): void => {
     // Try each alias
     for (const alias of aliases) {
       if (window[alias as keyof Window]) {
-        window[standardName as keyof Window] = window[alias as keyof Window];
+        (window as any)[standardName] = window[alias as keyof Window];
         console.log(`Assigned window.${alias} to window.${standardName}`);
         break;
       }

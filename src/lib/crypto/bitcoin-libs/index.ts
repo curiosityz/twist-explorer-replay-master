@@ -5,7 +5,8 @@
 
 export { checkBitcoinLibsLoaded, isLibrariesLoaded } from './check-status';
 export { checkAndLogLibraryStatus, mapLibraryAliases, refreshLibraryReferences } from './logging';
-export { BitcoinLibsCheckResult, REQUIRED_LIBRARIES, LIBRARY_ALIASES } from './types';
+export type { BitcoinLibsCheckResult } from './types';
+export { REQUIRED_LIBRARIES, LIBRARY_ALIASES } from './types';
 
 /**
  * Check specific libraries required for a feature

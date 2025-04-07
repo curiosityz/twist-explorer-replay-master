@@ -26,7 +26,7 @@ export const checkBitcoinLibsLoaded = (): BitcoinLibsCheckResult => {
       if (window[alias as keyof Window]) {
         // If found by alias, assign to main name if not already present
         if (!window[lib as keyof Window]) {
-          window[lib as keyof Window] = window[alias as keyof Window];
+          (window as any)[lib] = window[alias as keyof Window];
         }
         foundLibraries[lib] = alias;
         return false;
@@ -44,7 +44,7 @@ export const checkBitcoinLibsLoaded = (): BitcoinLibsCheckResult => {
   // If secp256k1 is available but Bitcoin isn't, create mock Bitcoin for testing
   if (!window.Bitcoin && window.secp256k1) {
     console.warn("Creating mock Bitcoin object for testing purposes");
-    window.Bitcoin = {
+    (window as any).Bitcoin = {
       crypto: {
         sha256: (data: Uint8Array) => {
           console.warn("Using mock SHA256 - not secure!");
