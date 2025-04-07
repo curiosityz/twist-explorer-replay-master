@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { XCircle, RefreshCw, Settings, Globe, KeySquare, Database } from 'lucide-react';
+import { XCircle, RefreshCw, Settings, Globe, KeySquare, Database, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
@@ -27,6 +27,10 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
                       
   const isDataExtractionError = error.includes('extract') && 
                                error.includes('cryptographic data');
+                               
+  const isNotFoundError = error.includes('404') || 
+                         error.includes('not found') || 
+                         error.includes('Not Found');
 
   return (
     <div className="flex flex-col items-center justify-center h-full">
@@ -88,6 +92,19 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
         </Alert>
       )}
       
+      {isNotFoundError && (
+        <Alert className="mb-4 max-w-md">
+          <AlertTitle className="flex items-center">
+            <Search className="mr-2 h-4 w-4" />
+            Transaction Not Found
+          </AlertTitle>
+          <AlertDescription>
+            The requested transaction could not be found on the blockchain.
+            Please verify that you entered the correct transaction ID.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       <Button 
         onClick={onRetry}
         className="mt-4 bg-crypto-primary hover:bg-crypto-primary/80"
@@ -100,3 +117,4 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
 };
 
 export default AnalysisErrorState;
+

@@ -11,10 +11,26 @@ export const useAnalysisError = () => {
   
   const handleAnalysisError = async (error: unknown, txid?: string) => {
     let errorMessage: string;
+    let errorType: string = 'unknown';
     
     if (error instanceof Error) {
       errorMessage = error.message;
       console.error('Analysis error:', error);
+      
+      // Categorize error types for better error messages
+      if (errorMessage.includes('extract cryptographic data')) {
+        errorType = 'extraction';
+        errorMessage = "Could not extract cryptographic data from this transaction. It may not contain the signature format we're analyzing.";
+      } else if (errorMessage.includes('CORS') || errorMessage.includes('Failed to fetch')) {
+        errorType = 'network';
+        errorMessage = "Network request failed. This could be due to CORS restrictions or connectivity issues.";
+      } else if (errorMessage.includes('401') || errorMessage.includes('Unauthorized')) {
+        errorType = 'auth';
+        errorMessage = "Authentication failed when accessing blockchain data. Please check your API credentials.";
+      } else if (errorMessage.includes('404') || errorMessage.includes('Not Found')) {
+        errorType = 'notfound';
+        errorMessage = "Transaction not found. Please verify the transaction ID is correct.";
+      }
     } else {
       errorMessage = 'Unknown error occurred';
       console.error('Analysis error (unknown type):', error);
@@ -48,6 +64,7 @@ export const useAnalysisError = () => {
             .from(Tables.vulnerability_analyses)
             .update({
               message: errorMessage,
+              error_type: errorType,
               updated_at: new Date().toISOString()
             })
             .eq('id', existingError.id);
@@ -65,7 +82,8 @@ export const useAnalysisError = () => {
           vulnerability_type: 'unknown',
           public_key: { x: '0x0', y: '0x0', isOnCurve: false } as unknown as Record<string, any>,
           status: 'failed',
-          message: errorMessage
+          message: errorMessage,
+          error_type: errorType
         };
         
         const { error: saveError } = await supabase
@@ -87,3 +105,4 @@ export const useAnalysisError = () => {
     handleAnalysisError
   };
 };
+
