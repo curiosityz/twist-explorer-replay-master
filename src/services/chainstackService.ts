@@ -42,17 +42,34 @@ export class ChainStackService {
       headers['x-api-key'] = this.apiKey;
     }
     
-    // If we have a proxy URL, use it instead of direct API call
-    const url = this.proxyUrl ? 
-      `${this.proxyUrl}?method=${method}&params=${encodeURIComponent(JSON.stringify(params))}` : 
-      this.rpcUrl;
-    
     try {
-      console.log(`Making RPC call to: ${url}`);
-      const response = await fetch(url, {
-        method: this.proxyUrl ? 'GET' : 'POST',
+      console.log(`Making RPC call: ${method} with params:`, params);
+      
+      // If we have a proxy URL, use it instead of direct API call
+      if (this.proxyUrl) {
+        const url = `${this.proxyUrl}?method=${method}&params=${encodeURIComponent(JSON.stringify(params))}`;
+        console.log(`Using proxy URL: ${url}`);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+          mode: 'cors',
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        console.log(`RPC response via proxy:`, data);
+        return data;
+      }
+      
+      // Direct RPC call to the node
+      const response = await fetch(this.rpcUrl, {
+        method: 'POST',
         headers,
-        body: this.proxyUrl ? undefined : JSON.stringify({
+        body: JSON.stringify({
           jsonrpc: '2.0',
           id: Date.now(),
           method,
@@ -62,19 +79,31 @@ export class ChainStackService {
       });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
       
       const data = await response.json();
+      console.log(`RPC response:`, data);
       
       if (data.error) {
         throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
       }
       
-      return this.proxyUrl ? data : data.result;
-    } catch (error) {
-      console.error(`ChainStack RPC error (${method}):`, error);
-      throw error;
+      return data.result;
+    } catch (error: any) {
+      // Check for CORS errors
+      const errorMessage = error.message || 'Unknown error';
+      const isCorsError = errorMessage.includes('CORS') || 
+                         (error.name === 'TypeError' && errorMessage.includes('Failed to fetch'));
+      
+      if (isCorsError) {
+        console.error(`CORS error in RPC call (${method}):`, error);
+        throw new Error(`CORS policy prevents direct connection. Try using a CORS proxy or provide CORS headers on your endpoint.`);
+      } else {
+        console.error(`ChainStack RPC error (${method}):`, error);
+        throw error;
+      }
     }
   }
   
@@ -88,14 +117,22 @@ export class ChainStackService {
   }
 
   /**
-   * Gets the current block height
+   * Gets the current block height directly from the node
    * @returns Current block height
    */
   async getBlockHeight(): Promise<number> {
     try {
-      const result = await fetch('https://blockchain.info/q/getblockcount');
-      const text = await result.text();
-      return parseInt(text, 10);
+      // Try direct RPC call first
+      try {
+        const blockchainInfo = await this.rpcCall('getblockchaininfo', []);
+        return blockchainInfo.blocks;
+      } catch (rpcError) {
+        console.warn("Failed to get blockheight via RPC, falling back to blockchain.info:", rpcError);
+        // Fallback to blockchain.info
+        const result = await fetch('https://blockchain.info/q/getblockcount');
+        const text = await result.text();
+        return parseInt(text, 10);
+      }
     } catch (error) {
       console.error("Failed to get block height:", error);
       throw error;
@@ -103,12 +140,32 @@ export class ChainStackService {
   }
   
   /**
-   * Gets UTXOs for a specific address using blockchain.info API
+   * Gets UTXOs for a specific address first via RPC, falling back to blockchain.info API
    * @param address Bitcoin address
    * @returns Array of UTXOs
    */
   async getAddressUtxos(address: string): Promise<UTXO[]> {
     try {
+      // Try direct RPC call first
+      try {
+        // Note: This requires an index on the node (addressindex=1)
+        const result = await this.rpcCall('getaddressutxos', [{ addresses: [address] }]);
+        
+        if (Array.isArray(result)) {
+          return result.map((utxo: any) => ({
+            txid: utxo.txid,
+            vout: utxo.outputIndex,
+            value: utxo.satoshis,
+            scriptPubKey: utxo.script,
+            address: address,
+            confirmations: utxo.confirmations || 0
+          }));
+        }
+      } catch (rpcError) {
+        console.warn("Failed to get UTXOs via RPC, falling back to blockchain.info:", rpcError);
+      }
+      
+      // Fallback to blockchain.info
       const response = await fetch(`https://blockchain.info/unspent?active=${address}`);
       
       if (!response.ok) {
@@ -135,12 +192,22 @@ export class ChainStackService {
   }
   
   /**
-   * Gets balance for an address
+   * Gets balance for an address first via RPC, falling back to blockchain.info API
    * @param address Bitcoin address
    * @returns Balance in BTC
    */
   async getAddressBalance(address: string): Promise<number> {
     try {
+      // Try direct RPC call first
+      try {
+        // Note: This requires an index on the node (addressindex=1)
+        const result = await this.rpcCall('getaddressbalance', [{ addresses: [address] }]);
+        return (result.balance + result.received) / 100000000; // Convert satoshis to BTC
+      } catch (rpcError) {
+        console.warn("Failed to get balance via RPC, falling back to blockchain.info:", rpcError);
+      }
+      
+      // Fallback to blockchain.info
       const response = await fetch(`https://blockchain.info/balance?active=${address}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -156,12 +223,21 @@ export class ChainStackService {
   }
   
   /**
-   * Broadcasts a signed transaction to the network
+   * Broadcasts a signed transaction to the network using RPC, falling back to blockchain.info
    * @param txHex Signed transaction in hex format
    * @returns Transaction ID if successful
    */
   async broadcastTransaction(txHex: string): Promise<string> {
     try {
+      // Try direct RPC call first
+      try {
+        const txid = await this.rpcCall('sendrawtransaction', [txHex]);
+        return txid;
+      } catch (rpcError) {
+        console.warn("Failed to broadcast via RPC, falling back to blockchain.info:", rpcError);
+      }
+      
+      // Fallback to blockchain.info
       const response = await fetch('https://blockchain.info/pushtx', {
         method: 'POST',
         headers: {
@@ -182,24 +258,51 @@ export class ChainStackService {
   }
   
   /**
-   * Creates a raw transaction
+   * Creates a raw transaction via RPC
    * @param inputs Transaction inputs (UTXOs to spend)
    * @param outputs Transaction outputs (recipients)
    * @returns Raw transaction hex
    */
   async createRawTransaction(inputs: TxInput[], outputs: TxOutput[]): Promise<string> {
-    // This operation requires a real node - we'll throw an informative error
-    throw new Error("Creating raw transactions requires a full Bitcoin node. Please configure a valid node endpoint.");
+    try {
+      // Format inputs for RPC
+      const rpcInputs = inputs.map(input => ({
+        txid: input.txid,
+        vout: input.vout
+      }));
+      
+      // Format outputs for RPC
+      const rpcOutputs: Record<string, number> = {};
+      outputs.forEach(output => {
+        if (output.address) {
+          rpcOutputs[output.address] = output.value;
+        }
+      });
+      
+      // Call createrawtransaction RPC method
+      return await this.rpcCall('createrawtransaction', [rpcInputs, rpcOutputs]);
+    } catch (error) {
+      console.error("Failed to create raw transaction:", error);
+      throw new Error("Creating raw transactions requires a full Bitcoin node with RPC access. Please configure a valid node endpoint.");
+    }
   }
   
   /**
-   * Gets transaction details using blockchain.info API
+   * Gets transaction details using RPC, falling back to blockchain.info API
    * @param txid Transaction ID
    * @returns Transaction details
    */
   async getTransaction(txid: string): Promise<any> {
     try {
-      // Use blockchain.info API instead of direct RPC
+      // Try direct RPC call first
+      try {
+        const txData = await this.rpcCall('getrawtransaction', [txid, true]);
+        return txData;
+      } catch (rpcError) {
+        console.warn("Failed to get transaction via RPC, falling back to blockchain.info:", rpcError);
+      }
+      
+      // Fallback to blockchain.info API
       const response = await fetch(`https://blockchain.info/rawtx/${txid}?format=json`);
       
       if (!response.ok) {
@@ -248,11 +351,28 @@ export class ChainStackService {
   }
   
   /**
-   * Gets current fee estimates
+   * Gets current fee estimates via RPC, falling back to bitcoinfees.earn.com
    * @returns Fee estimates in satoshis/vbyte
    */
   async estimateFee(): Promise<{high: number, medium: number, low: number}> {
     try {
+      // Try direct RPC call first
+      try {
+        const highPriority = await this.rpcCall('estimatesmartfee', [1]);
+        const mediumPriority = await this.rpcCall('estimatesmartfee', [6]);
+        const lowPriority = await this.rpcCall('estimatesmartfee', [24]);
+        
+        // Convert BTC/kB to satoshis/vbyte
+        return {
+          high: Math.round((highPriority.feerate || 0.0002) * 100000), // BTC/kB to sat/vB
+          medium: Math.round((mediumPriority.feerate || 0.0001) * 100000),
+          low: Math.round((lowPriority.feerate || 0.00005) * 100000)
+        };
+      } catch (rpcError) {
+        console.warn("Failed to estimate fee via RPC, falling back to bitcoinfees.earn.com:", rpcError);
+      }
+      
+      // Fallback to bitcoinfees.earn.com
       const response = await fetch('https://bitcoinfees.earn.com/api/v1/fees/recommended');
       
       if (!response.ok) {

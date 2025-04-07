@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ChainType, NodeConfiguration } from '@/types';
-import { AlertCircle, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, WifiOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface ConnectionPanelProps {
   onConnect: (config: NodeConfiguration) => void;
@@ -40,12 +41,82 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
     setIsLoading(true);
     setError(null);
 
-    // In a real application, we would actually try to connect to the node here
-    // For this demo, we'll simulate a connection after a short delay
-    setTimeout(() => {
+    try {
+      // Prepare headers for the request
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json'
+      };
+      
+      // Add API key to headers if provided
+      if (formData.apiKey) {
+        headers['Authorization'] = `Bearer ${formData.apiKey}`;
+      }
+      
+      // Perform a simple getblockchaininfo RPC call to test the connection
+      const response = await fetch(formData.rpcUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'getblockchaininfo',
+          params: []
+        })
+      });
+      
+      // Check if the response is ok
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Check for RPC errors
+      if (data.error) {
+        throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
+      }
+      
+      // Get blockchain info from response
+      const blockchainInfo = data.result;
+      
+      // Connection successful
+      toast({
+        title: "Connection Successful",
+        description: `Connected to ${blockchainInfo.chain} (height: ${blockchainInfo.blocks})`,
+      });
+      
+      // Pass the connection info back to the parent component
+      onConnect({ 
+        ...formData, 
+        connected: true,
+        lastSyncBlock: blockchainInfo.blocks,
+        syncStatus: 'connected'
+      });
+    } catch (error: any) {
+      console.error("Failed to connect to RPC:", error);
+      
+      // Handle CORS errors specially
+      const errorMessage = error.message || 'Unknown error';
+      const isCorsError = errorMessage.includes('CORS') || 
+                          error.name === 'TypeError' && errorMessage.includes('Failed to fetch');
+      
+      if (isCorsError) {
+        setError('CORS error: Unable to connect directly from browser. Consider using a proxy or CORS-enabled endpoint.');
+      } else {
+        setError(`Connection failed: ${errorMessage}`);
+      }
+      
+      toast({
+        title: "Connection Failed",
+        description: isCorsError ? 
+          "CORS policy prevents direct connection. Try using a CORS proxy or provide CORS headers on your endpoint." :
+          `Failed to connect: ${errorMessage}`,
+        variant: "destructive"
+      });
+    } finally {
       setIsLoading(false);
-      onConnect({ ...formData, connected: true });
-    }, 1500);
+    }
   };
 
   return (
@@ -81,13 +152,16 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
               onChange={(e) => handleChange('rpcUrl', e.target.value)}
               className="bg-crypto-background border-crypto-border font-mono text-sm"
             />
+            <p className="text-xs text-crypto-foreground/60">
+              Note: Direct browser connections may be blocked by CORS policies.
+            </p>
           </div>
           
           <div className="space-y-2">
             <Label htmlFor="chain">Blockchain</Label>
             <Select 
               value={formData.chain} 
-              onValueChange={(value) => handleChange('chain', value)}
+              onValueChange={(value) => handleChange('chain', value as ChainType)}
             >
               <SelectTrigger className="bg-crypto-background border-crypto-border">
                 <SelectValue placeholder="Select blockchain" />
@@ -116,7 +190,7 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
           
           {error && (
             <div className="flex items-center gap-2 text-destructive text-sm">
-              <AlertCircle size={16} />
+              <WifiOff size={16} />
               <span>{error}</span>
             </div>
           )}

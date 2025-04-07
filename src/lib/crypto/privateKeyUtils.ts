@@ -97,12 +97,12 @@ export const verifyPrivateKey = (
     );
     
     // Derive public key from private key using secp256k1 library
-    // Fix: Remove argument from publicKeyCreate call
+    // Fixed: Removed second argument from publicKeyCreate call
     const derivedPubKey = window.secp256k1.publicKeyCreate(privKeyBytes);
     
     // Convert derived public key to uncompressed format (if needed)
-    // Fix: Remove argument from publicKeyConvert call
-    const uncompressedDerivedPubKey = window.secp256k1.publicKeyConvert(derivedPubKey, false);
+    // Fixed: Removed second argument from publicKeyConvert call
+    const uncompressedDerivedPubKey = window.secp256k1.publicKeyConvert(derivedPubKey);
     
     // Extract x and y coordinates from the derived public key
     const derivedX = Array.from(uncompressedDerivedPubKey.slice(1, 33))
@@ -146,7 +146,7 @@ export const wifToPrivateKey = (wif: string): string => {
       
       // Double SHA256 hash for checksum verification
       const sha256 = window.Bitcoin.crypto.sha256;
-      // Fix: Remove argument from sha256 calls
+      // Fixed: Removed second argument from sha256 calls
       const calculatedChecksum = sha256(sha256(payload)).slice(0, 4);
       
       // Check if checksums match
