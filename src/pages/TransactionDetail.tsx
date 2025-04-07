@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -33,6 +34,7 @@ const TransactionDetail = () => {
           .from(Tables.blockchain_transactions)
           .select('*')
           .eq('txid', txid)
+          .limit(1)
           .maybeSingle();
           
         if (txError) {
@@ -61,11 +63,12 @@ const TransactionDetail = () => {
           .from(Tables.vulnerability_analyses)
           .select('*')
           .eq('txid', txid)
+          .limit(1)
           .maybeSingle();
           
         if (analysisError) {
           console.error('Error fetching analysis:', analysisError);
-        } else {
+        } else if (analysisData) {
           setAnalysis(analysisData);
           
           if (analysisData?.public_key) {
@@ -77,18 +80,24 @@ const TransactionDetail = () => {
                 .from(Tables.private_key_fragments)
                 .select('*')
                 .eq('public_key_hex', publicKeyHex)
+                .limit(1)
                 .maybeSingle();
                 
               if (!keyError && keyData) {
                 setKeyFragment(keyData);
                 
                 if (keyData.completed && keyData.combined_fragments) {
-                  const isValid = verifyPrivateKey(
-                    keyData.combined_fragments, 
-                    publicKey.x, 
-                    publicKey.y
-                  );
-                  setKeyVerificationStatus(isValid);
+                  try {
+                    const isValid = verifyPrivateKey(
+                      keyData.combined_fragments, 
+                      publicKey.x, 
+                      publicKey.y
+                    );
+                    setKeyVerificationStatus(isValid);
+                  } catch (verifyError) {
+                    console.error("Key verification error:", verifyError);
+                    setKeyVerificationStatus(false);
+                  }
                 }
               }
             } catch (err) {
