@@ -117,7 +117,6 @@ export const isValidBitcoinAddress = (
     // First try with bitcoin-address-validation library if available
     if (window.bitcoinAddressValidation) {
       console.log("Using bitcoinAddressValidation to validate address");
-      // Fix: Don't pass the network parameter as the library function doesn't accept it
       return window.bitcoinAddressValidation.validate(address);
     }
     
@@ -199,7 +198,7 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Fix: Call secp256k1.publicKeyConvert without any extra parameters
+      // Fix: Calling publicKeyConvert without any arguments
       const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey);
       
       // Extract x and y from decompressed key (format: 04|x|y)
@@ -284,7 +283,7 @@ export const wifToPrivateKey = (wif: string): string | null => {
       throw new Error("bs58 library not loaded");
     }
     
-    // Fix: Call bs58.decode without any extra parameters
+    // Fix: Call bs58.decode with just the wif string
     const bytes = window.bs58.decode(wif);
     
     // WIF format: version(1) + key(32) + [compressed-flag(1)] + checksum(4)
