@@ -49,6 +49,11 @@ export const decompressPublicKey = (
     }
     
     // Check if Bitcoin libraries are loaded
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      throw new Error(`Bitcoin libraries not loaded: Missing ${libCheck.missing.join(', ')}`);
+    }
+    
     if (!window.secp256k1) {
       throw new Error("secp256k1 library not loaded");
     }
@@ -67,7 +72,9 @@ export const decompressPublicKey = (
     
     // Use secp256k1 library to decompress the key
     try {
-      // Call publicKeyConvert without options parameter
+      // secp256k1.publicKeyConvert accepts two parameters:
+      // 1. The compressed public key as Uint8Array
+      // 2. A boolean indicating whether to compress or decompress (false = decompress)
       const decompressedKey = window.secp256k1.publicKeyConvert(compressedPubKey, false);
       
       if (!decompressedKey || decompressedKey.length !== 65) {
@@ -166,6 +173,13 @@ export const validatePublicKey = (xHex: string, yHex: string): {
         isOnCurve: false,
         reason: "Point is not on the secp256k1 curve" 
       };
+    }
+    
+    // Check if libraries are loaded
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      console.warn(`Bitcoin libraries not fully loaded: Missing ${libCheck.missing.join(', ')}`);
+      // Continue with partial validation
     }
     
     // Check if secp256k1 library is available for more advanced validation
