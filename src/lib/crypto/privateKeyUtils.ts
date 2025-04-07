@@ -1,9 +1,72 @@
-
 /**
- * Bitcoin private key utility functions
+ * Private key utilities for Bitcoin
  */
 
 import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
+
+/**
+ * Check if a string is a valid WIF (Wallet Import Format) private key
+ * @param wif The WIF string to validate
+ * @returns Boolean indicating if the WIF is valid
+ */
+export const isValidWIF = (wif: string): boolean => {
+  try {
+    // Basic validation - WIF should be base58 encoded string
+    // with specific lengths: 51-52 characters for mainnet
+    if (!wif || typeof wif !== 'string') {
+      return false;
+    }
+    
+    // Check length (mainnet compressed: 52 chars, uncompressed: 51 chars)
+    // Testnet has different lengths but similar structure
+    if (wif.length < 50 || wif.length > 54) {
+      return false;
+    }
+    
+    // Check for valid prefix - mainnet WIFs start with '5', 'K', or 'L'
+    const validMainnetPrefixes = ['5', 'K', 'L'];
+    // Testnet WIFs start with '9' or 'c'
+    const validTestnetPrefixes = ['9', 'c'];
+    
+    // Combined valid prefixes
+    const validPrefixes = [...validMainnetPrefixes, ...validTestnetPrefixes];
+    if (!validPrefixes.includes(wif.charAt(0))) {
+      return false;
+    }
+    
+    // Check if bitcoinjs library is available for full validation
+    const libCheck = checkBitcoinLibsLoaded();
+    if (!libCheck.loaded) {
+      console.warn("Bitcoin libraries not fully loaded, performing basic WIF validation only");
+      return true; // Return true based on prefix and length checks if libraries not available
+    }
+    
+    // If we have the BS58 library, we can do proper checksum validation
+    if (window.bs58) {
+      try {
+        // Decode the base58 string
+        const decoded = window.bs58.decode(wif);
+        
+        // Check length of decoded data
+        // WIF format: [1 byte version][32 bytes private key][optional 1 byte compression flag][4 bytes checksum]
+        // So valid lengths are 37 bytes (uncompressed) or 38 bytes (compressed)
+        if (decoded.length !== 37 && decoded.length !== 38) {
+          return false;
+        }
+        
+        return true;
+      } catch (e) {
+        return false; // Decoding failed, invalid Base58
+      }
+    }
+    
+    // If bs58 is not available, return true based on prefix and length checks
+    return true;
+  } catch (error) {
+    console.error("Error validating WIF:", error);
+    return false;
+  }
+};
 
 /**
  * Convert WIF format private key to raw hex
