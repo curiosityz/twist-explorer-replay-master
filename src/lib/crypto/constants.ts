@@ -23,5 +23,9 @@ export const twistParams = {
   // For secp256k1, we can use -7 as the twist's b parameter
   b: (curveParams.p - curveParams.b) % curveParams.p,
   // Order of the twist curve group (precomputed for efficiency)
-  n: BigInt('0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1')
+  n: BigInt('0x7FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF5D576E7357A4501DDFE92F46681B20A1'),
+  // Generator points for the twist curve (derived from the main curve generator)
+  // These are simplified representations for demonstration purposes
+  Gx: BigInt('0x79BE667EF9DCBBAC55A06295CE870B07029BFCDB2DCE28D959F2815B16F81798'),
+  Gy: BigInt('0xB7C52588D95C3B9AA25B0403F1EEF75702E84BB7597AABE663B82F6F04EF2777')
 };
