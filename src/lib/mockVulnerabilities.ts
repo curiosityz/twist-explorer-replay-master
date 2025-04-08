@@ -5,7 +5,7 @@ import { supabase, Tables } from '@/integrations/supabase/client';
 export const fetchVulnerabilityCases = async (): Promise<VulnerabilityCase[]> => {
   try {
     const { data, error } = await supabase
-      .from(Tables.vulnerability_cases)
+      .from(Tables.vulnerability_analyses)
       .select('*');
 
     if (error) {
