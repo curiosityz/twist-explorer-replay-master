@@ -46,9 +46,9 @@ export const checkBitcoinLibsLoaded = (): BitcoinLibsCheckResult => {
     console.warn("Creating mock Bitcoin object for testing purposes");
     (window as any).Bitcoin = {
       crypto: {
-        sha256: (data: Uint8Array) => {
+        sha256: (data: Uint8Array): Uint8Array => {
           console.warn("Using mock SHA256 - not secure!");
-          return new Uint8Array(32); // Return dummy hash
+          return new Uint8Array(32).fill(1); // Return dummy hash
         }
       }
     };

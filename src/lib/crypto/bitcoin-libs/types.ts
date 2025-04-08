@@ -4,7 +4,7 @@
  */
 
 /**
- * Describes the result of checking Bitcoin libraries
+ * Result of checking for Bitcoin libraries
  */
 export interface BitcoinLibsCheckResult {
   loaded: boolean;
@@ -12,7 +12,7 @@ export interface BitcoinLibsCheckResult {
 }
 
 /**
- * Required libraries mapping
+ * List of required Bitcoin libraries
  */
 export const REQUIRED_LIBRARIES = [
   'Bitcoin',
@@ -22,26 +22,14 @@ export const REQUIRED_LIBRARIES = [
   'secp256k1',
   'bitcoinMessage',
   'bitcoinAddressValidation'
-] as const;
+];
 
 /**
- * Type for required library names
+ * Mapping of library names to their possible alternative global names
  */
-export type RequiredLibraryName = typeof REQUIRED_LIBRARIES[number];
-
-/**
- * Maps library names to their alternative global names
- */
-export interface LibraryAliasMap {
-  [key: string]: string[];
-}
-
-/**
- * Library aliases configuration
- */
-export const LIBRARY_ALIASES: LibraryAliasMap = {
+export const LIBRARY_ALIASES: Record<string, string[]> = {
   'Bitcoin': ['bitcoin', 'bitcoinjs', 'BitcoinLib'],
   'secp256k1': ['nobleSecp256k1', 'secp'],
-  'bitcoinAddressValidation': ['validate'],
-  'bitcoinOps': ['OPS']
+  'bitcoinOps': ['OPS'],
+  'bitcoinAddressValidation': ['validate']
 };
