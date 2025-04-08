@@ -1,3 +1,4 @@
+
 /**
  * Public key compression/decompression utilities
  */
@@ -44,7 +45,6 @@ export const decompressPublicKey = (compressedPubKey: string): DecompressedKey =
       );
       
       // Use the library to decompress
-      // Fixed: Remove the second parameter
       const decompressedKey = window.secp256k1.publicKeyConvert(pubKeyBytes);
       
       // Extract coordinates from result (format: 04 | x | y)
