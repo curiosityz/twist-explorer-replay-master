@@ -1,148 +1,107 @@
 
 /**
- * Application initialization functions
+ * Initialize application dependencies
  */
-import { toast } from 'sonner';
-import { 
-  checkBitcoinLibsLoaded,
-  initializeMockLibraries 
-} from './crypto/bitcoin-libs';
-import { checkAndLogLibraryStatus } from './crypto/bitcoin-libs/logging';
-import { refreshLibraryReferences } from './crypto/bitcoin-libs'; 
-import { mapLibraryAliases } from './crypto/bitcoinUtilities';
 
-// Wait for a specific duration
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+// Import the refresh function from bitcoinLibsCheck
+import { areBitcoinLibrariesAvailable, refreshLibraryReferences } from './crypto/bitcoinLibsCheck';
 
 /**
- * Load libraries dynamically with retry capability
- * @param libraryName Name of the library to load
- * @param url URL to load the library from
- * @param fallbackUrl Optional fallback URL if the primary fails
+ * Initialize all required libraries and dependencies for the application
+ * @returns Promise that resolves when all libraries are loaded
  */
-export const loadScript = (libraryName: string, url: string, fallbackUrl?: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = url;
-    script.async = true;
-
-    script.onload = () => {
-      console.log(`${libraryName} loaded successfully from ${url}`);
-      resolve();
-    };
-
-    script.onerror = async (e) => {
-      console.error(`Failed to load ${libraryName} library`, e);
-      
-      if (fallbackUrl) {
-        console.log(`Trying fallback URL for ${libraryName}`);
-        try {
-          const fallbackScript = document.createElement('script');
-          fallbackScript.src = fallbackUrl;
-          fallbackScript.async = true;
-          
-          fallbackScript.onload = () => {
-            console.log(`${libraryName} loaded successfully from fallback URL`);
-            resolve();
-          };
-          
-          fallbackScript.onerror = () => {
-            console.error(`Failed to load ${libraryName} from fallback URL as well`);
-            reject(new Error(`Could not load ${libraryName}`));
-          };
-          
-          document.body.appendChild(fallbackScript);
-        } catch (error) {
-          reject(error instanceof Error ? error : new Error(String(error)));
-        }
-      } else {
-        reject(new Error(`Failed to load ${libraryName}`));
-      }
-    };
-
-    document.body.appendChild(script);
-  });
-};
-
-/**
- * Try to dynamically import a module, with fallback to script loading
- */
-export const tryDynamicImport = async (
-  libraryName: string, 
-  importPath: string, 
-  scriptUrl?: string,
-  fallbackUrl?: string
-): Promise<boolean> => {
+export async function initializeApplication(): Promise<void> {
   try {
-    const module = await import(importPath);
-    window[libraryName as keyof Window] = module.default || module;
-    console.log(`Loaded ${libraryName} via dynamic import`);
-    return true;
-  } catch (e) {
-    console.warn(`Dynamic import failed for ${libraryName}, trying script tag approach`);
-    if (scriptUrl) {
-      try {
-        await loadScript(libraryName, scriptUrl, fallbackUrl);
-        return true;
-      } catch (scriptError) {
-        console.error(`Failed to load ${libraryName} via script tag:`, scriptError);
-        return false;
-      }
-    }
-    return false;
-  }
-};
-
-/**
- * Initialize all required cryptographic libraries
- */
-export const initializeLibraries = async (): Promise<void> => {
-  // First check if libraries are already loaded
-  checkAndLogLibraryStatus();
-  
-  // Get the status of available libraries
-  const libStatus = checkBitcoinLibsLoaded();
-  
-  if (!libStatus.loaded) {
-    console.error(`Bitcoin libraries not loaded: Missing ${libStatus.missing.join(', ')}`);
+    console.log("Initializing application...");
     
-    // Try refreshing references to ensure all available libraries are mapped properly
+    // First refresh library references to ensure all available libraries are detected
     refreshLibraryReferences();
-    mapLibraryAliases(window);
     
-    // Second check after refreshing references
-    const updatedStatus = checkBitcoinLibsLoaded();
-    checkAndLogLibraryStatus();
-    
-    if (!updatedStatus.loaded) {
-      console.warn("Creating mock implementations for missing libraries");
-      // Initialize mock implementations for testing and development
-      initializeMockLibraries();
+    // Check if Bitcoin libraries are available
+    const libStatus = areBitcoinLibrariesAvailable();
+    if (!libStatus.available) {
+      console.warn(`Bitcoin libraries not loaded: Missing ${libStatus.missingLibraries.join(', ')}`);
+      // Libraries will be loaded on-demand or lazily later
     }
-  }
-  
-  // Final check of library status
-  const finalStatus = checkBitcoinLibsLoaded();
-  if (!finalStatus.loaded) {
-    console.warn("Some Bitcoin libraries could not be loaded. Limited functionality available.");
-    toast.warning("Crypto libraries not fully loaded. Some features may be limited.");
-  } else {
-    console.log("All Bitcoin libraries successfully loaded");
-  }
-};
-
-/**
- * Initialize the application
- */
-export const initializeApplication = async (): Promise<void> => {
-  try {
-    await initializeLibraries();
-    console.log("Application initialized successfully");
     
-    // Add a delay to ensure all initialization is complete before React hydration
-    await wait(1000);
+    // Initialize database connection if needed
+    // await initializeDatabase();
+    
+    console.log("Application initialization complete");
   } catch (error) {
     console.error("Failed to initialize application:", error);
-    toast.error("Failed to initialize application. Please refresh the page.");
+    throw error;
   }
-};
+}
+
+/**
+ * Load required external libraries dynamically
+ * @returns Promise that resolves when libraries are loaded
+ */
+export async function loadLibraries(): Promise<void> {
+  try {
+    console.log("Loading external libraries...");
+    
+    // Load polyfills if needed
+    await loadPolyfills();
+    
+    // Load cryptocurrency libraries
+    await loadCryptoLibraries();
+    
+    console.log("Libraries loaded successfully");
+  } catch (error) {
+    console.error("Error loading libraries:", error);
+    throw error;
+  }
+}
+
+/**
+ * Load browser polyfills if needed for older browsers
+ */
+async function loadPolyfills(): Promise<void> {
+  // No polyfills needed for modern browsers
+  return Promise.resolve();
+}
+
+/**
+ * Load cryptocurrency libraries required for the application
+ */
+async function loadCryptoLibraries(): Promise<void> {
+  try {
+    const libraries: Record<string, string> = {
+      'bitcoin': 'https://cdn.jsdelivr.net/npm/bitcoinjs-lib@5.2.0/dist/bitcoin.min.js',
+      'bip39': 'https://cdn.jsdelivr.net/npm/bip39@3.1.0/dist/bip39.min.js',
+      'bs58': 'https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.min.js',
+      'secp256k1': 'https://cdn.jsdelivr.net/npm/@noble/secp256k1@1.7.1/dist/secp256k1.min.js'
+    };
+    
+    const loadPromises = Object.entries(libraries).map(async ([name, url]) => {
+      if (!(window as any)[name]) {
+        try {
+          const script = document.createElement('script');
+          script.src = url;
+          script.async = true;
+          
+          const loadPromise = new Promise<void>((resolve, reject) => {
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load ${name} from ${url}`));
+          });
+          
+          document.head.appendChild(script);
+          return loadPromise;
+        } catch (error) {
+          console.error(`Error loading ${name}:`, error);
+          throw error;
+        }
+      }
+    });
+    
+    await Promise.all(loadPromises);
+    
+    // Refresh references after loading
+    refreshLibraryReferences();
+  } catch (error) {
+    console.warn("Error during library loading:", error);
+    throw error;
+  }
+}

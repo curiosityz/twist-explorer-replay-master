@@ -1,147 +1,193 @@
 
-// Private key utility functions
-
-import { hexToBigInt } from './mathUtils';
+import BigInt from 'big-integer';
+import { hexToBigInt, bigIntToHex } from './mathUtils';
+import { curveParams } from './constants';
 
 /**
- * Verifies that a private key is valid for the secp256k1 curve
- * 
- * @param privateKey The private key to verify
- * @param xCoord X coordinate of associated public key (for verification)
- * @param yCoord Y coordinate of associated public key (for verification)
- * @returns True if the private key is valid
+ * Convert a private key to public key
+ * This is a crucial operation for Bitcoin wallet functionality
+ * @param privateKey The private key as a hex string
+ * @param compressed Whether to output compressed format
+ * @returns Public key as { x, y } coordinates
  */
-export function verifyPrivateKey(privateKey: string, xCoord: string, yCoord: string): boolean {
+export const privateKeyToPublicKey = (privateKey: string, compressed = true): { x: string, y: string } => {
+  // Remove '0x' prefix if present
+  const cleanPrivateKey = privateKey.startsWith('0x') ? privateKey.slice(2) : privateKey;
+  
   try {
-    if (!privateKey || privateKey.length === 0) {
-      console.error("Invalid private key: empty");
-      return false;
+    // Check if the key is valid
+    const privKeyBigInt = hexToBigInt(cleanPrivateKey);
+    if (privKeyBigInt.leq(0) || privKeyBigInt.geq(curveParams.n)) {
+      throw new Error('Private key outside allowed range');
     }
 
-    // Clean input and convert to BigInt
-    const key = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
-    const keyBigInt = hexToBigInt(key);
-
-    // Check if the number is within the valid range for secp256k1
-    const N = BigInt('0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141');
-    
-    if (keyBigInt <= BigInt(0) || keyBigInt >= N) {
-      console.error("Private key out of range for secp256k1");
-      return false;
-    }
-
-    // If secp256k1 library is available, verify against provided public key
-    if (window.secp256k1 && xCoord && yCoord) {
-      try {
-        // Normalized inputs
-        const normalizedKey = privateKey.startsWith('0x') ? privateKey.substring(2) : privateKey;
-        let normalizedX = xCoord.startsWith('0x') ? xCoord.substring(2) : xCoord;
-        let normalizedY = yCoord.startsWith('0x') ? yCoord.substring(2) : yCoord;
+    // Use the secp256k1 library if available
+    if (window.secp256k1?.utils?.pointFromScalar) {
+      // Use the native implementation from the secp256k1 library
+      const privateKeyBytes = hexToBytes(cleanPrivateKey);
+      const publicKeyBytes = window.secp256k1.utils.pointFromScalar(privateKeyBytes);
+      
+      if (publicKeyBytes) {
+        // Parse the resulting point
+        const x = bytesToHex(publicKeyBytes.slice(1, 33));
+        const y = bytesToHex(publicKeyBytes.slice(33));
         
-        // Ensure proper length (pad with leading zeros if needed)
-        normalizedX = normalizedX.padStart(64, '0');
-        normalizedY = normalizedY.padStart(64, '0');
-        
-        // Convert to bytes
-        const privateKeyBytes = new Uint8Array(
-          normalizedKey.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-        );
-        
-        // Generate public key from private key using secp256k1
-        const generatedPublicKey = window.secp256k1.publicKeyCreate(privateKeyBytes);
-        
-        // Remove second parameter which is causing TypeScript errors
-        const uncompressedKey = window.secp256k1.publicKeyConvert(generatedPublicKey);
-        
-        // Extract x and y from generated key (format: 04 | x | y)
-        const genX = Array.from(uncompressedKey.slice(1, 33))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-          
-        const genY = Array.from(uncompressedKey.slice(33, 65))
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-        
-        // Compare with provided coordinates
-        const xMatch = normalizedX.toLowerCase() === genX.toLowerCase();
-        const yMatch = normalizedY.toLowerCase() === genY.toLowerCase();
-        
-        if (!xMatch || !yMatch) {
-          console.error("Generated public key doesn't match provided coordinates");
-          return false;
-        }
-        
-        return true;
-      } catch (error) {
-        console.error("Error verifying with secp256k1:", error);
-        // Fall through to basic check
+        return {
+          x: `0x${x}`,
+          y: `0x${y}`
+        };
       }
     }
     
-    // If we can't verify using the library, just check range
-    return true;
+    // Fallback implementation if secp256k1 is not available
+    // Using standard elliptic curve point multiplication: G * privKey
+    
+    // Start with generator point
+    let x = curveParams.Gx;
+    let y = curveParams.Gy;
+    
+    // Binary representation of private key for double-and-add algorithm
+    const keyBits = privKeyBigInt.toString(2).split('').map(Number);
+    
+    // Double-and-add algorithm for scalar multiplication
+    for (let i = 1; i < keyBits.length; i++) {
+      // Double
+      [x, y] = pointDouble(x, y);
+      
+      // Add if bit is 1
+      if (keyBits[i] === 1) {
+        [x, y] = pointAdd(x, y, curveParams.Gx, curveParams.Gy);
+      }
+    }
+    
+    return {
+      x: `0x${x.toString(16).padStart(64, '0')}`,
+      y: `0x${y.toString(16).padStart(64, '0')}`
+    };
   } catch (error) {
-    console.error("Error in private key verification:", error);
-    return false;
+    console.error('Error deriving public key:', error);
+    throw new Error(`Failed to derive public key: ${error.message}`);
   }
+};
+
+/**
+ * Simple function to convert public key to compressed format
+ * @param x X coordinate of public key
+ * @param y Y coordinate of public key
+ * @returns Compressed public key in hex format
+ */
+export const compressPublicKey = (x: string, y: string): string => {
+  try {
+    if (window.secp256k1?.utils?.pointCompress) {
+      const xClean = x.startsWith('0x') ? x.slice(2) : x;
+      const yClean = y.startsWith('0x') ? y.slice(2) : y;
+      
+      // Format as uncompressed first
+      const uncompressedHex = `04${xClean}${yClean}`;
+      const uncompressedBytes = hexToBytes(uncompressedHex);
+      
+      // Then compress using the library
+      const compressedBytes = window.secp256k1.utils.pointCompress(uncompressedBytes);
+      
+      return bytesToHex(compressedBytes);
+    }
+    
+    // Manual compression if library not available
+    const yValue = BigInt(y.startsWith('0x') ? y.slice(2) : y, 16);
+    const prefix = yValue.isOdd() ? '03' : '02';
+    const xHex = (x.startsWith('0x') ? x.slice(2) : x).padStart(64, '0');
+    
+    return prefix + xHex;
+  } catch (error) {
+    console.error("Error compressing public key:", error);
+    throw new Error(`Failed to compress public key: ${error.message}`);
+  }
+};
+
+// Utility function for private key derivation
+function hexToBytes(hex: string): Uint8Array {
+  const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex;
+  const bytes = new Uint8Array(cleanHex.length / 2);
+  
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(cleanHex.substring(i * 2, i * 2 + 2), 16);
+  }
+  
+  return bytes;
 }
 
-/**
- * Derives a public key from a private key
- * 
- * @param privateKey The private key in hex format
- * @returns Object containing the x and y coordinates of the public key
- */
-export function derivePublicKey(privateKey: string): { x: string; y: string } | null {
-  try {
-    if (!privateKey || privateKey.length === 0) {
-      throw new Error("Invalid private key");
-    }
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('');
+}
 
-    // Clean input
-    const normalizedKey = privateKey.startsWith('0x') ? privateKey.substring(2) : privateKey;
-    
-    // Check if secp256k1 library is available
-    if (window.secp256k1) {
-      try {
-        // Convert private key to bytes
-        const privateKeyBytes = new Uint8Array(
-          normalizedKey.match(/.{1,2}/g)?.map(byte => parseInt(byte, 16)) || []
-        );
-        
-        // Generate public key
-        const compressedKey = window.secp256k1.publicKeyCreate(privateKeyBytes);
-        
-        // Convert to uncompressed format - removed second parameter
-        const uncompressedKey = window.secp256k1.publicKeyConvert(compressedKey);
-        
-        // Extract x and y coordinates (format: 04 | x | y)
-        const xBytes = uncompressedKey.slice(1, 33);
-        const yBytes = uncompressedKey.slice(33, 65);
-        
-        const x = Array.from(xBytes)
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-          
-        const y = Array.from(yBytes)
-          .map(b => b.toString(16).padStart(2, '0'))
-          .join('');
-        
-        return { x, y };
-      } catch (error) {
-        console.error("Error deriving public key with secp256k1:", error);
-      }
+// Point operations for elliptic curve
+function pointDouble(x: BigInt, y: BigInt): [BigInt, BigInt] {
+  // Double a point on the curve
+  const p = curveParams.p;
+  const a = curveParams.a;
+  
+  // s = (3x²+ a) / 2y
+  const threeX2 = BigInt.fromJSNumber(3).multiply(x.square()).mod(p);
+  const numerator = threeX2.add(a).mod(p);
+  const denominator = BigInt.fromJSNumber(2).multiply(y).mod(p);
+  const s = numerator.multiply(modInverse(denominator, p)).mod(p);
+  
+  // x' = s² - 2x
+  const xNew = s.square().subtract(BigInt.fromJSNumber(2).multiply(x)).mod(p);
+  
+  // y' = s(x-x') - y
+  const yNew = s.multiply(x.subtract(xNew)).subtract(y).mod(p);
+  
+  return [xNew, yNew];
+}
+
+function pointAdd(x1: BigInt, y1: BigInt, x2: BigInt, y2: BigInt): [BigInt, BigInt] {
+  // Add two points on the curve
+  const p = curveParams.p;
+  
+  // Check for special cases
+  if (x1.eq(0) && y1.eq(0)) return [x2, y2];
+  if (x2.eq(0) && y2.eq(0)) return [x1, y1];
+  
+  if (x1.eq(x2)) {
+    if (y1.eq(y2)) {
+      return pointDouble(x1, y1);
     }
-    
-    // Fallback for testing (this would not be secure in production)
-    console.warn("Using fallback public key derivation - not secure!");
-    const mockX = "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
-    const mockY = "483ada7726a3c4655da4fbfc0e1108a8fd17b448a68554199c47d08ffb10d4b8";
-    
-    return { x: mockX, y: mockY };
-    
-  } catch (error) {
-    console.error("Failed to derive public key:", error);
-    return null;
+    // P + (-P) = O (point at infinity)
+    return [BigInt(0), BigInt(0)];
   }
+  
+  // s = (y2 - y1) / (x2 - x1)
+  const numerator = y2.subtract(y1).mod(p);
+  const denominator = x2.subtract(x1).mod(p);
+  const s = numerator.multiply(modInverse(denominator, p)).mod(p);
+  
+  // x3 = s² - x1 - x2
+  const x3 = s.square().subtract(x1).subtract(x2).mod(p);
+  
+  // y3 = s(x1 - x3) - y1
+  const y3 = s.multiply(x1.subtract(x3)).subtract(y1).mod(p);
+  
+  return [x3, y3];
+}
+
+function modInverse(a: BigInt, m: BigInt): BigInt {
+  // Extended Euclidean algorithm for modular inverse
+  let [old_r, r] = [a, m];
+  let [old_s, s] = [BigInt(1), BigInt(0)];
+  
+  while (!r.eq(0)) {
+    const quotient = old_r.divide(r);
+    [old_r, r] = [r, old_r.subtract(quotient.multiply(r))];
+    [old_s, s] = [s, old_s.subtract(quotient.multiply(s))];
+  }
+  
+  // Make sure old_r = gcd(a,m) = 1
+  if (!old_r.eq(1)) {
+    throw new Error('Modular inverse does not exist');
+  }
+  
+  return old_s.mod(m).add(m).mod(m); // Ensure result is positive
 }
