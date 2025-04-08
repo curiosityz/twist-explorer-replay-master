@@ -92,7 +92,7 @@ export const compressPublicKey = (x: string, y: string): string => {
     }
     
     // Manual compression if library not available
-    const yValue = BigInt(y.startsWith('0x') ? y.slice(2) : y, 16);
+    const yValue = BigInt(y.startsWith('0x') ? y : `0x${y}`);
     const prefix = yValue % 2n === 1n ? '03' : '02';
     const xHex = (x.startsWith('0x') ? x.slice(2) : x).padStart(64, '0');
     

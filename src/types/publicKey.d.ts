@@ -3,10 +3,10 @@
  * Type definitions for public key objects
  */
 
-interface PublicKey {
+export interface PublicKey {
   x: string;
   y: string;
-  isOnCurve?: boolean;
+  isOnCurve: boolean;
 }
 
 declare global {
