@@ -3,6 +3,7 @@
  */
 
 import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
+import { validatePrivateKey } from './keyUtils';
 
 /**
  * Check if a string is a valid WIF (Wallet Import Format) private key
@@ -117,6 +118,11 @@ export const wifToPrivateKey = (wif: string): string | null => {
     // Basic validation of the extracted key
     if (privateKeyHex.length !== 64 || !/^[0-9a-f]+$/i.test(privateKeyHex)) {
       throw new Error("Invalid private key hex format after extraction");
+    }
+    
+    // Validate the private key
+    if (!validatePrivateKey(privateKeyHex)) {
+      throw new Error("Invalid private key after extraction");
     }
     
     return privateKeyHex;

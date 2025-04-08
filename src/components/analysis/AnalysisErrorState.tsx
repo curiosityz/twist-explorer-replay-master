@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { XCircle, RefreshCw, Settings, Globe, KeySquare, Database, Search, FileCode, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';

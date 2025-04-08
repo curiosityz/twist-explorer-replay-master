@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Check, Copy, Cpu } from 'lucide-react';
@@ -130,6 +129,32 @@ const AnalysisResultDisplay: React.FC<AnalysisResultDisplayProps> = ({
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {analysisResult.nonceReuse && (
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-crypto-foreground/70">
+            Nonce Reuse Detected
+          </div>
+          <div className="bg-crypto-background p-2 rounded">
+            <div className="text-xs font-mono">
+              {analysisResult.nonceReuse}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {analysisResult.weakSignature && (
+        <div className="space-y-2">
+          <div className="text-xs font-medium text-crypto-foreground/70">
+            Weak Signature Detected
+          </div>
+          <div className="bg-crypto-background p-2 rounded">
+            <div className="text-xs font-mono">
+              {analysisResult.weakSignature}
+            </div>
+          </div>
         </div>
       )}
     </div>

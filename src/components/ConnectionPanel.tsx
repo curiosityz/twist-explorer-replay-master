@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -40,12 +39,15 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
     setIsLoading(true);
     setError(null);
 
-    // In a real application, we would actually try to connect to the node here
-    // For this demo, we'll simulate a connection after a short delay
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Simulate a connection attempt
+      await new Promise((resolve, reject) => setTimeout(resolve, 1500));
       onConnect({ ...formData, connected: true });
-    }, 1500);
+    } catch (err) {
+      setError('Failed to connect to the node. Please check your configuration.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

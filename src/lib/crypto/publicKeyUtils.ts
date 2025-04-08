@@ -3,6 +3,7 @@
  */
 
 import { checkBitcoinLibsLoaded } from './bitcoinLibsCheck';
+import { isPointOnCurve } from './curveOperations';
 
 /**
  * Create compressed public key from x and y coordinates

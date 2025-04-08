@@ -1,4 +1,3 @@
-
 /**
  * Mathematical utilities for cryptographic operations
  */

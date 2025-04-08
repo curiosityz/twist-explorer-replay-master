@@ -1,4 +1,3 @@
-
 import { Shield, Unlock, Key, Check, AlertCircle } from 'lucide-react';
 import { Bitcoin } from 'lucide-react';
 import { CryptographicPoint } from '@/types';
@@ -21,6 +20,15 @@ export function AnalysisTab({
     return (
       <div className="text-center py-6 text-crypto-foreground/70">
         No analysis data available for this transaction
+      </div>
+    );
+  }
+
+  // Validate totalInputValue
+  if (isNaN(totalInputValue) || totalInputValue < 0) {
+    return (
+      <div className="text-center py-6 text-crypto-foreground/70">
+        Invalid total input value
       </div>
     );
   }
@@ -138,6 +146,30 @@ export function AnalysisTab({
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {analysis.nonce_reuse && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium mb-2">Nonce Reuse Detected</h3>
+          <div className="bg-crypto-background rounded-md p-4 font-mono text-xs space-y-2">
+            <div>
+              <span className="text-crypto-accent">Nonce Reuse: </span>
+              <span>{analysis.nonce_reuse}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {analysis.weak_signature && (
+        <div className="mb-6">
+          <h3 className="text-sm font-medium mb-2">Weak Signature Detected</h3>
+          <div className="bg-crypto-background rounded-md p-4 font-mono text-xs space-y-2">
+            <div>
+              <span className="text-crypto-accent">Weak Signature: </span>
+              <span>{analysis.weak_signature}</span>
+            </div>
+          </div>
         </div>
       )}
     </>

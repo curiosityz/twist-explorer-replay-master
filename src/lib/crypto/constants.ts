@@ -1,4 +1,3 @@
-
 /**
  * Constants for elliptic curve cryptography operations
  */

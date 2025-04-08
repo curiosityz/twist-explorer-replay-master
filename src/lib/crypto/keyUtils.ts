@@ -1,4 +1,3 @@
-
 /**
  * Utilities for key handling, verification, and normalization
  */
