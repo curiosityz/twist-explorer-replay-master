@@ -94,6 +94,7 @@ async function loadCryptoLibraries(): Promise<void> {
           throw error;
         }
       }
+      return Promise.resolve();
     });
     
     await Promise.all(loadPromises);

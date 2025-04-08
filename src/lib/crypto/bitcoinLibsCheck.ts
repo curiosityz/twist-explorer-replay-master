@@ -21,7 +21,7 @@ export function areBitcoinLibrariesAvailable() {
  * @returns Object with loaded status and missing libraries
  */
 export function checkBitcoinLibsLoaded() {
-  const requiredLibraries = ['Bitcoin', 'bip39', 'bs58', 'secp256k1'];
+  const requiredLibraries = ['Bitcoin', 'bip39', 'bs58', 'bech32', 'secp256k1', 'bitcoinMessage', 'bitcoinAddressValidation'];
   const missingLibraries = requiredLibraries.filter(lib => !(window as any)[lib]);
   
   return {

@@ -1,5 +1,4 @@
 
-import BigInt from 'big-integer';
 import { hexToBigInt, bigIntToHex } from './mathUtils';
 import { curveParams } from './constants';
 
@@ -17,7 +16,7 @@ export const privateKeyToPublicKey = (privateKey: string, compressed = true): { 
   try {
     // Check if the key is valid
     const privKeyBigInt = hexToBigInt(cleanPrivateKey);
-    if (privKeyBigInt.lesser(0) || privKeyBigInt.greater(curveParams.n)) {
+    if (privKeyBigInt < 0n || privKeyBigInt > curveParams.n) {
       throw new Error('Private key outside allowed range');
     }
 
@@ -94,7 +93,7 @@ export const compressPublicKey = (x: string, y: string): string => {
     
     // Manual compression if library not available
     const yValue = BigInt(y.startsWith('0x') ? y.slice(2) : y, 16);
-    const prefix = yValue.isOdd() ? '03' : '02';
+    const prefix = yValue % 2n === 1n ? '03' : '02';
     const xHex = (x.startsWith('0x') ? x.slice(2) : x).padStart(64, '0');
     
     return prefix + xHex;
@@ -123,71 +122,71 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 // Point operations for elliptic curve
-function pointDouble(x: BigInt.BigInteger, y: BigInt.BigInteger): [BigInt.BigInteger, BigInt.BigInteger] {
+function pointDouble(x: bigint, y: bigint): [bigint, bigint] {
   // Double a point on the curve
   const p = curveParams.p;
   const a = curveParams.a;
   
   // s = (3x²+ a) / 2y
-  const threeX2 = BigInt(3).multiply(x.square()).mod(p);
-  const numerator = threeX2.add(a).mod(p);
-  const denominator = BigInt(2).multiply(y).mod(p);
-  const s = numerator.multiply(modInverse(denominator, p)).mod(p);
+  const threeX2 = (3n * x * x) % p;
+  const numerator = (threeX2 + a) % p;
+  const denominator = (2n * y) % p;
+  const s = (numerator * modInverse(denominator, p)) % p;
   
   // x' = s² - 2x
-  const xNew = s.square().subtract(BigInt(2).multiply(x)).mod(p);
+  const xNew = (s * s - 2n * x) % p;
   
   // y' = s(x-x') - y
-  const yNew = s.multiply(x.subtract(xNew)).subtract(y).mod(p);
+  const yNew = (s * (x - xNew) - y) % p;
   
   return [xNew, yNew];
 }
 
-function pointAdd(x1: BigInt.BigInteger, y1: BigInt.BigInteger, x2: BigInt.BigInteger, y2: BigInt.BigInteger): [BigInt.BigInteger, BigInt.BigInteger] {
+function pointAdd(x1: bigint, y1: bigint, x2: bigint, y2: bigint): [bigint, bigint] {
   // Add two points on the curve
   const p = curveParams.p;
   
   // Check for special cases
-  if (x1.equals(0) && y1.equals(0)) return [x2, y2];
-  if (x2.equals(0) && y2.equals(0)) return [x1, y1];
+  if (x1 === 0n && y1 === 0n) return [x2, y2];
+  if (x2 === 0n && y2 === 0n) return [x1, y1];
   
-  if (x1.equals(x2)) {
-    if (y1.equals(y2)) {
+  if (x1 === x2) {
+    if (y1 === y2) {
       return pointDouble(x1, y1);
     }
     // P + (-P) = O (point at infinity)
-    return [BigInt(0), BigInt(0)];
+    return [0n, 0n];
   }
   
   // s = (y2 - y1) / (x2 - x1)
-  const numerator = y2.subtract(y1).mod(p);
-  const denominator = x2.subtract(x1).mod(p);
-  const s = numerator.multiply(modInverse(denominator, p)).mod(p);
+  const numerator = (y2 - y1) % p;
+  const denominator = (x2 - x1) % p;
+  const s = (numerator * modInverse(denominator, p)) % p;
   
   // x3 = s² - x1 - x2
-  const x3 = s.square().subtract(x1).subtract(x2).mod(p);
+  const x3 = (s * s - x1 - x2) % p;
   
   // y3 = s(x1 - x3) - y1
-  const y3 = s.multiply(x1.subtract(x3)).subtract(y1).mod(p);
+  const y3 = (s * (x1 - x3) - y1) % p;
   
   return [x3, y3];
 }
 
-function modInverse(a: BigInt.BigInteger, m: BigInt.BigInteger): BigInt.BigInteger {
+function modInverse(a: bigint, m: bigint): bigint {
   // Extended Euclidean algorithm for modular inverse
   let [old_r, r] = [a, m];
-  let [old_s, s] = [BigInt(1), BigInt(0)];
+  let [old_s, s] = [1n, 0n];
   
-  while (!r.equals(0)) {
-    const quotient = old_r.divide(r);
-    [old_r, r] = [r, old_r.subtract(quotient.multiply(r))];
-    [old_s, s] = [s, old_s.subtract(quotient.multiply(s))];
+  while (r !== 0n) {
+    const quotient = old_r / r;
+    [old_r, r] = [r, old_r - quotient * r];
+    [old_s, s] = [s, old_s - quotient * s];
   }
   
   // Make sure old_r = gcd(a,m) = 1
-  if (!old_r.equals(1)) {
+  if (old_r !== 1n) {
     throw new Error('Modular inverse does not exist');
   }
   
-  return old_s.mod(m).add(m).mod(m); // Ensure result is positive
+  return (old_s % m + m) % m; // Ensure result is positive
 }

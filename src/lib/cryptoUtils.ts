@@ -65,4 +65,3 @@ export {
   saveKeyFragments,
   fetchKeyFragmentsForPublicKey
 } from './vulnerability';
-
