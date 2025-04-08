@@ -1,7 +1,25 @@
 
 /**
  * Utility functions for working with Bitcoin libraries
+ * This file re-exports all Bitcoin-related utilities
  */
+
+// Re-export address utilities
+export { 
+  isValidBitcoinAddress,
+  validateBitcoinAddress,
+  wifToPrivateKey
+} from './addressUtils';
+
+// Re-export signature utilities  
+export { decodeDERSignature } from './signatureUtils';
+
+// Re-export public key utilities
+export { 
+  isPointOnSecp256k1Curve,
+  createCompressedPublicKey,
+  decompressPublicKey
+} from './publicKeyUtils';
 
 /**
  * Map library aliases to their primary names

@@ -8,7 +8,7 @@ import {
   initializeMockLibraries 
 } from './crypto/bitcoin-libs';
 import { checkAndLogLibraryStatus } from './crypto/bitcoin-libs/logging';
-import { refreshLibraryReferences } from './crypto/bitcoinLibsCheck';
+import { refreshLibraryReferences } from './crypto/bitcoin-libs'; 
 import { mapLibraryAliases } from './crypto/bitcoinUtilities';
 
 // Wait for a specific duration
@@ -53,7 +53,7 @@ export const loadScript = (libraryName: string, url: string, fallbackUrl?: strin
           
           document.body.appendChild(fallbackScript);
         } catch (error) {
-          reject(error);
+          reject(error instanceof Error ? error : new Error(String(error)));
         }
       } else {
         reject(new Error(`Failed to load ${libraryName}`));
@@ -72,7 +72,7 @@ export const tryDynamicImport = async (
   importPath: string, 
   scriptUrl?: string,
   fallbackUrl?: string
-) => {
+): Promise<boolean> => {
   try {
     const module = await import(importPath);
     window[libraryName as keyof Window] = module.default || module;
@@ -115,7 +115,7 @@ export const initializeLibraries = async (): Promise<void> => {
     checkAndLogLibraryStatus();
     
     if (!updatedStatus.loaded) {
-      console.warning("Creating mock implementations for missing libraries");
+      console.warn("Creating mock implementations for missing libraries");
       // Initialize mock implementations for testing and development
       initializeMockLibraries();
     }

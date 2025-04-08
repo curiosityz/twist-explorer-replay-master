@@ -112,8 +112,7 @@ export function derivePublicKey(privateKey: string): { x: string; y: string } | 
         // Generate public key
         const compressedKey = window.secp256k1.publicKeyCreate(privateKeyBytes);
         
-        // Convert to uncompressed format
-        // Remove second parameter which is causing TypeScript errors
+        // Convert to uncompressed format - removed second parameter
         const uncompressedKey = window.secp256k1.publicKeyConvert(compressedKey);
         
         // Extract x and y coordinates (format: 04 | x | y)

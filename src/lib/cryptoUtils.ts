@@ -45,7 +45,7 @@ export {
   factorize
 } from './crypto/factorize';
 
-// Export Bitcoin-specific utilities from their new modules
+// Export Bitcoin-specific utilities properly
 export {
   isValidBitcoinAddress,
   validateBitcoinAddress,

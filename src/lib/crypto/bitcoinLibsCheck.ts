@@ -4,8 +4,17 @@
  */
 
 import { checkBitcoinLibsLoaded } from './bitcoin-libs/check-status';
-import { refreshLibraryReferences } from './bitcoin-libs';
+import { refreshLibraryReferences as refreshReferences } from './bitcoin-libs';
 import { mapLibraryAliases } from './bitcoinUtilities';
+
+/**
+ * Refresh library references to ensure all available libraries are found
+ */
+export const refreshLibraryReferences = (): void => {
+  // Map library aliases to their primary names
+  refreshReferences();
+  mapLibraryAliases(window);
+};
 
 /**
  * Check if all required Bitcoin libraries are loaded
@@ -17,7 +26,6 @@ export function areBitcoinLibrariesAvailable(): {
 } {
   // First refresh library mappings to ensure all available libraries are found
   refreshLibraryReferences();
-  mapLibraryAliases(window);
   
   // Then check if libraries are loaded
   const status = checkBitcoinLibsLoaded();
@@ -27,3 +35,6 @@ export function areBitcoinLibrariesAvailable(): {
     missingLibraries: status.missing
   };
 }
+
+// Re-export the check function for compatibility
+export { checkBitcoinLibsLoaded } from './bitcoin-libs/check-status';
