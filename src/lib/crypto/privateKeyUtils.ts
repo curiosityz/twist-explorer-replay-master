@@ -17,7 +17,7 @@ export const privateKeyToPublicKey = (privateKey: string, compressed = true): { 
   try {
     // Check if the key is valid
     const privKeyBigInt = hexToBigInt(cleanPrivateKey);
-    if (privKeyBigInt.leq(0) || privKeyBigInt.geq(curveParams.n)) {
+    if (privKeyBigInt.lesser(0) || privKeyBigInt.greater(curveParams.n)) {
       throw new Error('Private key outside allowed range');
     }
 
@@ -123,19 +123,19 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 // Point operations for elliptic curve
-function pointDouble(x: BigInt, y: BigInt): [BigInt, BigInt] {
+function pointDouble(x: BigInt.BigInteger, y: BigInt.BigInteger): [BigInt.BigInteger, BigInt.BigInteger] {
   // Double a point on the curve
   const p = curveParams.p;
   const a = curveParams.a;
   
   // s = (3x²+ a) / 2y
-  const threeX2 = BigInt.fromJSNumber(3).multiply(x.square()).mod(p);
+  const threeX2 = BigInt(3).multiply(x.square()).mod(p);
   const numerator = threeX2.add(a).mod(p);
-  const denominator = BigInt.fromJSNumber(2).multiply(y).mod(p);
+  const denominator = BigInt(2).multiply(y).mod(p);
   const s = numerator.multiply(modInverse(denominator, p)).mod(p);
   
   // x' = s² - 2x
-  const xNew = s.square().subtract(BigInt.fromJSNumber(2).multiply(x)).mod(p);
+  const xNew = s.square().subtract(BigInt(2).multiply(x)).mod(p);
   
   // y' = s(x-x') - y
   const yNew = s.multiply(x.subtract(xNew)).subtract(y).mod(p);
@@ -143,16 +143,16 @@ function pointDouble(x: BigInt, y: BigInt): [BigInt, BigInt] {
   return [xNew, yNew];
 }
 
-function pointAdd(x1: BigInt, y1: BigInt, x2: BigInt, y2: BigInt): [BigInt, BigInt] {
+function pointAdd(x1: BigInt.BigInteger, y1: BigInt.BigInteger, x2: BigInt.BigInteger, y2: BigInt.BigInteger): [BigInt.BigInteger, BigInt.BigInteger] {
   // Add two points on the curve
   const p = curveParams.p;
   
   // Check for special cases
-  if (x1.eq(0) && y1.eq(0)) return [x2, y2];
-  if (x2.eq(0) && y2.eq(0)) return [x1, y1];
+  if (x1.equals(0) && y1.equals(0)) return [x2, y2];
+  if (x2.equals(0) && y2.equals(0)) return [x1, y1];
   
-  if (x1.eq(x2)) {
-    if (y1.eq(y2)) {
+  if (x1.equals(x2)) {
+    if (y1.equals(y2)) {
       return pointDouble(x1, y1);
     }
     // P + (-P) = O (point at infinity)
@@ -173,19 +173,19 @@ function pointAdd(x1: BigInt, y1: BigInt, x2: BigInt, y2: BigInt): [BigInt, BigI
   return [x3, y3];
 }
 
-function modInverse(a: BigInt, m: BigInt): BigInt {
+function modInverse(a: BigInt.BigInteger, m: BigInt.BigInteger): BigInt.BigInteger {
   // Extended Euclidean algorithm for modular inverse
   let [old_r, r] = [a, m];
   let [old_s, s] = [BigInt(1), BigInt(0)];
   
-  while (!r.eq(0)) {
+  while (!r.equals(0)) {
     const quotient = old_r.divide(r);
     [old_r, r] = [r, old_r.subtract(quotient.multiply(r))];
     [old_s, s] = [s, old_s.subtract(quotient.multiply(s))];
   }
   
   // Make sure old_r = gcd(a,m) = 1
-  if (!old_r.eq(1)) {
+  if (!old_r.equals(1)) {
     throw new Error('Modular inverse does not exist');
   }
   

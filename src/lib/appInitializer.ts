@@ -4,7 +4,7 @@
  */
 
 // Import the refresh function from bitcoinLibsCheck
-import { areBitcoinLibrariesAvailable, refreshLibraryReferences } from './crypto/bitcoinLibsCheck';
+import { areBitcoinLibrariesAvailable, refreshBitcoinLibraries } from './crypto/bitcoinLibsCheck';
 
 /**
  * Initialize all required libraries and dependencies for the application
@@ -15,7 +15,7 @@ export async function initializeApplication(): Promise<void> {
     console.log("Initializing application...");
     
     // First refresh library references to ensure all available libraries are detected
-    refreshLibraryReferences();
+    refreshBitcoinLibraries();
     
     // Check if Bitcoin libraries are available
     const libStatus = areBitcoinLibrariesAvailable();
@@ -99,7 +99,7 @@ async function loadCryptoLibraries(): Promise<void> {
     await Promise.all(loadPromises);
     
     // Refresh references after loading
-    refreshLibraryReferences();
+    refreshBitcoinLibraries();
   } catch (error) {
     console.warn("Error during library loading:", error);
     throw error;

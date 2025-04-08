@@ -1,40 +1,60 @@
 
 /**
- * Check Bitcoin library availability
+ * Utility to check if Bitcoin libraries are loaded and available
  */
-
-import { checkBitcoinLibsLoaded } from './bitcoin-libs/check-status';
-import { refreshLibraryReferences as refreshReferences } from './bitcoin-libs';
-import { mapLibraryAliases } from './bitcoinUtilities';
 
 /**
- * Refresh library references to ensure all available libraries are found
+ * Check if Bitcoin libraries are loaded and available
  */
-export const refreshLibraryReferences = (): void => {
-  // Map library aliases to their primary names
-  refreshReferences();
-  mapLibraryAliases(window);
-};
-
-/**
- * Check if all required Bitcoin libraries are loaded
- * @returns Object containing loaded status and missing libraries
- */
-export function areBitcoinLibrariesAvailable(): { 
-  available: boolean;
-  missingLibraries: string[];
-} {
-  // First refresh library mappings to ensure all available libraries are found
-  refreshLibraryReferences();
-  
-  // Then check if libraries are loaded
-  const status = checkBitcoinLibsLoaded();
+export function areBitcoinLibrariesAvailable() {
+  const requiredLibraries = ['Bitcoin', 'bip39', 'bs58', 'secp256k1'];
+  const missingLibraries = requiredLibraries.filter(lib => !(window as any)[lib]);
   
   return {
-    available: status.loaded,
-    missingLibraries: status.missing
+    available: missingLibraries.length === 0,
+    missingLibraries
   };
 }
 
-// Re-export the check function for compatibility
-export { checkBitcoinLibsLoaded } from './bitcoin-libs/check-status';
+/**
+ * Check if specific Bitcoin libraries are loaded
+ * @returns Object with loaded status and missing libraries
+ */
+export function checkBitcoinLibsLoaded() {
+  const requiredLibraries = ['Bitcoin', 'bip39', 'bs58', 'secp256k1'];
+  const missingLibraries = requiredLibraries.filter(lib => !(window as any)[lib]);
+  
+  return {
+    loaded: missingLibraries.length === 0,
+    missing: missingLibraries
+  };
+}
+
+/**
+ * Refresh references to Bitcoin libraries
+ * This is useful after dynamically loading libraries
+ */
+export function refreshBitcoinLibraries() {
+  // If there are alternative names for libraries, map them
+  if (!window.Bitcoin && (window.bitcoin || window.bitcoinjs)) {
+    window.Bitcoin = window.bitcoin || window.bitcoinjs;
+    console.log("Mapped bitcoinjs to window.Bitcoin");
+  }
+  
+  // Map noble-secp256k1 to window.secp256k1 if needed
+  if (!window.secp256k1 && window.nobleSecp256k1) {
+    window.secp256k1 = window.nobleSecp256k1;
+    console.log("Mapped noble-secp256k1 to window.secp256k1");
+  }
+  
+  // Check what's available
+  const libs = {
+    bitcoin: !!window.Bitcoin || !!window.bitcoin,
+    bip39: !!window.bip39,
+    bs58: !!window.bs58,
+    secp256k1: !!window.secp256k1,
+  };
+  
+  console.log("Bitcoin libraries availability:", libs);
+  return libs;
+}

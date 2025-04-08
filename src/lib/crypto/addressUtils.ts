@@ -57,3 +57,41 @@ export const isValidBitcoinAddress = (
 
 // For backward compatibility
 export const validateBitcoinAddress = isValidBitcoinAddress;
+
+/**
+ * Convert a wallet import format (WIF) private key to hex format
+ * @param wif WIF format private key string
+ * @returns Hex format private key or null if invalid
+ */
+export const wifToPrivateKey = (wif: string): string | null => {
+  try {
+    // Check if bs58 is available
+    if (window.bs58) {
+      // Decode the base58 WIF string
+      const decoded = window.bs58.decode(wif);
+      
+      // Check if it's a valid WIF (should be either 33 or 34 bytes)
+      if (decoded.length !== 33 && decoded.length !== 34) {
+        console.error("Invalid WIF length");
+        return null;
+      }
+      
+      // Skip version byte (first) and checksum (last 4 bytes if compressed)
+      // For compressed keys, also skip the compression flag
+      const privateKeyBytes = decoded.length === 34 ? 
+        decoded.slice(1, 33) : // Compressed key
+        decoded.slice(1, 33);  // Uncompressed key
+      
+      // Convert to hex
+      return Array.from(privateKeyBytes)
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+    } else {
+      console.error("bs58 library not available for WIF decoding");
+      return null;
+    }
+  } catch (error) {
+    console.error("Error decoding WIF:", error);
+    return null;
+  }
+};

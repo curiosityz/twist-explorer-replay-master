@@ -45,7 +45,7 @@ export {
   factorize
 } from './crypto/factorize';
 
-// Export Bitcoin-specific utilities properly
+// Export Bitcoin-specific utilities from bitcoinUtilities
 export {
   isValidBitcoinAddress,
   validateBitcoinAddress,
@@ -65,3 +65,4 @@ export {
   saveKeyFragments,
   fetchKeyFragmentsForPublicKey
 } from './vulnerability';
+

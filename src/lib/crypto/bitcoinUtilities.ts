@@ -9,7 +9,7 @@ export {
   isValidBitcoinAddress,
   validateBitcoinAddress,
   wifToPrivateKey
-} from './addressUtils';
+} from './addressUtils/index';
 
 // Re-export signature utilities  
 export { decodeDERSignature } from './signatureUtils';
