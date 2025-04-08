@@ -9,7 +9,10 @@ export { REQUIRED_LIBRARIES, LIBRARY_ALIASES } from './types';
 export { initializeMockLibraries } from './mock-libs';
 export { checkAndLogLibraryStatus } from './logging';
 
-// Add these utility functions for backwards compatibility
+/**
+ * Map library aliases to their primary names
+ * @param window The global window object
+ */
 export const mapLibraryAliases = (window: Window): void => {
   // Map library aliases to their primary names
   if (!window.Bitcoin && (window.bitcoin || window.bitcoinjs)) {
@@ -23,12 +26,19 @@ export const mapLibraryAliases = (window: Window): void => {
   }
 };
 
+/**
+ * Refresh references to ensure all available libraries are properly mapped
+ */
 export const refreshLibraryReferences = (): void => {
   // Refresh references to ensure all available libraries are properly mapped
   mapLibraryAliases(window);
   console.log("Library references refreshed");
 };
 
+/**
+ * Check which required libraries are missing
+ * @returns Array of missing library names
+ */
 export const checkRequiredLibraries = (): string[] => {
   const { REQUIRED_LIBRARIES, LIBRARY_ALIASES } = require('./types');
   
@@ -44,6 +54,10 @@ export const checkRequiredLibraries = (): string[] => {
   });
 };
 
+/**
+ * Handle missing libraries by creating mocks as needed
+ * @param missingLibs Array of missing library names
+ */
 export const handleMissingLibraries = (missingLibs: string[]): void => {
   if (missingLibs.length > 0) {
     console.warn(`Missing libraries: ${missingLibs.join(', ')}`);

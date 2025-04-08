@@ -21,14 +21,14 @@
     <script type="importmap">
     {
       "imports": {
-        "@noble/secp256k1": "https://cdn.skypack.dev/@noble/secp256k1",
-        "bs58": "https://cdn.skypack.dev/bs58",
-        "bip39": "https://cdn.skypack.dev/bip39",
-        "bech32": "https://cdn.skypack.dev/bech32",
-        "bitcoinjs-message": "https://cdn.skypack.dev/bitcoinjs-message",
-        "bitcoin-ops": "https://cdn.skypack.dev/bitcoin-ops",
-        "bitcoin-address-validation": "https://cdn.skypack.dev/bitcoin-address-validation",
-        "bitcoinjs-lib": "https://cdn.skypack.dev/bitcoinjs-lib"
+        "@noble/secp256k1": "https://esm.sh/@noble/secp256k1",
+        "bs58": "https://esm.sh/bs58",
+        "bip39": "https://esm.sh/bip39",
+        "bech32": "https://esm.sh/bech32",
+        "bitcoinjs-message": "https://esm.sh/bitcoinjs-message",
+        "bitcoin-ops": "https://esm.sh/bitcoin-ops",
+        "bitcoin-address-validation": "https://esm.sh/bitcoin-address-validation",
+        "bitcoinjs-lib": "https://esm.sh/bitcoinjs-lib"
       }
     }
     </script>
@@ -64,33 +64,33 @@
           
           // Load bs58
           const bs58Module = await import('bs58');
-          window.bs58 = bs58Module;
+          window.bs58 = bs58Module.default || bs58Module;
           markLibLoaded('bs58');
           
           // Load bip39
           const bip39Module = await import('bip39');
-          window.bip39 = bip39Module;
+          window.bip39 = bip39Module.default || bip39Module;
           markLibLoaded('bip39');
           
           // Load bech32
           const bech32Module = await import('bech32');
-          window.bech32 = bech32Module;
+          window.bech32 = bech32Module.default || bech32Module;
           markLibLoaded('bech32');
           
           // Load bitcoinjs-message
           const bitcoinMessageModule = await import('bitcoinjs-message');
-          window.bitcoinMessage = bitcoinMessageModule;
+          window.bitcoinMessage = bitcoinMessageModule.default || bitcoinMessageModule;
           markLibLoaded('bitcoinMessage');
           
           // Load bitcoin-address-validation
           const validationModule = await import('bitcoin-address-validation');
-          window.bitcoinAddressValidation = window.validate = validationModule.default;
+          window.bitcoinAddressValidation = window.validate = validationModule.default || validationModule;
           markLibLoaded('bitcoinAddressValidation');
           
           // Load bitcoinjs-lib (last since it's the largest)
           try {
             const bitcoinModule = await import('bitcoinjs-lib');
-            window.Bitcoin = window.bitcoin = window.bitcoinjs = bitcoinModule;
+            window.Bitcoin = window.bitcoin = window.bitcoinjs = bitcoinModule.default || bitcoinModule;
             markLibLoaded('bitcoin');
             console.log("All libraries loaded successfully!");
           } catch (e) {
