@@ -19,7 +19,8 @@ export const initializeMockLibraries = (): void => {
     (window as any).bs58 = {
       encode: (data: Uint8Array): string => {
         // Basic encode to base58 format (simplified)
-        return Buffer.from(data).toString('base64');
+        const base64 = Buffer.from(data).toString('base64');
+        return base64.replace(/[+/]/g, '').replace(/=/g, '');
       },
       decode: (str: string): Uint8Array => {
         // Return empty array as fallback
@@ -35,9 +36,10 @@ export const initializeMockLibraries = (): void => {
       generateMnemonic: (): string => {
         return "mock mnemonic words for testing only";
       },
-      mnemonicToSeedSync: (mnemonic: string): Buffer => {
-        return Buffer.from(new Uint8Array(64).fill(1));
-      }
+      mnemonicToSeedSync: (mnemonic: string): Uint8Array => {
+        return new Uint8Array(64).fill(1);
+      },
+      validateMnemonic: (): boolean => true
     };
   }
   
@@ -49,7 +51,9 @@ export const initializeMockLibraries = (): void => {
       },
       encode: (prefix: string, words: number[]): string => {
         return "bc1qmockaddress";
-      }
+      },
+      toWords: (bytes: Uint8Array): number[] => [],
+      fromWords: (words: number[]): Uint8Array => new Uint8Array()
     };
   }
   
@@ -70,6 +74,7 @@ export const initializeMockLibraries = (): void => {
     (window as any).bitcoinAddressValidation = (address: string): boolean => {
       return true;
     };
+    (window as any).validate = (window as any).bitcoinAddressValidation;
   }
   
   if (!window.secp256k1) {
@@ -102,6 +107,10 @@ export const initializeMockLibraries = (): void => {
       ecdsaVerify: () => true,
       publicKeyVerify: () => true
     };
+    
+    // Add aliases
+    (window as any).nobleSecp256k1 = (window as any).secp256k1;
+    (window as any).secp = (window as any).secp256k1;
   }
   
   if (!window.Bitcoin) {
@@ -162,6 +171,10 @@ export const initializeMockLibraries = (): void => {
         fromHex: () => BigInt(1)
       }
     };
+    
+    // Add aliases
+    (window as any).bitcoin = (window as any).Bitcoin;
+    (window as any).bitcoinjs = (window as any).Bitcoin;
   }
   
   console.info("Mock libraries initialized");

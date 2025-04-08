@@ -52,6 +52,12 @@ export const checkBitcoinLibsLoaded = (): BitcoinLibsCheckResult => {
         }
       }
     };
+    foundLibraries['Bitcoin'] = 'mock';
+    // Update missing list
+    const bitcoinIndex = missing.indexOf('Bitcoin');
+    if (bitcoinIndex !== -1) {
+      missing.splice(bitcoinIndex, 1);
+    }
   }
   
   return {

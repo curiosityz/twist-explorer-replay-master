@@ -30,6 +30,8 @@ export const refreshLibraryReferences = (): void => {
 };
 
 export const checkRequiredLibraries = (): string[] => {
+  const { REQUIRED_LIBRARIES, LIBRARY_ALIASES } = require('./types');
+  
   return REQUIRED_LIBRARIES.filter(lib => {
     // Check for direct references
     if (window[lib as keyof Window]) {
