@@ -10,9 +10,8 @@ export { REQUIRED_LIBRARIES, LIBRARY_ALIASES } from './types';
 
 /**
  * Check specific libraries required for a feature
- * @param feature Feature name for logging
  * @param requiredLibs Array of library names needed for the feature
- * @returns Boolean indicating if all required libraries are available
+ * @returns Object with loading status and missing libraries
  */
 export const checkRequiredLibraries = (requiredLibs: string[]): { loaded: boolean; missing: string[] } => {
   const missing = requiredLibs.filter(lib => !window[lib as keyof Window]);

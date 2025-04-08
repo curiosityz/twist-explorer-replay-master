@@ -37,6 +37,21 @@
           window.bitcoinLibsLoaded[name] = true;
           console.log(`${name} library loaded successfully`);
         }
+        
+        // If name is an alias, try to map it to the main library name
+        const aliasMap = {
+          'OPS': 'bitcoinOps',
+          'validate': 'bitcoinAddressValidation',
+          'bitcoin': 'Bitcoin',
+          'bitcoinjs': 'Bitcoin',
+          'secp': 'secp256k1',
+          'nobleSecp256k1': 'secp256k1'
+        };
+        
+        if (aliasMap[name]) {
+          window.bitcoinLibsLoaded[aliasMap[name]] = true;
+          console.log(`${name} mapped to ${aliasMap[name]}`);
+        }
       }
       
       // Global error handler for script loading
@@ -62,7 +77,7 @@
             
     <!-- The secp256k1 library is crucial, so load it from multiple sources -->
     <script src="https://cdn.jsdelivr.net/npm/@noble/secp256k1@2.0.0/lib/index.browser.js"
-            onload="window.secp256k1 = window.nobleSecp256k1 = window.secp = secp256k1; markLibLoaded('secp256k1');"
+            onload="window.secp256k1 = window.nobleSecp256k1 = window.secp = secp256k1; markLibLoaded('secp256k1'); markLibLoaded('nobleSecp256k1'); markLibLoaded('secp');"
             onerror="console.error('Failed to load @noble/secp256k1 library')"></script>
             
     <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js"
@@ -70,37 +85,21 @@
             onerror="console.error('Failed to load bitcoinjs-message library')"></script>
             
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-ops@1.4.1/map.min.js"
-            onload="window.bitcoinOps = OPS; markLibLoaded('bitcoinOps');"
+            onload="window.bitcoinOps = OPS; markLibLoaded('bitcoinOps'); markLibLoaded('OPS');"
             onerror="console.error('Failed to load bitcoin-ops library')"></script>
             
     <script src="https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js"
-            onload="window.bitcoinAddressValidation = validate; markLibLoaded('bitcoinAddressValidation');"
+            onload="window.bitcoinAddressValidation = validate; markLibLoaded('bitcoinAddressValidation'); markLibLoaded('validate');"
             onerror="console.error('Failed to load bitcoin-address-validation library')"></script>
     
-    <!-- Load BitcoinJS with better error handling -->
-    <script src="https://unpkg.com/bitcoinjs-lib@6.1.3/dist/bitcoin-lib.js"
-            onload="window.Bitcoin = Bitcoin || bitcoin || bitcoinjs; markLibLoaded('bitcoin');"
-            onerror="console.error('Failed to load bitcoinjs-lib from unpkg')"></script>
+    <!-- Load BitcoinJS with better error handling from multiple sources -->
+    <script src="https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.3/dist/bitcoin-lib.js"
+            onload="window.Bitcoin = window.bitcoin = window.bitcoinjs = Bitcoin; markLibLoaded('Bitcoin'); markLibLoaded('bitcoin'); markLibLoaded('bitcoinjs');"
+            onerror="console.log('Failed to load bitcoinjs-lib from jsdelivr, trying unpkg')"></script>
             
-    <!-- Fallback for bitcoinjs-lib if the first CDN fails -->
-    <script>
-      setTimeout(function() {
-        if (!window.Bitcoin && !window.bitcoin && !window.bitcoinjs) {
-          console.log("Loading bitcoinjs-lib fallback from alternate CDN...");
-          var script = document.createElement('script');
-          script.src = "https://cdn.jsdelivr.net/npm/bitcoinjs-lib@6.1.3/dist/bitcoin-lib.js";
-          script.onload = function() {
-            window.Bitcoin = Bitcoin || bitcoin || bitcoinjs;
-            markLibLoaded('bitcoin');
-            console.log("Loaded bitcoinjs-lib from fallback CDN");
-          };
-          script.onerror = function() {
-            console.error("Failed to load bitcoinjs-lib from fallback CDN");
-          };
-          document.head.appendChild(script);
-        }
-      }, 1000); // Check after 1 second if the first CDN failed
-    </script>
+    <script src="https://unpkg.com/bitcoinjs-lib@6.1.3/dist/bitcoin-lib.js"
+            onload="if(!window.Bitcoin) { window.Bitcoin = window.bitcoin = window.bitcoinjs = Bitcoin; markLibLoaded('Bitcoin'); markLibLoaded('bitcoin'); markLibLoaded('bitcoinjs'); }"
+            onerror="console.error('Failed to load bitcoinjs-lib from unpkg')"></script>
 
     <!-- Load @noble/secp256k1 as an importable module -->
     <script type="importmap">
@@ -137,7 +136,18 @@
             "bitcoinAddressValidation": !!window.bitcoinAddressValidation
           });
           
-          // Make sure secp256k1 is loaded one way or another
+          // Make sure all references point to the right objects
+          if (!window.Bitcoin && (window.bitcoin || window.bitcoinjs)) {
+            window.Bitcoin = window.bitcoin || window.bitcoinjs;
+            console.log("Mapped alternative Bitcoin library name to window.Bitcoin");
+          }
+          
+          if (!window.secp256k1 && (window.nobleSecp256k1 || window.secp)) {
+            window.secp256k1 = window.nobleSecp256k1 || window.secp;
+            console.log("Mapped alternative secp256k1 library name");
+          }
+          
+          // Force import secp256k1 if not loaded
           if (!window.secp256k1) {
             console.warn("secp256k1 not loaded through script tags, attempting dynamic import");
             import('@noble/secp256k1').then(module => {
@@ -150,17 +160,59 @@
             });
           }
           
-          // Ensure Bitcoin global is set
-          if (!window.Bitcoin) {
-            if (window.bitcoin) {
-              window.Bitcoin = window.bitcoin;
-              console.log("Set window.Bitcoin from window.bitcoin");
-            } else if (window.bitcoinjs) {
-              window.Bitcoin = window.bitcoinjs;
-              console.log("Set window.Bitcoin from window.bitcoinjs");
-            } else {
-              console.error("Could not load Bitcoin library from any source");
+          // Final check for missing libraries
+          console.log("Checking for missing libraries...");
+          const requiredLibs = ['Bitcoin', 'bs58', 'bip39', 'bech32', 'secp256k1', 'bitcoinMessage', 'bitcoinAddressValidation'];
+          const missing = requiredLibs.filter(lib => !window[lib]);
+          
+          if (missing.length > 0) {
+            console.warn(`Still missing libraries: ${missing.join(', ')}`);
+            
+            // Create a last resort loader function
+            const loadScript = (src) => {
+              return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.async = true;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+              });
+            };
+            
+            // Try to load missing libraries one more time
+            const loadPromises = [];
+            
+            if (missing.includes('bs58')) {
+              loadPromises.push(loadScript('https://cdn.jsdelivr.net/npm/bs58@5.0.0/dist/bs58.bundle.min.js')
+                .then(() => window.bs58 = bs58));
             }
+            
+            if (missing.includes('bip39')) {
+              loadPromises.push(loadScript('https://cdn.jsdelivr.net/npm/bip39@3.1.0/dist/index.min.js')
+                .then(() => window.bip39 = bip39));
+            }
+            
+            if (missing.includes('bech32')) {
+              loadPromises.push(loadScript('https://cdn.jsdelivr.net/npm/bech32@2.0.0/dist/index.min.js')
+                .then(() => window.bech32 = bech32));
+            }
+            
+            if (missing.includes('bitcoinMessage')) {
+              loadPromises.push(loadScript('https://cdn.jsdelivr.net/npm/bitcoinjs-message@2.2.0/index.min.js')
+                .then(() => window.bitcoinMessage = bitcoinMessage));
+            }
+            
+            if (missing.includes('bitcoinAddressValidation')) {
+              loadPromises.push(loadScript('https://cdn.jsdelivr.net/npm/bitcoin-address-validation@3.0.0/dist/index.min.js')
+                .then(() => window.bitcoinAddressValidation = validate));
+            }
+            
+            Promise.allSettled(loadPromises).then(() => {
+              console.log("Final attempt to load libraries completed");
+            });
+          } else {
+            console.log("All required libraries are loaded!");
           }
         }, 1000);
       });
