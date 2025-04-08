@@ -139,7 +139,7 @@ export const wifToPrivateKey = (wif: string): string => {
       
       // Double SHA256 hash for checksum verification
       const sha256 = window.Bitcoin.crypto.sha256;
-      // Fix: Remove the second parameter from publicKeyConvert
+      // Fix: Remove the second parameter
       const calculatedChecksum = sha256(sha256(payload)).slice(0, 4);
       
       // Check if checksums match
