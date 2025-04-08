@@ -44,7 +44,7 @@ export const decompressPublicKey = (compressedPubKey: string): DecompressedKey =
         compressedPubKey.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
       );
       
-      // Use the library to decompress
+      // Use the library to decompress - passing no arguments
       const decompressedKey = window.secp256k1.publicKeyConvert(pubKeyBytes);
       
       // Extract coordinates from result (format: 04 | x | y)
@@ -90,7 +90,7 @@ export const decompressPublicKey = (compressedPubKey: string): DecompressedKey =
   const result = {
     x: xHex,
     y: yHex,
-    isOnCurve: isPointOnCurve(x, y.toString(16)) // Convert y to string for isPointOnCurve
+    isOnCurve: isPointOnCurve(x.toString(16), yHex) // Convert x to string for isPointOnCurve
   };
   
   // Validation

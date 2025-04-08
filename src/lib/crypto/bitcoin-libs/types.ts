@@ -1,10 +1,10 @@
 
 /**
- * Type definitions for Bitcoin libraries
+ * Types and constants for Bitcoin libraries functionality
  */
 
 /**
- * Result of checking for Bitcoin libraries
+ * Result of checking Bitcoin libraries status
  */
 export interface BitcoinLibsCheckResult {
   loaded: boolean;
@@ -15,21 +15,24 @@ export interface BitcoinLibsCheckResult {
  * List of required Bitcoin libraries
  */
 export const REQUIRED_LIBRARIES = [
-  'Bitcoin',
-  'bs58',
-  'bip39',
-  'bech32',
-  'secp256k1',
-  'bitcoinMessage',
+  'Bitcoin', 
+  'bs58', 
+  'bip39', 
+  'bech32', 
+  'secp256k1', 
+  'bitcoinMessage', 
   'bitcoinAddressValidation'
 ];
 
 /**
- * Mapping of library names to their possible alternative global names
+ * Map of library name to its potential aliases in the window object
  */
 export const LIBRARY_ALIASES: Record<string, string[]> = {
-  'Bitcoin': ['bitcoin', 'bitcoinjs', 'BitcoinLib'],
+  'Bitcoin': ['bitcoin', 'bitcoinjs', 'BitcoinJS'],
   'secp256k1': ['nobleSecp256k1', 'secp'],
-  'bitcoinOps': ['OPS'],
-  'bitcoinAddressValidation': ['validate']
+  'bitcoinAddressValidation': ['validate'],
+  'bitcoinMessage': ['bitcoinMessage', 'bitcoin.Message'],
+  'bs58': ['base58'], 
+  'bip39': ['BIP39'],
+  'bech32': ['bech32', 'segwit']
 };
