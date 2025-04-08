@@ -1,4 +1,3 @@
-
 /**
  * Public key compression/decompression utilities
  */
@@ -91,7 +90,7 @@ export const decompressPublicKey = (compressedPubKey: string): DecompressedKey =
   const result = {
     x: xHex,
     y: yHex,
-    isOnCurve: isPointOnCurve(x, y.toString(16)) // Fix: Convert bigint to string for isPointOnCurve
+    isOnCurve: isPointOnCurve(x, y.toString(16)) // Convert y to string for isPointOnCurve
   };
   
   // Validation
