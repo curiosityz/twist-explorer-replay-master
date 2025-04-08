@@ -5,15 +5,19 @@
 
 /**
  * Check if a point is on the secp256k1 curve
- * @param xHex X coordinate (hex string)
- * @param yHex Y coordinate (hex string)
+ * @param xHex X coordinate (hex string or bigint)
+ * @param yHex Y coordinate (hex string or bigint)
  * @returns Boolean indicating if the point is on the curve
  */
-export const isPointOnSecp256k1Curve = (xHex: string, yHex: string): boolean => {
+export const isPointOnSecp256k1Curve = (xHex: string | bigint, yHex: string | bigint): boolean => {
   try {
+    // Convert inputs to string if they're bigint
+    const xStr = typeof xHex === 'bigint' ? xHex.toString(16) : xHex;
+    const yStr = typeof yHex === 'bigint' ? yHex.toString(16) : yHex;
+    
     // Clean inputs - remove 0x prefix if present
-    const xClean = xHex.startsWith('0x') ? xHex.slice(2) : xHex;
-    const yClean = yHex.startsWith('0x') ? yHex.slice(2) : yHex;
+    const xClean = xStr.startsWith('0x') ? xStr.slice(2) : xStr;
+    const yClean = yStr.startsWith('0x') ? yStr.slice(2) : yStr;
     
     // Validate inputs
     if (!/^[0-9a-fA-F]+$/.test(xClean) || !/^[0-9a-fA-F]+$/.test(yClean)) {

@@ -91,7 +91,7 @@ export const decompressPublicKey = (compressedPubKey: string): DecompressedKey =
   const result = {
     x: xHex,
     y: yHex,
-    isOnCurve: isPointOnCurve(x, y)
+    isOnCurve: isPointOnCurve(x, y.toString(16)) // Fix: Convert bigint to string for isPointOnCurve
   };
   
   // Validation
