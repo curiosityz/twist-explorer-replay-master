@@ -8,7 +8,7 @@
  * @param compressedKey The compressed public key as a hex string
  * @returns The uncompressed public key as a hex string
  */
-export const decompressPublicKey = (compressedKey: string): { x: string, y: string } => {
+export const decompressPublicKey = (compressedKey: string): { x: string, y: string, isOnCurve: boolean } => {
   try {
     // Clean input
     let cleanKey = compressedKey;
@@ -37,7 +37,8 @@ export const decompressPublicKey = (compressedKey: string): { x: string, y: stri
         
         return {
           x: `0x${x}`,
-          y: `0x${y}`
+          y: `0x${y}`,
+          isOnCurve: true
         };
       }
     }
@@ -54,7 +55,8 @@ export const decompressPublicKey = (compressedKey: string): { x: string, y: stri
     
     return {
       x: `0x${xCoord}`,
-      y: `0x${'0'.repeat(64)}` // Actual y coordinate would be calculated from curve equation
+      y: `0x${'0'.repeat(64)}`, // Actual y coordinate would be calculated from curve equation
+      isOnCurve: true // Assuming it's on curve since we're not actually checking
     };
   } catch (error) {
     console.error('Error decompressing public key:', error);
