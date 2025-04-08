@@ -12,8 +12,10 @@ initializeApplication();
 
 // Then proceed with normal React rendering
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-    <Toaster />
-  </React.StrictMode>
+  <App />
+);
+
+// Add Toaster at the application root level
+ReactDOM.createRoot(document.getElementById('toaster-root') || document.createElement('div')).render(
+  <Toaster />
 );

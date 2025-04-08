@@ -1,180 +1,148 @@
 
 /**
- * Application initialization functionality
+ * Application initialization functions
  */
-
+import { toast } from 'sonner';
 import { 
   checkBitcoinLibsLoaded,
-  REQUIRED_LIBRARIES, 
-  initializeMockLibraries,
-  checkAndLogLibraryStatus,
-  refreshLibraryReferences
+  initializeMockLibraries 
 } from './crypto/bitcoin-libs';
-import { toast } from 'sonner';
+import { checkAndLogLibraryStatus } from './crypto/bitcoin-libs/logging';
+import { refreshLibraryReferences } from './crypto/bitcoinLibsCheck';
+import { mapLibraryAliases } from './crypto/bitcoinUtilities';
+
+// Wait for a specific duration
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Load a script dynamically with fallback options
- * @param urls Array of URLs to try loading the script from
- * @param name Library name for reporting
- * @returns Promise that resolves when script loads or rejects on failure
+ * Load libraries dynamically with retry capability
+ * @param libraryName Name of the library to load
+ * @param url URL to load the library from
+ * @param fallbackUrl Optional fallback URL if the primary fails
  */
-const loadScript = (urls: string[], name: string): Promise<void> => {
+export const loadScript = (libraryName: string, url: string, fallbackUrl?: string): Promise<void> => {
   return new Promise((resolve, reject) => {
-    // Try each URL in sequence
-    const tryNextUrl = (index: number) => {
-      if (index >= urls.length) {
-        reject(new Error(`Failed to load ${name} from all sources`));
-        return;
-      }
-      
-      const script = document.createElement('script');
-      script.src = urls[index];
-      script.async = true;
-      
-      script.onload = () => {
-        console.log(`${name} loaded successfully from ${urls[index]}`);
-        resolve();
-      };
-      
-      script.onerror = () => {
-        console.error(`Failed to load ${name} from ${urls[index]}`);
-        // Try next URL
-        tryNextUrl(index + 1);
-      };
-      
-      document.head.appendChild(script);
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+
+    script.onload = () => {
+      console.log(`${libraryName} loaded successfully from ${url}`);
+      resolve();
     };
-    
-    // Start with the first URL
-    tryNextUrl(0);
+
+    script.onerror = async (e) => {
+      console.error(`Failed to load ${libraryName} library`, e);
+      
+      if (fallbackUrl) {
+        console.log(`Trying fallback URL for ${libraryName}`);
+        try {
+          const fallbackScript = document.createElement('script');
+          fallbackScript.src = fallbackUrl;
+          fallbackScript.async = true;
+          
+          fallbackScript.onload = () => {
+            console.log(`${libraryName} loaded successfully from fallback URL`);
+            resolve();
+          };
+          
+          fallbackScript.onerror = () => {
+            console.error(`Failed to load ${libraryName} from fallback URL as well`);
+            reject(new Error(`Could not load ${libraryName}`));
+          };
+          
+          document.body.appendChild(fallbackScript);
+        } catch (error) {
+          reject(error);
+        }
+      } else {
+        reject(new Error(`Failed to load ${libraryName}`));
+      }
+    };
+
+    document.body.appendChild(script);
   });
 };
 
 /**
- * Try to dynamically import a module with better error handling
- * @param moduleName Name of the module to import
- * @returns Promise that resolves with the imported module
+ * Try to dynamically import a module, with fallback to script loading
  */
-const tryDynamicImport = async (moduleName: string): Promise<any> => {
+export const tryDynamicImport = async (
+  libraryName: string, 
+  importPath: string, 
+  scriptUrl?: string,
+  fallbackUrl?: string
+) => {
   try {
-    // Check if already loaded in window
-    const globalName = moduleName.replace(/-/g, '');
-    if (window[globalName as keyof Window]) {
-      console.log(`${moduleName} already loaded in window`);
-      return window[globalName as keyof Window];
-    }
-    
-    // Try dynamic import first
-    try {
-      console.log(`Trying dynamic import for ${moduleName}`);
-      switch (moduleName) {
-        case 'bs58':
-          const bs58Module = await import('bs58');
-          window.bs58 = bs58Module.default || bs58Module;
-          return bs58Module;
-        
-        case 'bip39':
-          const bip39Module = await import('bip39');
-          window.bip39 = bip39Module.default || bip39Module;
-          return bip39Module;
-          
-        case 'bech32':
-          const bech32Module = await import('bech32');
-          window.bech32 = bech32Module.default || bech32Module;
-          return bech32Module;
-          
-        case 'secp256k1':
-          const secp256k1Module = await import('@noble/secp256k1');
-          window.secp256k1 = window.nobleSecp256k1 = window.secp = secp256k1Module;
-          return secp256k1Module;
-          
-        case 'bitcoinjs-lib':
-          const bitcoinModule = await import('bitcoinjs-lib');
-          window.Bitcoin = window.bitcoin = window.bitcoinjs = bitcoinModule.default || bitcoinModule;
-          return bitcoinModule;
-          
-        default:
-          throw new Error(`No dynamic import handler for ${moduleName}`);
+    const module = await import(importPath);
+    window[libraryName as keyof Window] = module.default || module;
+    console.log(`Loaded ${libraryName} via dynamic import`);
+    return true;
+  } catch (e) {
+    console.warn(`Dynamic import failed for ${libraryName}, trying script tag approach`);
+    if (scriptUrl) {
+      try {
+        await loadScript(libraryName, scriptUrl, fallbackUrl);
+        return true;
+      } catch (scriptError) {
+        console.error(`Failed to load ${libraryName} via script tag:`, scriptError);
+        return false;
       }
-    } catch (importError) {
-      console.warn(`Dynamic import failed for ${moduleName}:`, importError);
-      
-      // Fall back to script loading
-      const cdnUrls = [
-        `https://esm.sh/${moduleName}`,
-        `https://unpkg.com/${moduleName}`,
-        `https://cdn.jsdelivr.net/npm/${moduleName}`
-      ];
-      
-      await loadScript(cdnUrls, moduleName);
-      console.log(`Loaded ${moduleName} via script tag`);
-      
-      // Check if it's now available in the window
-      if (window[globalName as keyof Window]) {
-        return window[globalName as keyof Window];
-      }
-      
-      throw new Error(`${moduleName} not found in window after script loading`);
     }
-  } catch (error) {
-    console.error(`Failed to load ${moduleName}:`, error);
-    throw error;
+    return false;
   }
 };
 
 /**
- * Initialize the Bitcoin libraries
- * This function should be called before using any Bitcoin cryptography functionality
+ * Initialize all required cryptographic libraries
  */
-export const initializeLibraries = async (): Promise<boolean> => {
-  console.info("Initializing Bitcoin libraries...");
+export const initializeLibraries = async (): Promise<void> => {
+  // First check if libraries are already loaded
+  checkAndLogLibraryStatus();
   
-  // Map any library aliases that might exist already
-  refreshLibraryReferences();
+  // Get the status of available libraries
+  const libStatus = checkBitcoinLibsLoaded();
   
-  // Give time for ES modules to load
-  await new Promise(resolve => setTimeout(resolve, 500));
-  
-  // Check library status and log
-  const libsCheck = checkAndLogLibraryStatus();
-  
-  if (!libsCheck) {
-    console.error(`Bitcoin libraries not loaded: Missing ${checkBitcoinLibsLoaded().missing.join(', ')}`);
+  if (!libStatus.loaded) {
+    console.error(`Bitcoin libraries not loaded: Missing ${libStatus.missing.join(', ')}`);
     
-    // Wait a bit longer and try again
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Refresh the references
+    // Try refreshing references to ensure all available libraries are mapped properly
     refreshLibraryReferences();
-    console.info("Library references refreshed. Current status:");
-    const secondCheck = checkAndLogLibraryStatus();
+    mapLibraryAliases(window);
     
-    if (!secondCheck) {
-      console.warn("Creating mock implementations for missing libraries");
+    // Second check after refreshing references
+    const updatedStatus = checkBitcoinLibsLoaded();
+    checkAndLogLibraryStatus();
+    
+    if (!updatedStatus.loaded) {
+      console.warning("Creating mock implementations for missing libraries");
+      // Initialize mock implementations for testing and development
       initializeMockLibraries();
-      
-      console.info("Retrying Bitcoin libraries initialization...");
-      const finalCheck = checkAndLogLibraryStatus();
-      return finalCheck;
     }
-    
-    return secondCheck;
   }
   
-  return true;
+  // Final check of library status
+  const finalStatus = checkBitcoinLibsLoaded();
+  if (!finalStatus.loaded) {
+    console.warn("Some Bitcoin libraries could not be loaded. Limited functionality available.");
+    toast.warning("Crypto libraries not fully loaded. Some features may be limited.");
+  } else {
+    console.log("All Bitcoin libraries successfully loaded");
+  }
 };
 
 /**
  * Initialize the application
- * This function should be called on application startup
  */
 export const initializeApplication = async (): Promise<void> => {
   try {
-    // Initialize libraries
     await initializeLibraries();
-    console.info("Application initialization completed");
+    console.log("Application initialized successfully");
+    
+    // Add a delay to ensure all initialization is complete before React hydration
+    await wait(1000);
   } catch (error) {
-    console.error("Error during application initialization:", error);
-    toast.error("Failed to initialize application");
+    console.error("Failed to initialize application:", error);
+    toast.error("Failed to initialize application. Please refresh the page.");
   }
 };

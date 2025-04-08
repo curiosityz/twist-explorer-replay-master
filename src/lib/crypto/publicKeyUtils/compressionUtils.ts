@@ -43,7 +43,7 @@ export function decompressPublicKey(compressedKey: string): { x: string; y: stri
         );
         
         // Use secp256k1 library to decompress the key
-        // Fixed: Remove the second parameter from publicKeyConvert
+        // Remove second parameter which is causing TypeScript errors
         const decompressed = window.secp256k1.publicKeyConvert(keyBytes);
         
         // Extract x and y coordinates (format: 04 | x | y)

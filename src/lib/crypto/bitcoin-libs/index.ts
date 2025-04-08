@@ -10,10 +10,9 @@ export { initializeMockLibraries } from './mock-libs';
 export { checkAndLogLibraryStatus } from './logging';
 
 /**
- * Map library aliases to their primary names
- * @param window The global window object
+ * Refresh references to ensure all available libraries are properly mapped
  */
-export const mapLibraryAliases = (window: Window): void => {
+export const refreshLibraryReferences = (): void => {
   // Map library aliases to their primary names
   if (!window.Bitcoin && (window.bitcoin || window.bitcoinjs)) {
     window.Bitcoin = window.bitcoin || window.bitcoinjs;
@@ -24,14 +23,7 @@ export const mapLibraryAliases = (window: Window): void => {
     window.secp256k1 = window.nobleSecp256k1 || window.secp;
     console.log("Mapped alternative secp256k1 library name");
   }
-};
-
-/**
- * Refresh references to ensure all available libraries are properly mapped
- */
-export const refreshLibraryReferences = (): void => {
-  // Refresh references to ensure all available libraries are properly mapped
-  mapLibraryAliases(window);
+  
   console.log("Library references refreshed");
 };
 
