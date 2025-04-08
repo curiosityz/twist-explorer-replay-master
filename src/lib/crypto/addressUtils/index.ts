@@ -67,12 +67,21 @@ export const wifToPrivateKey = (wif: string): string | null => {
   try {
     // Check if bs58 is available
     if (window.bs58) {
-      // Decode the base58 WIF string - fix the call here
-      // The correct way to call decode depends on the bs58 library implementation
-      // Most implementations take the string as an argument
-      const decoded = typeof window.bs58.decode === 'function' 
-        ? window.bs58.decode(wif)
-        : new Uint8Array(0); // Fallback if decode function doesn't exist
+      let decoded: Uint8Array;
+      
+      // Handle different bs58 library implementations
+      if (typeof window.bs58.decode === 'function') {
+        try {
+          // Try to call with the argument
+          decoded = window.bs58.decode(wif) as Uint8Array;
+        } catch (decodeError) {
+          console.error("Error decoding WIF with argument:", decodeError);
+          return null;
+        }
+      } else {
+        console.error("bs58.decode is not a function");
+        return null;
+      }
       
       // Check if it's a valid WIF (should be either 33 or 34 bytes)
       if (decoded.length !== 33 && decoded.length !== 34) {
