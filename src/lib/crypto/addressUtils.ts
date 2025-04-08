@@ -67,7 +67,7 @@ export const wifToPrivateKey = (wif: string): string | null => {
   try {
     // Check if bs58 is available
     if (window.bs58) {
-      // Decode the base58 WIF string
+      // Decode the base58 WIF string - fix the call here
       const decoded = window.bs58.decode(wif);
       
       // Check if it's a valid WIF (should be either 33 or 34 bytes)
