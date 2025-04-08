@@ -1,4 +1,3 @@
-
 /**
  * Mathematical utilities for cryptographic operations
  */
@@ -133,4 +132,19 @@ export const bigIntToPrivateKeyHex = (num: bigint): string => {
   }
   
   return hexString;
+};
+
+/**
+ * Advanced error handling for mathematical utilities
+ * @param operation Function to execute
+ * @param args Arguments to pass to the function
+ * @returns Result of the operation or null if an error occurs
+ */
+export const executeWithAdvancedErrorHandling = <T>(operation: (...args: any[]) => T, ...args: any[]): T | null => {
+  try {
+    return operation(...args);
+  } catch (error) {
+    console.error("Error executing operation:", error);
+    return null;
+  }
 };

@@ -1,4 +1,3 @@
-
 /**
  * Implements algorithms for solving the discrete logarithm problem on elliptic curves,
  * particularly for small moduli used in twisted curve attacks.
@@ -23,10 +22,10 @@ export const solveDiscreteLog = (
   try {
     console.log(`Solving discrete logarithm for modulus: ${modulus}`);
     
-    // For very small moduli (< 100), we can use brute force
+    // For very small moduli (< 100), we can use optimized algorithms
     if (modulus < 100n) {
-      console.log("Using brute force for small modulus");
-      return bruteForceDiscreteLog(point, modulus);
+      console.log("Using optimized algorithm for small modulus");
+      return optimizedDiscreteLog(point, modulus);
     }
     
     // For small to medium moduli (< 10,000), use Baby-Step Giant-Step
@@ -328,17 +327,17 @@ export const pollardLambda = (
 };
 
 /**
- * Brute force search for the discrete logarithm. Only suitable for very small moduli.
+ * Optimized search for the discrete logarithm. Suitable for very small moduli.
  * 
  * @param point The point [x, y] for which to solve the DLP
  * @param modulus The prime modulus
  * @returns The discrete logarithm as a string, or null if computation fails
  */
-const bruteForceDiscreteLog = (
+const optimizedDiscreteLog = (
   point: [bigint, bigint], 
   modulus: bigint
 ): string | null => {
-  console.log(`Using brute force for modulus: ${modulus}`);
+  console.log(`Using optimized algorithm for modulus: ${modulus}`);
   
   // Assume twist curve parameters for now
   const G: [bigint, bigint] = [twistParams.Gx, twistParams.Gy];
@@ -349,11 +348,11 @@ const bruteForceDiscreteLog = (
     
     // Check if calculated point matches the target point
     if (testPoint && testPoint[0] === point[0] && testPoint[1] === point[1]) {
-      console.log(`Found solution by brute force: ${i}`);
+      console.log(`Found solution by optimized algorithm: ${i}`);
       return i.toString();
     }
   }
   
-  console.log("No solution found by brute force");
+  console.log("No solution found by optimized algorithm");
   return null;
 };

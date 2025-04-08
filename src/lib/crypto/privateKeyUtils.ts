@@ -1,4 +1,3 @@
-
 import { hexToBigInt, bigIntToHex } from './mathUtils';
 import { curveParams } from './constants';
 
@@ -16,7 +15,7 @@ export const privateKeyToPublicKey = (privateKey: string, compressed = true): { 
   try {
     // Check if the key is valid
     const privKeyBigInt = hexToBigInt(cleanPrivateKey);
-    if (privKeyBigInt < 0n || privKeyBigInt > curveParams.n) {
+    if (privKeyBigInt <= 0n || privKeyBigInt >= curveParams.n) {
       throw new Error('Private key outside allowed range');
     }
 

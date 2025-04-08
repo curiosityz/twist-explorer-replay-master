@@ -1,7 +1,8 @@
-
 /**
  * Utility to check if Bitcoin libraries are loaded and available
  */
+
+import { checkAndLogLibraryStatus, refreshLibraryReferences } from './bitcoin-libs';
 
 /**
  * Check if Bitcoin libraries are loaded and available
@@ -13,20 +14,6 @@ export function areBitcoinLibrariesAvailable() {
   return {
     available: missingLibraries.length === 0,
     missingLibraries
-  };
-}
-
-/**
- * Check if specific Bitcoin libraries are loaded
- * @returns Object with loaded status and missing libraries
- */
-export function checkBitcoinLibsLoaded() {
-  const requiredLibraries = ['Bitcoin', 'bip39', 'bs58', 'bech32', 'secp256k1', 'bitcoinMessage', 'bitcoinAddressValidation'];
-  const missingLibraries = requiredLibraries.filter(lib => !(window as any)[lib]);
-  
-  return {
-    loaded: missingLibraries.length === 0,
-    missing: missingLibraries
   };
 }
 

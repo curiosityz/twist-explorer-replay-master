@@ -1,4 +1,3 @@
-
 /**
  * Elliptic curve operations for secp256k1
  */
@@ -295,3 +294,21 @@ function decompressPoint(pointBytes: Uint8Array): [bigint, bigint] {
   
   return [xBigInt, yBigInt];
 }
+
+/**
+ * Tests for point addition and scalar multiplication functions
+ */
+export const testCurveOperations = () => {
+  // Test point addition
+  const point1: [bigint, bigint] = [curveParams.Gx, curveParams.Gy];
+  const point2: [bigint, bigint] = [curveParams.Gx, curveParams.Gy];
+  const addedPoint = pointAdd(point1, point2);
+  console.log("Point addition result:", addedPoint);
+
+  // Test scalar multiplication
+  const scalar = 2n;
+  const multipliedPoint = scalarMultiply(scalar, point1);
+  console.log("Scalar multiplication result:", multipliedPoint);
+
+  // Additional tests can be added here
+};

@@ -1,4 +1,3 @@
-
 /**
  * Implementation of the Chinese Remainder Theorem for private key recovery
  */

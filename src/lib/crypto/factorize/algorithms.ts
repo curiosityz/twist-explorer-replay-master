@@ -1,4 +1,3 @@
-
 /**
  * Factorization algorithms implementation
  * Based on FranX1024/factorizer
