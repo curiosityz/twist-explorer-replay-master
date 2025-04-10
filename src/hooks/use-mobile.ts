@@ -26,3 +26,11 @@ export function useMediaQuery(query: string): boolean {
   
   return matches;
 }
+
+/**
+ * Custom hook to detect mobile devices based on a width breakpoint
+ * @returns Boolean indicating if the current viewport is mobile-sized
+ */
+export function useIsMobile(): boolean {
+  return useMediaQuery('(max-width: 767px)');
+}

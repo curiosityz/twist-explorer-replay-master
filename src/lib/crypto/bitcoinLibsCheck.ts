@@ -1,8 +1,10 @@
+
 /**
  * Utility to check if Bitcoin libraries are loaded and available
  */
 
-import { checkAndLogLibraryStatus, refreshLibraryReferences } from './bitcoin-libs';
+import { checkBitcoinLibsLoaded } from './bitcoin-libs/check-status';
+export { checkBitcoinLibsLoaded };
 
 /**
  * Check if Bitcoin libraries are loaded and available
