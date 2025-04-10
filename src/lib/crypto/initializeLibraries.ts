@@ -23,6 +23,28 @@ export const initializeBitcoinLibraries = (): { loaded: boolean; missing: string
   // Check if libraries were loaded properly
   const libStatus = checkBitcoinLibsLoaded();
   
+  // Check for ESM loaded libraries that might be available but not properly mapped
+  const esmLibraries = (window as any).esmLibraries || {};
+  const realLibrariesAvailable = Object.keys(esmLibraries).length > 0;
+  
+  if (realLibrariesAvailable) {
+    console.log("ESM libraries detected:", Object.keys(esmLibraries));
+    // Map ESM libraries to global window objects if they're not already there
+    Object.entries(esmLibraries).forEach(([name, lib]) => {
+      if (!window[name as keyof Window]) {
+        console.log(`Mapping ESM library ${name} to window.${name}`);
+        (window as any)[name] = lib;
+      }
+    });
+    
+    // Check library status again after mapping ESM libraries
+    const updatedStatus = checkBitcoinLibsLoaded();
+    if (updatedStatus.loaded) {
+      console.log("Successfully mapped ESM libraries to window");
+      return updatedStatus;
+    }
+  }
+  
   // If libraries are missing, initialize mock versions for fallback support
   if (!libStatus.loaded) {
     console.warn(`Some Bitcoin libraries not loaded: ${libStatus.missing.join(', ')}`);

@@ -50,24 +50,8 @@ export const checkBitcoinLibsLoaded = (): BitcoinLibsCheckResult => {
     console.log("Found Bitcoin libraries:", foundLibraries);
   }
   
-  // If secp256k1 is available but Bitcoin isn't, create mock Bitcoin for testing
-  if (!window.Bitcoin && window.secp256k1) {
-    console.warn("Creating mock Bitcoin object for testing purposes");
-    (window as any).Bitcoin = {
-      crypto: {
-        sha256: (data: Uint8Array): Uint8Array => {
-          console.warn("Using mock SHA256 - not secure!");
-          return new Uint8Array(32).fill(1); // Return dummy hash
-        }
-      }
-    };
-    foundLibraries['Bitcoin'] = 'mock';
-    // Update missing list
-    const bitcoinIndex = missing.indexOf('Bitcoin');
-    if (bitcoinIndex !== -1) {
-      missing.splice(bitcoinIndex, 1);
-    }
-  }
+  // NOTE: We're NOT creating mock Bitcoin library here anymore
+  // We'll only create mocks in the dedicated mock-libs.ts file
   
   return {
     loaded: missing.length === 0,
