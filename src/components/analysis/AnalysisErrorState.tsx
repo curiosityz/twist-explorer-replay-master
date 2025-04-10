@@ -3,14 +3,16 @@ import React from 'react';
 import { XCircle, RefreshCw, Settings, Globe, KeySquare, Database, Search, FileCode, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import DataExtractionError from './DataExtractionError';
 
 interface AnalysisErrorStateProps {
   txid?: string;
   error: string;
   onRetry: () => void;
+  transaction?: any;
 }
 
-const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, onRetry }) => {
+const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, onRetry, transaction }) => {
   // Enhanced error type detection
   const isNetworkError = error.includes('fetch') || 
                          error.includes('network') || 
@@ -26,7 +28,8 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
                       error.includes('Authentication');
                       
   const isDataExtractionError = error.includes('extract') && 
-                               error.includes('cryptographic data');
+                               (error.includes('cryptographic data') || 
+                                error.includes('signature data'));
                                
   const isNotFoundError = error.includes('404') || 
                          error.includes('not found') || 
@@ -43,6 +46,11 @@ const AnalysisErrorState: React.FC<AnalysisErrorStateProps> = ({ txid, error, on
 
   const isAddressError = error.includes('address validation') ||
                         error.includes('invalid address');
+  
+  // Special handling for data extraction errors
+  if (isDataExtractionError && txid && transaction) {
+    return <DataExtractionError txid={txid} onRetry={onRetry} transaction={transaction} />;
+  }
 
   return (
     <div className="flex flex-col items-center justify-center h-full">
