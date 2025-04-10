@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ChainType, NodeConfiguration } from '@/types';
 import { AlertCircle, CheckCircle2, WifiOff } from 'lucide-react';
 import { toast } from 'sonner';
+import { Drawer, DrawerContent, DrawerTrigger } from '@/components/ui/drawer';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useMediaQuery } from '@/hooks/use-mobile';
 
 interface ConnectionPanelProps {
   onConnect: (config: NodeConfiguration) => void;
@@ -21,6 +25,8 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   const handleChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -82,6 +88,9 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
       // Connection successful
       toast(`Connected to ${blockchainInfo.chain} (height: ${blockchainInfo.blocks})`);
       
+      // Close the form
+      setIsFormOpen(false);
+      
       // Pass the connection info back to the parent component
       onConnect({ 
         ...formData, 
@@ -113,6 +122,81 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
     }
   };
 
+  const connectionForm = (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="name">Connection Name</Label>
+        <Input
+          id="name"
+          placeholder="Bitcoin Mainnet"
+          value={formData.name}
+          onChange={(e) => handleChange('name', e.target.value)}
+          className="bg-crypto-background border-crypto-border"
+        />
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="rpcUrl">RPC Endpoint URL</Label>
+        <Input
+          id="rpcUrl"
+          placeholder="https://example.core.chainstack.com/YOUR_KEY"
+          value={formData.rpcUrl}
+          onChange={(e) => handleChange('rpcUrl', e.target.value)}
+          className="bg-crypto-background border-crypto-border font-mono text-sm"
+        />
+        <p className="text-xs text-crypto-foreground/60">
+          Note: Direct browser connections may be blocked by CORS policies.
+        </p>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="chain">Blockchain</Label>
+        <Select 
+          value={formData.chain} 
+          onValueChange={(value) => handleChange('chain', value as ChainType)}
+        >
+          <SelectTrigger className="bg-crypto-background border-crypto-border">
+            <SelectValue placeholder="Select blockchain" />
+          </SelectTrigger>
+          <SelectContent className="bg-crypto-background border-crypto-border">
+            <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
+            <SelectItem value="BCH">Bitcoin Cash (BCH)</SelectItem>
+            <SelectItem value="BSV">Bitcoin SV (BSV)</SelectItem>
+            <SelectItem value="LTC">Litecoin (LTC)</SelectItem>
+            <SelectItem value="Other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      
+      <div className="space-y-2">
+        <Label htmlFor="apiKey">API Key (Optional)</Label>
+        <Input
+          id="apiKey"
+          type="password"
+          placeholder="••••••••••••••••••••••"
+          value={formData.apiKey}
+          onChange={(e) => handleChange('apiKey', e.target.value)}
+          className="bg-crypto-background border-crypto-border"
+        />
+      </div>
+      
+      {error && (
+        <div className="flex items-center gap-2 text-destructive text-sm">
+          <WifiOff size={16} />
+          <span>{error}</span>
+        </div>
+      )}
+      
+      <Button
+        onClick={handleConnect}
+        disabled={isLoading}
+        className="w-full bg-crypto-accent hover:bg-crypto-accent/80"
+      >
+        {isLoading ? 'Connecting...' : 'Connect to Node'}
+      </Button>
+    </div>
+  );
+
   return (
     <Card className="bg-crypto-muted border-crypto-border">
       <CardHeader>
@@ -125,78 +209,33 @@ const ConnectionPanel = ({ onConnect }: ConnectionPanelProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Connection Name</Label>
-            <Input
-              id="name"
-              placeholder="Bitcoin Mainnet"
-              value={formData.name}
-              onChange={(e) => handleChange('name', e.target.value)}
-              className="bg-crypto-background border-crypto-border"
-            />
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="rpcUrl">RPC Endpoint URL</Label>
-            <Input
-              id="rpcUrl"
-              placeholder="https://example.core.chainstack.com/YOUR_KEY"
-              value={formData.rpcUrl}
-              onChange={(e) => handleChange('rpcUrl', e.target.value)}
-              className="bg-crypto-background border-crypto-border font-mono text-sm"
-            />
-            <p className="text-xs text-crypto-foreground/60">
-              Note: Direct browser connections may be blocked by CORS policies.
-            </p>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="chain">Blockchain</Label>
-            <Select 
-              value={formData.chain} 
-              onValueChange={(value) => handleChange('chain', value as ChainType)}
-            >
-              <SelectTrigger className="bg-crypto-background border-crypto-border">
-                <SelectValue placeholder="Select blockchain" />
-              </SelectTrigger>
-              <SelectContent className="bg-crypto-muted border-crypto-border">
-                <SelectItem value="BTC">Bitcoin (BTC)</SelectItem>
-                <SelectItem value="BCH">Bitcoin Cash (BCH)</SelectItem>
-                <SelectItem value="BSV">Bitcoin SV (BSV)</SelectItem>
-                <SelectItem value="LTC">Litecoin (LTC)</SelectItem>
-                <SelectItem value="Other">Other</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="apiKey">API Key (Optional)</Label>
-            <Input
-              id="apiKey"
-              type="password"
-              placeholder="••••••••••••••••••••••"
-              value={formData.apiKey}
-              onChange={(e) => handleChange('apiKey', e.target.value)}
-              className="bg-crypto-background border-crypto-border"
-            />
-          </div>
-          
-          {error && (
-            <div className="flex items-center gap-2 text-destructive text-sm">
-              <WifiOff size={16} />
-              <span>{error}</span>
-            </div>
-          )}
-          
-          <Button
-            onClick={handleConnect}
-            disabled={isLoading}
-            className="w-full bg-crypto-accent hover:bg-crypto-accent/80"
-          >
-            {isLoading ? 'Connecting...' : 'Connect to Node'}
-          </Button>
-        </div>
+        {isMobile ? (
+          <Drawer open={isFormOpen} onOpenChange={setIsFormOpen}>
+            <DrawerTrigger asChild>
+              <Button className="w-full bg-crypto-accent hover:bg-crypto-accent/80">
+                Configure Connection
+              </Button>
+            </DrawerTrigger>
+            <DrawerContent className="bg-crypto-background p-4">
+              <div className="p-4">
+                <h3 className="text-lg font-semibold mb-4">Configure Node Connection</h3>
+                {connectionForm}
+              </div>
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Sheet open={isFormOpen} onOpenChange={setIsFormOpen}>
+            <SheetTrigger asChild>
+              <Button className="w-full bg-crypto-accent hover:bg-crypto-accent/80">
+                Configure Connection
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="bg-crypto-background border-crypto-border w-[350px] sm:w-[450px]">
+              <h3 className="text-lg font-semibold mb-4">Configure Node Connection</h3>
+              {connectionForm}
+            </SheetContent>
+          </Sheet>
+        )}
       </CardContent>
     </Card>
   );

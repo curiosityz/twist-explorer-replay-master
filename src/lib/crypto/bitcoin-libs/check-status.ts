@@ -33,6 +33,15 @@ export const checkBitcoinLibsLoaded = (): BitcoinLibsCheckResult => {
       }
     }
     
+    // Check if library was loaded as an ESM module (might not be on window)
+    const esmVersions = (window as any).esmLibraries;
+    if (esmVersions && esmVersions[lib]) {
+      // Map the ESM module to the global name
+      (window as any)[lib] = esmVersions[lib];
+      foundLibraries[lib] = `esm:${lib}`;
+      return false;
+    }
+    
     return true;
   });
   

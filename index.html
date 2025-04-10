@@ -28,32 +28,19 @@
         "bitcoinjs-message": "https://esm.sh/bitcoinjs-message@2.2.0",
         "bitcoin-ops": "https://esm.sh/bitcoin-ops@1.4.1",
         "bitcoin-address-validation": "https://esm.sh/bitcoin-address-validation@2.2.3",
-        "bitcoinjs-lib": "https://esm.sh/bitcoinjs-lib@6.1.5",
-        "react": "https://esm.sh/react@18.3.1",
-        "react-dom": "https://esm.sh/react-dom@18.3.1"
+        "bitcoinjs-lib": "https://esm.sh/bitcoinjs-lib@6.1.5"
       }
     }
     </script>
     
-    <script>
-      // Create a global loading tracker
-      window.bitcoinLibsLoaded = {
-        bs58: false,
-        bip39: false,
-        bech32: false,
-        secp256k1: false,
-        bitcoinMessage: false,
-        bitcoinOps: false,
-        bitcoinAddressValidation: false,
-        bitcoin: false
-      };
+    <script type="module">
+      // Create an ESM library tracker
+      window.esmLibraries = {};
       
       // Helper function to mark a library as loaded
-      function markLibLoaded(name) {
-        if (window.bitcoinLibsLoaded) {
-          window.bitcoinLibsLoaded[name] = true;
-          console.log(`${name} library loaded successfully`);
-        }
+      function markLibLoaded(name, module) {
+        window.esmLibraries[name] = module;
+        console.log(`ESM library ${name} loaded successfully`);
       }
       
       // Load libraries using ES modules
@@ -62,50 +49,42 @@
           // Load secp256k1
           const secp256k1Module = await import('@noble/secp256k1');
           window.secp256k1 = window.nobleSecp256k1 = window.secp = secp256k1Module;
-          markLibLoaded('secp256k1');
+          markLibLoaded('secp256k1', secp256k1Module);
           
           // Load bs58
           const bs58Module = await import('bs58');
           window.bs58 = bs58Module.default || bs58Module;
-          markLibLoaded('bs58');
+          markLibLoaded('bs58', window.bs58);
           
           // Load bip39
           const bip39Module = await import('bip39');
           window.bip39 = bip39Module.default || bip39Module;
-          markLibLoaded('bip39');
+          markLibLoaded('bip39', window.bip39);
           
           // Load bech32
           const bech32Module = await import('bech32');
           window.bech32 = bech32Module.default || bech32Module;
-          markLibLoaded('bech32');
+          markLibLoaded('bech32', window.bech32);
           
           // Load bitcoinjs-message
           const bitcoinMessageModule = await import('bitcoinjs-message');
           window.bitcoinMessage = bitcoinMessageModule.default || bitcoinMessageModule;
-          markLibLoaded('bitcoinMessage');
+          markLibLoaded('bitcoinMessage', window.bitcoinMessage);
           
           // Load bitcoin-address-validation
           const validationModule = await import('bitcoin-address-validation');
           window.bitcoinAddressValidation = window.validate = validationModule.default || validationModule;
-          markLibLoaded('bitcoinAddressValidation');
+          markLibLoaded('bitcoinAddressValidation', window.bitcoinAddressValidation);
           
           // Load bitcoinjs-lib (last since it's the largest)
           try {
             const bitcoinModule = await import('bitcoinjs-lib');
-            window.Bitcoin = window.bitcoin = window.bitcoinjs = bitcoinModule.default || bitcoinModule;
-            markLibLoaded('bitcoin');
+            window.Bitcoin = window.bitcoin = window.bitcoinjs = bitcoinModule;
+            markLibLoaded('Bitcoin', window.Bitcoin);
             console.log("All libraries loaded successfully!");
           } catch (e) {
             console.error("Failed to load bitcoinjs-lib:", e);
-            // Create basic mock if loading fails
-            window.Bitcoin = window.bitcoin = window.bitcoinjs = {
-              crypto: {
-                sha256: (data) => {
-                  console.warn("Using mock SHA256 - not secure!");
-                  return new Uint8Array(32).fill(1);
-                }
-              }
-            };
+            // The mock will be created by the initialization process
           }
         } catch (error) {
           console.error("Error loading libraries:", error);
@@ -114,14 +93,46 @@
       
       // Start loading libraries
       loadLibraries();
-
-      // Global error handler for script loading
-      window.addEventListener('error', function(e) {
-        if (e.filename && e.filename.includes('cdn')) {
-          console.error(`Error loading external library: ${e.filename}`, e.error);
-        }
-      }, true);
     </script>
+    
+    <style>
+      /* Fix for opaque modals and overlays */
+      .bg-black\/80 {
+        background-color: rgba(0, 0, 0, 0.8) !important;
+      }
+      
+      /* Ensure all modals and sheets have proper z-index and background */
+      [data-radix-popper-content-wrapper],
+      [role="dialog"],
+      .fixed.inset-0.z-50 {
+        z-index: 100 !important;
+      }
+      
+      /* Fix for select dropdowns */
+      [data-radix-select-content] {
+        background-color: var(--background) !important;
+        z-index: 200 !important;
+      }
+      
+      /* Fix for modals */
+      .dialog-overlay,
+      .dialog-content,
+      .sheet-overlay {
+        z-index: 50 !important;
+        background-color: rgba(0, 0, 0, 0.7) !important;
+      }
+      
+      /* Ensure sheet content is on top with proper background */
+      .sheet-content {
+        z-index: 51 !important;
+        background-color: var(--background) !important;
+      }
+      
+      /* Modal content should be visible */
+      [role="dialog"] {
+        background-color: var(--background) !important;
+      }
+    </style>
   </head>
 
   <body>
