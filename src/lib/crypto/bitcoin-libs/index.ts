@@ -13,15 +13,38 @@ export { checkAndLogLibraryStatus } from './logging';
  * Refresh references to ensure all available libraries are properly mapped
  */
 export const refreshLibraryReferences = (): void => {
+  // First check for ESM libraries which might be available but not on window
+  const esmLibs = (window as any).esmLibraries || {};
+  if (Object.keys(esmLibs).length > 0) {
+    console.log("Found ESM libraries:", Object.keys(esmLibs));
+    Object.entries(esmLibs).forEach(([name, lib]) => {
+      if (!window[name as keyof Window]) {
+        (window as any)[name] = lib;
+        console.log(`Mapped ESM library ${name}`);
+      }
+    });
+  }
+
   // Map library aliases to their primary names
   if (!window.Bitcoin && (window.bitcoin || window.bitcoinjs)) {
     window.Bitcoin = window.bitcoin || window.bitcoinjs;
     console.log("Mapped alternative Bitcoin library name to window.Bitcoin");
   }
   
-  if (!window.secp256k1 && (window.nobleSecp256k1 || window.secp)) {
-    window.secp256k1 = window.nobleSecp256k1 || window.secp;
+  if (!window.secp256k1 && ((window as any).nobleSecp256k1 || (window as any).secp)) {
+    window.secp256k1 = (window as any).nobleSecp256k1 || (window as any).secp;
     console.log("Mapped alternative secp256k1 library name");
+  }
+  
+  // Check for common dynamic import patterns
+  if ((window as any)._bitcoinLibs) {
+    const dynamicLibs = (window as any)._bitcoinLibs;
+    Object.entries(dynamicLibs).forEach(([name, lib]) => {
+      if (!window[name as keyof Window]) {
+        (window as any)[name] = lib;
+        console.log(`Mapped dynamically loaded library ${name}`);
+      }
+    });
   }
   
   console.log("Library references refreshed");
@@ -53,17 +76,8 @@ export const checkRequiredLibraries = (): string[] => {
 export const handleMissingLibraries = (missingLibs: string[]): void => {
   if (missingLibs.length > 0) {
     console.warn(`Missing libraries: ${missingLibs.join(', ')}`);
-    // Attempt to create mock implementations for critical libraries
-    if (missingLibs.includes('Bitcoin') && window.secp256k1) {
-      console.warn("Creating mock Bitcoin implementation using secp256k1");
-      (window as any).Bitcoin = {
-        crypto: {
-          sha256: (data: Uint8Array) => {
-            console.warn("Using mock SHA256 implementation - not secure!");
-            return new Uint8Array(32).fill(1);
-          }
-        }
-      };
-    }
+    // Import the mock library initializer
+    const { initializeMockLibraries } = require('./mock-libs');
+    initializeMockLibraries();
   }
 };

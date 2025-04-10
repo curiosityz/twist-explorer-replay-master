@@ -45,8 +45,21 @@ export const initializeBitcoinLibraries = (): { loaded: boolean; missing: string
     }
   }
   
-  // If libraries are missing, initialize mock versions for fallback support
+  // If libraries are missing, check if we need to map any name variants
   if (!libStatus.loaded) {
+    // If secp256k1 is available as noble-secp256k1, map it
+    if (!window.secp256k1 && (window as any).nobleSecp256k1) {
+      console.log("Mapping noble-secp256k1 to window.secp256k1");
+      (window as any).secp256k1 = (window as any).nobleSecp256k1;
+    }
+    
+    // Check again after mapping variants
+    const variantStatus = checkBitcoinLibsLoaded();
+    if (variantStatus.loaded) {
+      console.log("Successfully mapped library variants");
+      return variantStatus;
+    }
+    
     console.warn(`Some Bitcoin libraries not loaded: ${libStatus.missing.join(', ')}`);
     console.info("Creating fallback implementations...");
     initializeMockLibraries();
