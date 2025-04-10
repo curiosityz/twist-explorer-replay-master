@@ -1,3 +1,4 @@
+
 import { Lock, Unlock, Key, CheckCircle2, XCircle, DollarSign, Bitcoin, AlertCircle } from 'lucide-react';
 import { formatBtcValue, formatUsdValue } from '@/lib/walletUtils';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -196,21 +197,6 @@ export function KeyFragmentsTab({
             <Alert variant="destructive" className="mt-4 bg-red-500/10 border-red-500/20">
               <AlertCircle className="h-4 w-4 text-red-500" />
               <AlertTitle className="text-red-500">Key Recovery Error</AlertTitle>
-              <AlertDescription className="text-xs mt-1">
-                {recoveryError}
-              </AlertDescription>
-            </Alert>
-          )}
-        </div>
-      ) : (
-        <div className="bg-crypto-background/50 border border-crypto-border/40 rounded-md p-6 text-center">
-          <Lock className="h-10 w-10 text-crypto-foreground/20 mx-auto mb-3" />
-          <p className="text-crypto-foreground/60">No key fragments have been extracted yet</p>
-        </div>
-      )}
-    </div>
-  );
-}
               <AlertDescription className="text-xs mt-1">
                 {recoveryError}
               </AlertDescription>
