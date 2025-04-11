@@ -9,13 +9,15 @@ import AnalysisLoadingState from './analysis/AnalysisLoadingState';
 import AnalysisErrorState from './analysis/AnalysisErrorState';
 import AnalysisResultDisplay from './analysis/AnalysisResultDisplay';
 import AnalysisStartButton from './analysis/AnalysisStartButton';
+import DataExtractionError from './analysis/DataExtractionError';
 
 interface CryptographicVisualizerProps {
   txid?: string;
   startAnalysis?: boolean;
+  transaction?: any;
 }
 
-const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicVisualizerProps) => {
+const CryptographicVisualizer = ({ txid, startAnalysis = false, transaction }: CryptographicVisualizerProps) => {
   const {
     analysisResult,
     isAnalyzing,
@@ -61,6 +63,28 @@ const CryptographicVisualizer = ({ txid, startAnalysis = false }: CryptographicV
   }
 
   if (error) {
+    // Check if this is a data extraction error specifically
+    if (error.includes("extract") || error.includes("cryptographic data")) {
+      return (
+        <Card className="bg-crypto-muted border-crypto-border h-full">
+          <CardHeader>
+            <CardTitle className="text-crypto-foreground">Data Extraction Failed</CardTitle>
+            <CardDescription className="text-crypto-foreground/70">
+              TXID: {txid.substring(0, 8)}...{txid.substring(txid.length - 8)}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="h-[280px] overflow-auto">
+            <DataExtractionError 
+              txid={txid} 
+              onRetry={handleAnalyzeTransaction}
+              transaction={transaction}
+            />
+          </CardContent>
+        </Card>
+      );
+    }
+    
+    // For other types of errors
     return (
       <Card className="bg-crypto-muted border-crypto-border h-full">
         <CardHeader>
