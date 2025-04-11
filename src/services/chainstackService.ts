@@ -4,6 +4,7 @@
 
 import { UTXO, TxInput, TxOutput } from '@/lib/walletUtils';
 import { toast } from 'sonner';
+import { safeFetch, shouldUseProxy } from './corsProxyService';
 
 // Default RPC endpoint for Bitcoin (this should be overridden by user configuration)
 const DEFAULT_RPC_ENDPOINT = 'https://blockchain.info';
@@ -19,16 +20,18 @@ export class ChainStackService {
   private rpcUrl: string;
   private apiKey: string | undefined;
   private proxyUrl: string | undefined;
+  private useCorsProxy: boolean;
   
   constructor(config?: ChainStackConfig) {
     this.rpcUrl = config?.rpcUrl || DEFAULT_RPC_ENDPOINT;
     this.apiKey = config?.apiKey;
     this.proxyUrl = config?.proxyUrl;
+    this.useCorsProxy = config?.useCorsProxy !== undefined ? config.useCorsProxy : true;
     
     // Remove any trailing slashes for consistency
     this.rpcUrl = this.rpcUrl.replace(/\/$/, '');
     
-    console.log(`ChainStack service initialized with URL: ${this.rpcUrl}`);
+    console.log(`ChainStack service initialized with URL: ${this.rpcUrl}, CORS proxy ${this.useCorsProxy ? 'enabled' : 'disabled'}`);
   }
   
   /**
@@ -50,8 +53,10 @@ export class ChainStackService {
     try {
       console.log(`Making RPC call to ${this.rpcUrl}: ${method} with params:`, params);
       
+      const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
+      
       // Direct RPC call to the node
-      const response = await fetch(this.rpcUrl, {
+      const response = await fetchFunction(this.rpcUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -98,7 +103,9 @@ export class ChainStackService {
       const url = `${this.rpcUrl === DEFAULT_RPC_ENDPOINT ? this.rpcUrl : 'https://blockchain.info'}/block-height/${height}?format=json`;
       console.log(`Using fallback blockchain.info API: ${url}`);
       
-      const response = await fetch(url);
+      const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
+      const response = await fetchFunction(url);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -122,7 +129,9 @@ export class ChainStackService {
       const url = `${this.rpcUrl === DEFAULT_RPC_ENDPOINT ? this.rpcUrl : 'https://blockchain.info'}/rawblock/${blockHash}`;
       console.log(`Using fallback blockchain.info API: ${url}`);
       
-      const response = await fetch(url);
+      const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
+      const response = await fetchFunction(url);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -140,8 +149,9 @@ export class ChainStackService {
    * @returns Response data
    */
   private async fetchData(url: string): Promise<any> {
-    try {      
-      const response = await fetch(url);
+    try {
+      const fetchFunction = this.useCorsProxy || shouldUseProxy(url) ? safeFetch : fetch;
+      const response = await fetchFunction(url);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -418,7 +428,9 @@ export class ChainStackService {
       const url = `https://blockchain.info/block-height/${height}?format=json`;
       console.log(`Falling back to blockchain.info API: ${url}`);
       
-      const response = await fetch(url);
+      const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
+      const response = await fetchFunction(url);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -455,7 +467,9 @@ export class ChainStackService {
       const url = `https://blockchain.info/rawblock/${blockHash}`;
       console.log(`Falling back to blockchain.info API: ${url}`);
       
-      const response = await fetch(url);
+      const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
+      const response = await fetchFunction(url);
+      
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -521,199 +535,7 @@ export class ChainStackService {
  * @returns Configured ChainStack service
  */
 export const initializeChainStack = (config: ChainStackConfig): ChainStackService => {
-  const rpcUrl = config?.rpcUrl || 'https://blockchain.info';
-  const apiKey = config?.apiKey || null;
-  
-  const service: ChainStackService = {
-    rpcUrl: rpcUrl,
-    apiKey: apiKey,
-    
-    /**
-     * Make an RPC call to the blockchain node
-     */
-    rpcCall: async (method: string, params: any[] = []): Promise<any> => {
-      try {
-        console.log(`Making RPC call to ${rpcUrl}: ${method} with params:`, params);
-        
-        // Import the CORS proxy service
-        const { safeFetch } = await import('./corsProxyService');
-        
-        const response = await safeFetch(rpcUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
-          },
-          body: JSON.stringify({
-            jsonrpc: '2.0',
-            id: Date.now().toString(),
-            method,
-            params
-          })
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
-        }
-        
-        const data = await response.json();
-        
-        if (data.error) {
-          throw new Error(`RPC error: ${JSON.stringify(data.error)}`);
-        }
-        
-        return data.result;
-      } catch (error) {
-        console.error(`ChainStack RPC error (${method}):`, error);
-        throw error;
-      }
-    },
-    
-    /**
-     * Helper method to make a GET request
-     * @param url URL to fetch
-     * @returns Response data
-     */
-    fetchData: async (url: string): Promise<any> => {
-      try {      
-        const response = await fetch(url);
-        
-        if (!response.ok) {
-          if (response.status === 404) {
-            return null;
-          }
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return await response.json();
-      } catch (error: any) {
-        throw error;
-      }
-    },
-    
-    /**
-     * Gets the current block height directly from the node
-     * @returns Current block height
-     */
-    getBlockHeight: async (): Promise<number> => {
-      try {
-        // Try direct RPC call first
-        try {
-          const blockchainInfo = await service.rpcCall('getblockchaininfo', []);
-          return blockchainInfo.blocks;
-        } catch (rpcError) {
-          console.warn("Failed to get blockheight via RPC, falling back to blockchain.info:", rpcError);
-          // Fallback to blockchain.info
-          const result = await fetch('https://blockchain.info/q/getblockcount');
-          const text = await result.text();
-          return parseInt(text, 10);
-        }
-      } catch (error) {
-        console.error("Failed to get block height:", error);
-        throw error;
-      }
-    },
-    
-    /**
-     * Gets transaction by txid
-     */
-    getTransaction: async (txid: string): Promise<any> => {
-      try {
-        // Attempt to use RPC method first
-        try {
-          return await service.rpcCall('getrawtransaction', [txid, true]);
-        } catch (error) {
-          console.error(`Failed to get transaction via RPC, falling back to blockchain.info:`, error);
-          
-          // Import the CORS proxy service
-          const { safeFetch } = await import('./corsProxyService');
-          
-          // Fallback to blockchain.info REST API
-          const response = await safeFetch(`https://blockchain.info/rawtx/${txid}`);
-          
-          if (!response.ok) {
-            throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
-          }
-          
-          return await response.json();
-        }
-      } catch (error) {
-        console.error(`Failed to get transaction ${txid}:`, error);
-        throw error;
-      }
-    },
-    
-    /**
-     * Gets block hash by height using blockchain API
-     * @param height Block height
-     * @returns Block hash or null if not found
-     */
-    getBlockHashByHeight: async (height: number): Promise<string | null> => {
-      try {
-        // Try direct RPC call
-        try {
-          console.log(`Getting block hash at height ${height} from ${rpcUrl}`);
-          const blockHash = await service.rpcCall('getblockhash', [height]);
-          return blockHash;
-        } catch (rpcError) {
-          console.warn("Failed to get block hash via RPC, falling back to blockchain.info:", rpcError);
-        }
-        
-        // Fallback to blockchain.info
-        const url = `https://blockchain.info/block-height/${height}?format=json`;
-        console.log(`Falling back to blockchain.info API: ${url}`);
-        
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        if (data?.blocks && data.blocks.length > 0) {
-          return data.blocks[0].hash;
-        }
-        
-        return null;
-      } catch (error) {
-        console.error(`Failed to get block hash for height ${height}:`, error);
-        return null;
-      }
-    },
-    
-    /**
-     * Gets full block data by hash using blockchain API
-     * @param blockHash Block hash
-     * @returns Block data or null if not found
-     */
-    getBlockByHash: async (blockHash: string): Promise<any | null> => {
-      try {
-        // Try direct RPC call
-        try {
-          console.log(`Getting block data for hash ${blockHash} from ${rpcUrl}`);
-          const blockData = await service.rpcCall('getblock', [blockHash, 2]);
-          return blockData;
-        } catch (rpcError) {
-          console.warn("Failed to get block via RPC, falling back to blockchain.info:", rpcError);
-        }
-        
-        // Fallback to blockchain.info
-        const url = `https://blockchain.info/rawblock/${blockHash}`;
-        console.log(`Falling back to blockchain.info API: ${url}`);
-        
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        return await response.json();
-      } catch (error) {
-        console.error(`Failed to get block data for hash ${blockHash}:`, error);
-        return null;
-      }
-    }
-  };
-  
-  return service;
+  return new ChainStackService(config);
 };
 
 // Create a default instance
