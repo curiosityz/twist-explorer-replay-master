@@ -3,6 +3,7 @@ import { toast } from 'sonner';
 import { chainstackService, ChainStackService } from './chainstackService';
 import { processTransactions } from './transactionService';
 import { analyzeTransaction } from '@/lib/vulnerability';
+import { extractSegWitData } from '@/lib/vulnerability/extraction/segwit/segWitExtractorCore';
 
 /**
  * Service to scan blockchain blocks and look for vulnerable transactions
@@ -174,7 +175,7 @@ export class BlockchainScannerService {
         const batchSize = 5;
         for (let i = 0; i < blockData.tx.length; i += batchSize) {
           const batch = blockData.tx.slice(i, i + batchSize);
-          await this.processTransactionBatch(batch);
+          await this.processTransactionBatch(batch, blockData);
           
           // Update status after each batch
           this._updateStatus();
@@ -198,23 +199,59 @@ export class BlockchainScannerService {
   /**
    * Process a batch of transactions
    * @param txids Array of transaction IDs to process
+   * @param blockData Full block data for context
    */
-  private async processTransactionBatch(txids: string[]): Promise<void> {
+  private async processTransactionBatch(txids: string[], blockData: any): Promise<void> {
     // Store transactions in the database
     const result = await processTransactions(txids);
     this.processedCount += result.successCount;
 
-    // Analyze each transaction for vulnerabilities
-    for (const txid of result.validTxids) {
+    // Enhanced: Analyze each transaction for vulnerabilities
+    for (const txid of txids) {
       try {
-        const analysisResult = await analyzeTransaction(txid);
-        
-        if (analysisResult && analysisResult.vulnerabilityType !== 'none') {
-          this.vulnerableCount++;
-          console.log(`Found vulnerable transaction: ${txid}`);
-          toast.success("Vulnerability found!", {
-            description: `TXID: ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)}`
-          });
+        // First, try to extract SegWit data directly from block data
+        // This helps us identify potential vulnerable transactions without fetching each one
+        const tx = blockData.tx.find((t: any) => t.txid === txid);
+        if (tx && tx.vin && Array.isArray(tx.vin)) {
+          // Look for witness data in inputs
+          for (const input of tx.vin) {
+            if (input.txinwitness && Array.isArray(input.txinwitness)) {
+              // Attempt to extract data from witness
+              try {
+                const extractedData = extractSegWitData(input.txinwitness);
+                if (extractedData && !extractedData.publicKey.isOnCurve) {
+                  console.log(`Potential vulnerability found in transaction ${txid} - analyzing further`);
+                  
+                  // Perform full analysis on promising transactions
+                  const analysisResult = await analyzeTransaction(txid);
+                  
+                  if (analysisResult && analysisResult.vulnerabilityType !== 'none') {
+                    this.vulnerableCount++;
+                    
+                    console.log(`Confirmed vulnerable transaction: ${txid}`);
+                    toast.success("Vulnerability found!", {
+                      description: `TXID: ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)}`
+                    });
+                    
+                    // Since these are high-value findings, analyze one at a time
+                    // to give the user a chance to explore each one
+                    if (this.vulnerableCount % 3 === 1) {
+                      toast.info("Scan paused briefly to let you review findings", {
+                        description: "Continuing in 5 seconds...",
+                        duration: 5000
+                      });
+                      
+                      // Small pause to allow user to see the result
+                      await new Promise(resolve => setTimeout(resolve, 5000));
+                    }
+                  }
+                }
+              } catch (extractError) {
+                // Just log and continue
+                console.error(`Error extracting SegWit data from ${txid}:`, extractError);
+              }
+            }
+          }
         }
       } catch (error) {
         // Just log errors and continue

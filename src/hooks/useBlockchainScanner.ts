@@ -64,10 +64,18 @@ export const useBlockchainScanner = () => {
     const intervalId = setInterval(() => {
       const updatedStatus = blockchainScannerService.getStatus();
       setScanStatus(updatedStatus);
+      
+      // Add toast notification when vulnerabilities are found
+      if (updatedStatus.vulnerableCount > scanStatus.vulnerableCount) {
+        const newVulnerabilities = updatedStatus.vulnerableCount - scanStatus.vulnerableCount;
+        toast.info(`${newVulnerabilities} new vulnerable transaction${newVulnerabilities > 1 ? 's' : ''} found!`, {
+          description: "Check the transactions page for details"
+        });
+      }
     }, 1000);
     
     return () => clearInterval(intervalId);
-  }, [scanStatus.isScanning]);
+  }, [scanStatus.isScanning, scanStatus.vulnerableCount]);
   
   const fetchLatestBlockHeight = async (chainService = chainstackService) => {
     if (!nodeConfig?.connected && chainService === chainstackService) {
