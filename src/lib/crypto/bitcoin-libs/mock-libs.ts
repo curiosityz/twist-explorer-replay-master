@@ -86,17 +86,46 @@ export const initializeMockLibraries = (): void => {
         result[0] = 0x02; // Even y-coordinate prefix
         return result;
       },
-      publicKeyConvert: (publicKey: Uint8Array): Uint8Array => {
-        // Convert to uncompressed format (65 bytes: prefix + x + y coordinates)
-        const result = new Uint8Array(65);
-        result[0] = 0x04; // Uncompressed format prefix
-        
-        // Copy the x-coordinate if available
-        if (publicKey.length >= 33) {
+      publicKeyConvert: (publicKey: Uint8Array, compressed = true): Uint8Array => {
+        // If input is compressed (33 bytes) and we want uncompressed
+        if (publicKey.length === 33 && !compressed) {
+          // Convert to uncompressed format (65 bytes: prefix + x + y coordinates)
+          const result = new Uint8Array(65);
+          result[0] = 0x04; // Uncompressed format prefix
+          
+          // Copy the x-coordinate if available
+          if (publicKey.length >= 33) {
+            result.set(publicKey.slice(1, 33), 1);
+          }
+          
+          // Generate a fake y-coordinate based on x
+          // In real implementation, this would be calculated using the curve equation
+          for (let i = 0; i < 32; i++) {
+            result[33 + i] = (publicKey[1 + (31 - i)] + i) % 256;
+          }
+          
+          return result;
+        } 
+        // If input is uncompressed (65 bytes) and we want compressed
+        else if (publicKey.length === 65 && compressed) {
+          // Generate compressed key (33 bytes: prefix + x-coordinate)
+          const result = new Uint8Array(33);
+          
+          // Use even prefix (02) for simplicity
+          result[0] = 0x02;
+          
+          // Copy x-coordinate
           result.set(publicKey.slice(1, 33), 1);
+          
+          return result;
         }
         
-        return result;
+        // If already in desired format, return a copy
+        return new Uint8Array(publicKey);
+      },
+      // Add decompress as an alias for publicKeyConvert for implementations that use this name
+      decompress: function(publicKey: Uint8Array): Uint8Array {
+        return this.publicKeyConvert(publicKey, false);
       },
       ecdsaSign: () => {
         return {
@@ -105,7 +134,14 @@ export const initializeMockLibraries = (): void => {
         };
       },
       ecdsaVerify: () => true,
-      publicKeyVerify: () => true
+      publicKeyVerify: () => true,
+      utils: {
+        // Add pointDecompress for noble-secp256k1 compatibility
+        pointDecompress: function(p: Uint8Array): Uint8Array {
+          // This should convert a compressed point to uncompressed
+          return (window as any).secp256k1.publicKeyConvert(p, false);
+        }
+      }
     };
     
     // Add aliases
@@ -150,10 +186,41 @@ export const initializeMockLibraries = (): void => {
         })
       },
       ECDSA: {
-        parseSig: () => ({
-          r: BigInt(1),
-          s: BigInt(1)
-        }),
+        parseSig: (hex: string) => {
+          // Extract r and s values from DER format if possible
+          let r = BigInt(1);
+          let s = BigInt(1);
+          
+          // Simple DER signature parsing
+          try {
+            if (hex.length > 8) {
+              // Try to get actual r and s values from the signature
+              const rLength = parseInt(hex.substring(6, 8), 16);
+              const rEnd = 8 + rLength * 2;
+              const rHex = hex.substring(8, rEnd);
+              
+              const sMarkerPos = rEnd + 2;
+              const sLengthPos = sMarkerPos + 2;
+              const sLength = parseInt(hex.substring(sLengthPos, sLengthPos + 2), 16);
+              const sStart = sLengthPos + 2;
+              const sEnd = sStart + sLength * 2;
+              const sHex = hex.substring(sStart, sEnd);
+              
+              // Parse hex values to bigint
+              if (rHex && sHex) {
+                r = BigInt(`0x${rHex}`);
+                s = BigInt(`0x${sHex}`);
+              }
+            }
+          } catch (e) {
+            console.warn("Mock DER parsing failed, using defaults", e);
+          }
+          
+          return {
+            r,
+            s
+          };
+        },
         parseSigCompact: () => ({
           r: BigInt(1),
           s: BigInt(1),
