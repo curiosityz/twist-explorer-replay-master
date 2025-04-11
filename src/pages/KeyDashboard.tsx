@@ -53,7 +53,15 @@ const KeyDashboard = () => {
           if (needsRecovery) {
             try {
               console.log(`Attempting to recover key for ${key.id}`);
-              const recoveredKey = combinePrivateKeyFragments(key.modulo_values);
+              // Convert modulo_values to proper format expected by combinePrivateKeyFragments
+              // This handles the case when the data from Supabase is not in the right format
+              const formattedModuloValues: Record<string, string> = {};
+              
+              Object.entries(key.modulo_values).forEach(([mod, val]) => {
+                formattedModuloValues[String(mod)] = String(val);
+              });
+              
+              const recoveredKey = combinePrivateKeyFragments(formattedModuloValues);
               
               if (recoveredKey) {
                 console.log(`Successfully recovered key for ${key.id}`);
