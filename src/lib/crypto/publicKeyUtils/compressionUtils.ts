@@ -181,7 +181,7 @@ export const createCompressedPublicKey = (publicKey: string | { x: string, y: st
     
     // Determine prefix based on y coordinate's parity
     const yValue = BigInt(`0x${y}`);
-    const prefix = yValue % 2n === 0n ? '02' : '03';
+    const prefix = yValue % BigInt(2) === BigInt(0) ? '02' : '03';
     
     // Combine prefix with x coordinate
     return `${prefix}${x}`;
