@@ -32,6 +32,9 @@ export const useBlockchainScanner = () => {
         apiKey: nodeConfig.apiKey
       });
       
+      // Set this custom chainstack service for the blockchain scanner
+      blockchainScannerService.setChainStackService(customChainstack);
+      
       // Update start and end blocks based on last sync block if available
       if (nodeConfig.lastSyncBlock) {
         const lastBlockHeight = nodeConfig.lastSyncBlock;

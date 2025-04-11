@@ -5,7 +5,7 @@
 import { UTXO, TxInput, TxOutput } from '@/lib/walletUtils';
 import { toast } from 'sonner';
 
-// Default RPC endpoint for Bitcoin (updated to use a CORS-friendly endpoint)
+// Default RPC endpoint for Bitcoin (this should be overridden by user configuration)
 const DEFAULT_RPC_ENDPOINT = 'https://blockchain.info/rawblock/';
 
 interface ChainStackConfig {
@@ -45,26 +45,6 @@ export class ChainStackService {
     try {
       console.log(`Making RPC call: ${method} with params:`, params);
       
-      // If we have a proxy URL, use it instead of direct API call
-      if (this.proxyUrl) {
-        const url = `${this.proxyUrl}?method=${method}&params=${encodeURIComponent(JSON.stringify(params))}`;
-        console.log(`Using proxy URL: ${url}`);
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          headers,
-          mode: 'cors',
-        });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        console.log(`RPC response via proxy:`, data);
-        return data;
-      }
-      
       // Direct RPC call to the node
       const response = await fetch(this.rpcUrl, {
         method: 'POST',
@@ -93,6 +73,58 @@ export class ChainStackService {
       return data.result;
     } catch (error: any) {
       console.error(`ChainStack RPC error (${method}):`, error);
+      
+      // For getblockhash and getblock methods, try fallbacks to blockchain.info API
+      if (method === 'getblockhash' && params.length > 0) {
+        return this.fallbackGetBlockHashByHeight(params[0]);
+      } else if (method === 'getblock' && params.length > 0) {
+        return this.fallbackGetBlockByHash(params[0]);
+      }
+      
+      throw error;
+    }
+  }
+  
+  /**
+   * Fallback implementation for getblockhash using blockchain.info API
+   */
+  private async fallbackGetBlockHashByHeight(height: number): Promise<string> {
+    try {
+      const url = `https://blockchain.info/block-height/${height}?format=json`;
+      console.log(`Using fallback blockchain.info API: ${url}`);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data?.blocks && data.blocks.length > 0) {
+        return data.blocks[0].hash;
+      }
+      throw new Error(`No block found at height ${height}`);
+    } catch (error) {
+      console.error(`Fallback getblockhash failed:`, error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Fallback implementation for getblock using blockchain.info API
+   */
+  private async fallbackGetBlockByHash(blockHash: string): Promise<any> {
+    try {
+      const url = `https://blockchain.info/rawblock/${blockHash}`;
+      console.log(`Using fallback blockchain.info API: ${url}`);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Fallback getblock failed:`, error);
       throw error;
     }
   }

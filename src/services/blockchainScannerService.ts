@@ -1,6 +1,6 @@
 
 import { toast } from 'sonner';
-import { chainstackService } from './chainstackService';
+import { chainstackService, ChainStackService } from './chainstackService';
 import { processTransactions } from './transactionService';
 import { analyzeTransaction } from '@/lib/vulnerability';
 
@@ -18,6 +18,20 @@ export class BlockchainScannerService {
   private statusCallback: ((status: ScanningStatus) => void) | null = null;
   private consecutiveErrorCount = 0;
   private maxConsecutiveErrors = 5;
+  private chainStackService: ChainStackService;
+
+  constructor() {
+    this.chainStackService = chainstackService;
+  }
+
+  /**
+   * Set a custom chainstack service
+   * @param service The custom chainstack service
+   */
+  setChainStackService(service: ChainStackService): void {
+    this.chainStackService = service;
+    console.log("ChainStack service updated with custom configuration");
+  }
 
   /**
    * Start scanning the blockchain for vulnerable transactions
@@ -210,29 +224,29 @@ export class BlockchainScannerService {
   }
 
   /**
-   * Get block hash by height using blockchain API with retries
+   * Get block hash by height using the configured chainstack service
    * @param height Block height
    * @returns Block hash or null if not found
    */
   private async getBlockHashByHeight(height: number): Promise<string | null> {
     try {
-      return await chainstackService.getBlockHashByHeight(height);
+      return await this.chainStackService.getBlockHashByHeight(height);
     } catch (error) {
-      console.error(`Failed to get block hash for height ${height} after retries:`, error);
+      console.error(`Failed to get block hash for height ${height}:`, error);
       return null;
     }
   }
 
   /**
-   * Get full block data by hash using blockchain API with retries
+   * Get full block data by hash using the configured chainstack service
    * @param blockHash Block hash
    * @returns Block data or null if not found
    */
   private async getBlockByHash(blockHash: string): Promise<any | null> {
     try {
-      return await chainstackService.getBlockByHash(blockHash);
+      return await this.chainStackService.getBlockByHash(blockHash);
     } catch (error) {
-      console.error(`Failed to get block data for hash ${blockHash} after retries:`, error);
+      console.error(`Failed to get block data for hash ${blockHash}:`, error);
       return null;
     }
   }
