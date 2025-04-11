@@ -188,12 +188,12 @@ export class BlockchainScannerService {
    */
   private async getBlockHashByHeight(height: number): Promise<string | null> {
     try {
-      // Try direct RPC call
+      // Try direct API call through chainstackService
       try {
-        const blockHash = await chainstackService.rpcCall('getblockhash', [height]);
-        return blockHash;
+        const blockHash = await chainstackService.getBlockHashByHeight(height);
+        if (blockHash) return blockHash;
       } catch (rpcError) {
-        console.warn("Failed to get block hash via RPC, falling back to blockchain.info:", rpcError);
+        console.warn("Failed to get block hash via API, falling back to blockchain.info:", rpcError);
       }
       
       // Fallback to blockchain.info
@@ -221,12 +221,12 @@ export class BlockchainScannerService {
    */
   private async getBlockByHash(blockHash: string): Promise<any | null> {
     try {
-      // Try direct RPC call
+      // Try direct API call through chainstackService
       try {
-        const blockData = await chainstackService.rpcCall('getblock', [blockHash, 2]);
-        return blockData;
+        const blockData = await chainstackService.getBlockByHash(blockHash);
+        if (blockData) return blockData;
       } catch (rpcError) {
-        console.warn("Failed to get block via RPC, falling back to blockchain.info:", rpcError);
+        console.warn("Failed to get block via API, falling back to blockchain.info:", rpcError);
       }
       
       // Fallback to blockchain.info

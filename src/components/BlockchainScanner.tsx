@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useBlockchainScanner } from '@/hooks/useBlockchainScanner';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Refresh, Play, StopCircle, Search, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Play, StopCircle, Search, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 const BlockchainScanner: React.FC = () => {
@@ -78,7 +78,7 @@ const BlockchainScanner: React.FC = () => {
                 disabled={isLoadingLatest || scanStatus.isScanning}
                 className="flex-shrink-0"
               >
-                <Refresh className={`h-4 w-4 ${isLoadingLatest ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isLoadingLatest ? 'animate-spin' : ''}`} />
               </Button>
             </div>
             <div className="text-xs text-crypto-foreground/60">

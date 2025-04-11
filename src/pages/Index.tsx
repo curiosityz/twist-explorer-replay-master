@@ -26,9 +26,13 @@ const Index = () => {
       <h1 className="text-2xl font-bold text-center mb-6 text-crypto-foreground">
         Bitcoin Vulnerability Scanner
       </h1>
-      <div className="grid grid-cols-1 gap-6">
+      
+      {/* Give the scanner more prominence */}
+      <div className="grid grid-cols-1 gap-6 mb-8">
         <BlockchainScanner />
-        
+      </div>
+      
+      <div className="grid grid-cols-1 gap-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1">
             <TransactionFetcher onFetch={handleFetchTransaction} />

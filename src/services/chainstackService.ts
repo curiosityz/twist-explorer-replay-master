@@ -1,4 +1,3 @@
-
 /**
  * ChainStack API service for blockchain interactions
  */
@@ -32,7 +31,7 @@ export class ChainStackService {
    * @param params Parameters for the RPC call
    * @returns Response from the node
    */
-  private async rpcCall(method: string, params: any[] = []): Promise<any> {
+  public async rpcCall(method: string, params: any[] = []): Promise<any> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -347,6 +346,67 @@ export class ChainStackService {
     } catch (error) {
       console.error(`Failed to get transaction details for ${txid}:`, error);
       throw error;
+    }
+  }
+
+  /**
+   * Gets block hash by height using blockchain API
+   * @param height Block height
+   * @returns Block hash or null if not found
+   */
+  async getBlockHashByHeight(height: number): Promise<string | null> {
+    try {
+      // Try direct RPC call
+      try {
+        const blockHash = await this.rpcCall('getblockhash', [height]);
+        return blockHash;
+      } catch (rpcError) {
+        console.warn("Failed to get block hash via RPC, falling back to blockchain.info:", rpcError);
+      }
+      
+      // Fallback to blockchain.info
+      const response = await fetch(`https://blockchain.info/block-height/${height}?format=json`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      if (data.blocks && data.blocks.length > 0) {
+        return data.blocks[0].hash;
+      }
+      
+      return null;
+    } catch (error) {
+      console.error(`Failed to get block hash for height ${height}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Gets full block data by hash using blockchain API
+   * @param blockHash Block hash
+   * @returns Block data or null if not found
+   */
+  async getBlockByHash(blockHash: string): Promise<any | null> {
+    try {
+      // Try direct RPC call
+      try {
+        const blockData = await this.rpcCall('getblock', [blockHash, 2]);
+        return blockData;
+      } catch (rpcError) {
+        console.warn("Failed to get block via RPC, falling back to blockchain.info:", rpcError);
+      }
+      
+      // Fallback to blockchain.info
+      const response = await fetch(`https://blockchain.info/rawblock/${blockHash}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error(`Failed to get block data for hash ${blockHash}:`, error);
+      return null;
     }
   }
   
