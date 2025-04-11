@@ -3,6 +3,9 @@
  * Main export file for Bitcoin libraries functionality
  */
 
+import { REQUIRED_LIBRARIES, LIBRARY_ALIASES } from './types';
+import { initializeMockLibraries } from './mock-libs';
+
 export { checkBitcoinLibsLoaded, isLibrariesLoaded } from './check-status';
 export type { BitcoinLibsCheckResult } from './types';
 export { REQUIRED_LIBRARIES, LIBRARY_ALIASES } from './types';
@@ -55,8 +58,6 @@ export const refreshLibraryReferences = (): void => {
  * @returns Array of missing library names
  */
 export const checkRequiredLibraries = (): string[] => {
-  const { REQUIRED_LIBRARIES, LIBRARY_ALIASES } = require('./types');
-  
   return REQUIRED_LIBRARIES.filter(lib => {
     // Check for direct references
     if (window[lib as keyof Window]) {
@@ -76,8 +77,6 @@ export const checkRequiredLibraries = (): string[] => {
 export const handleMissingLibraries = (missingLibs: string[]): void => {
   if (missingLibs.length > 0) {
     console.warn(`Missing libraries: ${missingLibs.join(', ')}`);
-    // Import the mock library initializer
-    const { initializeMockLibraries } = require('./mock-libs');
     initializeMockLibraries();
   }
 };

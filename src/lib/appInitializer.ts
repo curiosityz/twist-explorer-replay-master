@@ -67,7 +67,7 @@ export async function initializeApplication(): Promise<void> {
       
       // If we're out of retries, warn the user but don't block the application
       console.error("Could not load all required libraries:", libStatus.missing);
-      toast("Warning: Some crypto features may have limited functionality", {
+      toast.warning("Some crypto features may have limited functionality", {
         description: "Not all required libraries could be loaded",
         duration: 5000,
       });
