@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { supabase, Tables } from '@/integrations/supabase/client';
-import { ArrowLeft, Check, Copy, Database, Key, Lock, Unlock, Wallet } from 'lucide-react';
+import { ArrowLeft, Check, Copy, Database, Key, Lock, Unlock, Wallet, RefreshCw } from 'lucide-react';
 import { format } from 'date-fns';
 import { combinePrivateKeyFragments } from '@/lib/cryptoUtils';
 import { toast } from 'sonner';
@@ -14,31 +14,90 @@ const KeyDashboard = () => {
   const [keys, setKeys] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchKeys = async () => {
-      setLoading(true);
-      
-      try {
-        const { data, error } = await supabase
-          .from(Tables.private_key_fragments)
-          .select('*')
-          .order('updated_at', { ascending: false });
-          
-        if (error) {
-          console.error('Error fetching keys:', error);
-          setLoading(false);
-          return;
-        }
-        
-        setKeys(data || []);
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Function to fetch keys from the database
+  const fetchKeys = async () => {
+    setLoading(true);
     
+    try {
+      const { data, error } = await supabase
+        .from(Tables.private_key_fragments)
+        .select('*')
+        .order('updated_at', { ascending: false });
+        
+      if (error) {
+        console.error('Error fetching keys:', error);
+        toast.error('Failed to load key data');
+        setLoading(false);
+        return;
+      }
+      
+      // Make sure data exists and is properly formatted
+      if (data && Array.isArray(data)) {
+        console.log(`Fetched ${data.length} keys from database`);
+        
+        // Process each key to ensure it has the required fields
+        const processedKeys = data.map(key => {
+          // Verify the modulo_values field exists and is properly formatted
+          const hasModuloValues = key.modulo_values && 
+            typeof key.modulo_values === 'object' && 
+            Object.keys(key.modulo_values).length > 0;
+          
+          // Check if we need to attempt recovery of the key
+          const needsRecovery = hasModuloValues && 
+            !key.combined_fragments && 
+            Object.keys(key.modulo_values).length >= 6;
+          
+          // If we need to recover the key, do so now
+          if (needsRecovery) {
+            try {
+              console.log(`Attempting to recover key for ${key.id}`);
+              const recoveredKey = combinePrivateKeyFragments(key.modulo_values);
+              
+              if (recoveredKey) {
+                console.log(`Successfully recovered key for ${key.id}`);
+                key.combined_fragments = recoveredKey;
+                key.completed = true;
+                
+                // Update the database with the recovered key
+                supabase
+                  .from(Tables.private_key_fragments)
+                  .update({ 
+                    combined_fragments: recoveredKey,
+                    completed: true
+                  })
+                  .eq('id', key.id)
+                  .then(({ error }) => {
+                    if (error) {
+                      console.error('Error updating database with recovered key:', error);
+                    } else {
+                      console.log(`Updated database with recovered key for ${key.id}`);
+                    }
+                  });
+              }
+            } catch (recoveryError) {
+              console.error(`Error recovering key for ${key.id}:`, recoveryError);
+            }
+          }
+          
+          return key;
+        });
+        
+        setKeys(processedKeys);
+      } else {
+        setKeys([]);
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Failed to process key data');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Fetch keys on component mount
+  useEffect(() => {
     fetchKeys();
   }, []);
 
@@ -75,6 +134,13 @@ const KeyDashboard = () => {
     
     toast.success(`Exported ${keysData.length} keys`);
   };
+  
+  const refreshKeyData = async () => {
+    setRefreshing(true);
+    await fetchKeys();
+    setRefreshing(false);
+    toast.success('Key data refreshed');
+  };
 
   return (
     <div className="min-h-screen bg-crypto-background text-crypto-foreground p-6">
@@ -89,7 +155,22 @@ const KeyDashboard = () => {
           <h1 className="text-2xl font-bold">Recovered Private Keys</h1>
           
           <div className="ml-auto flex space-x-2">
-            <Button variant="outline" size="sm" onClick={exportAllKeys}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={refreshKeyData}
+              disabled={refreshing}
+            >
+              <RefreshCw className={`h-4 w-4 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={exportAllKeys}
+              disabled={keys.filter(k => k.completed).length === 0}
+            >
               <Copy className="h-4 w-4 mr-1" />
               Export All
             </Button>
@@ -120,7 +201,10 @@ const KeyDashboard = () => {
         <CardContent>
           {loading ? (
             <div className="py-8 text-center text-crypto-foreground/70">
-              Loading keys...
+              <div className="flex items-center justify-center mb-2">
+                <RefreshCw className="h-5 w-5 animate-spin mr-2" />
+                Loading keys...
+              </div>
             </div>
           ) : keys.length === 0 ? (
             <div className="py-8 text-center text-crypto-foreground/70">
@@ -136,7 +220,9 @@ const KeyDashboard = () => {
           ) : (
             <div className="space-y-4">
               {keys.map((key) => (
-                <div key={key.id} className="border border-crypto-border rounded-md p-4 bg-crypto-muted/30">
+                <div key={key.id} className={`border rounded-md p-4 ${
+                  key.completed ? 'border-green-500/20 bg-green-500/5' : 'border-crypto-border bg-crypto-muted/30'
+                }`}>
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center">
                       {key.completed ? (
@@ -145,7 +231,7 @@ const KeyDashboard = () => {
                         <Lock className="h-5 w-5 mr-2 text-amber-400" />
                       )}
                       <span className="font-mono text-sm truncate max-w-[240px]">
-                        {key.public_key_hex.substring(0, 16)}...
+                        {key.public_key_hex?.substring(0, 16)}...
                       </span>
                     </div>
                     <Badge variant={key.completed ? "default" : "secondary"} className="font-mono text-xs">
@@ -154,7 +240,7 @@ const KeyDashboard = () => {
                   </div>
                   
                   <div className="text-sm mb-3">
-                    <div><span className="text-crypto-foreground/70">Fragments:</span> {Object.keys(key.modulo_values).length}</div>
+                    <div><span className="text-crypto-foreground/70">Fragments:</span> {Object.keys(key.modulo_values || {}).length}</div>
                     <div><span className="text-crypto-foreground/70">Updated:</span> {format(new Date(key.updated_at), 'MMM dd, yyyy HH:mm')}</div>
                   </div>
                   
