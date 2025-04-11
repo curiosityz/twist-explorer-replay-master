@@ -236,4 +236,3 @@ function modPow(a: bigint, b: bigint, n: bigint): bigint {
   
   return result;
 }
-
