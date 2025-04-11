@@ -100,7 +100,8 @@ export const useBlockchainScanner = () => {
     
     setIsLoadingLatest(true);
     try {
-      console.log(`Fetching latest block height from ${serviceToUse.rpcUrl || 'default endpoint'}`);
+      // Use a safe way to log the endpoint without directly accessing private properties
+      console.log(`Fetching latest block height from ${nodeConfig?.rpcUrl || 'default endpoint'}`);
       const blockHeight = await serviceToUse.getBlockHeight();
       setLatestBlock(blockHeight);
       
