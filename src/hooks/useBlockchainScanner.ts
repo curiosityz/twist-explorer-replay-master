@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { ScanningStatus, blockchainScannerService } from '@/services/blockchainScannerService';
-import { chainstackService } from '@/services/chainstackService';
+import { NodeConfiguration } from '@/types';
+import { chainstackService, initializeChainStack } from '@/services/chainstackService';
 import { toast } from 'sonner';
 
 export const useBlockchainScanner = () => {
@@ -21,6 +22,34 @@ export const useBlockchainScanner = () => {
   const [customStartBlock, setCustomStartBlock] = useState<number>(0);
   const [customEndBlock, setCustomEndBlock] = useState<number>(0);
   
+  const [nodeConfig, setNodeConfig] = useState<NodeConfiguration | null>(null);
+  
+  // Update chainstack service when node config changes
+  useEffect(() => {
+    if (nodeConfig && nodeConfig.connected) {
+      const customChainstack = initializeChainStack({
+        rpcUrl: nodeConfig.rpcUrl,
+        apiKey: nodeConfig.apiKey,
+        useCorsProxy: true
+      });
+      
+      // Update start and end blocks based on last sync block if available
+      if (nodeConfig.lastSyncBlock) {
+        const lastBlockHeight = nodeConfig.lastSyncBlock;
+        setCustomStartBlock(Math.max(lastBlockHeight - 10, 0));
+        setCustomEndBlock(lastBlockHeight);
+        setLatestBlock(lastBlockHeight);
+      }
+      
+      // Fetch latest block height with the new configuration
+      fetchLatestBlockHeight(customChainstack);
+      
+      toast.success(`Connected to ${nodeConfig.name}`, {
+        description: `Using node at block height ${nodeConfig.lastSyncBlock || 'unknown'}`
+      });
+    }
+  }, [nodeConfig]);
+  
   // Fetch the latest block height when component mounts
   useEffect(() => {
     fetchLatestBlockHeight();
@@ -38,10 +67,14 @@ export const useBlockchainScanner = () => {
     return () => clearInterval(intervalId);
   }, [scanStatus.isScanning]);
   
-  const fetchLatestBlockHeight = async () => {
+  const fetchLatestBlockHeight = async (chainService = chainstackService) => {
+    if (!nodeConfig?.connected && chainService === chainstackService) {
+      return; // Don't fetch if not connected to a node, unless using a custom service
+    }
+    
     setIsLoadingLatest(true);
     try {
-      const blockHeight = await chainstackService.getBlockHeight();
+      const blockHeight = await chainService.getBlockHeight();
       setLatestBlock(blockHeight);
       
       // Set default custom range values (a small window for testing)
@@ -56,6 +89,11 @@ export const useBlockchainScanner = () => {
   };
   
   const startScan = async (startBlock: number, endBlock: number) => {
+    if (!nodeConfig?.connected) {
+      toast.error('Please connect to a node first');
+      return;
+    }
+    
     if (startBlock > endBlock) {
       toast.error('Start block cannot be greater than end block');
       return;
@@ -95,6 +133,8 @@ export const useBlockchainScanner = () => {
     setCustomEndBlock,
     startScan,
     stopScan,
-    refreshLatestBlock: fetchLatestBlockHeight
+    refreshLatestBlock: () => fetchLatestBlockHeight(),
+    nodeConfig,
+    setNodeConfig
   };
 };
