@@ -44,8 +44,8 @@ export const useBlockchainScanner = () => {
       const blockHeight = await chainstackService.getBlockHeight();
       setLatestBlock(blockHeight);
       
-      // Set default custom range values
-      setCustomStartBlock(Math.max(blockHeight - 10, 0));
+      // Set default custom range values (a small window for testing)
+      setCustomStartBlock(Math.max(blockHeight - 5, 0));
       setCustomEndBlock(blockHeight);
     } catch (error) {
       console.error('Failed to fetch latest block height:', error);
@@ -67,7 +67,7 @@ export const useBlockchainScanner = () => {
     }
     
     const blockRange = endBlock - startBlock;
-    if (blockRange > 50) {
+    if (blockRange > 20) {
       const confirmed = window.confirm(
         `You're about to scan ${blockRange} blocks, which may take a while and use significant resources. Continue?`
       );

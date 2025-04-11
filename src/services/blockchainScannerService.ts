@@ -16,6 +16,8 @@ export class BlockchainScannerService {
   private processedCount = 0;
   private vulnerableCount = 0;
   private statusCallback: ((status: ScanningStatus) => void) | null = null;
+  private consecutiveErrorCount = 0;
+  private maxConsecutiveErrors = 5;
 
   /**
    * Start scanning the blockchain for vulnerable transactions
@@ -42,6 +44,7 @@ export class BlockchainScannerService {
     this.processedCount = 0;
     this.vulnerableCount = 0;
     this.statusCallback = statusCallback || null;
+    this.consecutiveErrorCount = 0;
 
     toast.success("Starting blockchain scan", {
       description: `Scanning blocks ${startHeight} to ${endHeight}`
@@ -126,11 +129,29 @@ export class BlockchainScannerService {
       try {
         // Get block hash for this height
         const blockHash = await this.getBlockHashByHeight(height);
-        if (!blockHash) continue;
+        if (!blockHash) {
+          console.warn(`Could not get hash for block at height ${height}, skipping...`);
+          this.consecutiveErrorCount++;
+          
+          if (this.consecutiveErrorCount >= this.maxConsecutiveErrors) {
+            toast.error("Too many consecutive errors", {
+              description: "Stopping scan to prevent further issues"
+            });
+            break;
+          }
+          
+          continue;
+        }
+
+        // Reset consecutive error count when successful
+        this.consecutiveErrorCount = 0;
 
         // Get full block data
         const blockData = await this.getBlockByHash(blockHash);
-        if (!blockData || !blockData.tx || !Array.isArray(blockData.tx)) continue;
+        if (!blockData || !blockData.tx || !Array.isArray(blockData.tx)) {
+          console.warn(`Invalid block data for block ${height}, skipping...`);
+          continue;
+        }
 
         // Process all transactions in the block
         console.log(`Processing block ${height} with ${blockData.tx.length} transactions`);
@@ -148,7 +169,14 @@ export class BlockchainScannerService {
         }
       } catch (error) {
         console.error(`Error processing block ${height}:`, error);
-        // Continue to next block even if there's an error
+        this.consecutiveErrorCount++;
+        
+        if (this.consecutiveErrorCount >= this.maxConsecutiveErrors) {
+          toast.error("Too many consecutive errors", {
+            description: "Stopping scan to prevent further issues"
+          });
+          break;
+        }
       }
     }
   }
@@ -182,62 +210,29 @@ export class BlockchainScannerService {
   }
 
   /**
-   * Get block hash by height using blockchain API
+   * Get block hash by height using blockchain API with retries
    * @param height Block height
    * @returns Block hash or null if not found
    */
   private async getBlockHashByHeight(height: number): Promise<string | null> {
     try {
-      // Try direct API call through chainstackService
-      try {
-        const blockHash = await chainstackService.getBlockHashByHeight(height);
-        if (blockHash) return blockHash;
-      } catch (rpcError) {
-        console.warn("Failed to get block hash via API, falling back to blockchain.info:", rpcError);
-      }
-      
-      // Fallback to blockchain.info
-      const response = await fetch(`https://blockchain.info/block-height/${height}?format=json`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      if (data.blocks && data.blocks.length > 0) {
-        return data.blocks[0].hash;
-      }
-      
-      return null;
+      return await chainstackService.getBlockHashByHeight(height);
     } catch (error) {
-      console.error(`Failed to get block hash for height ${height}:`, error);
+      console.error(`Failed to get block hash for height ${height} after retries:`, error);
       return null;
     }
   }
 
   /**
-   * Get full block data by hash using blockchain API
+   * Get full block data by hash using blockchain API with retries
    * @param blockHash Block hash
    * @returns Block data or null if not found
    */
   private async getBlockByHash(blockHash: string): Promise<any | null> {
     try {
-      // Try direct API call through chainstackService
-      try {
-        const blockData = await chainstackService.getBlockByHash(blockHash);
-        if (blockData) return blockData;
-      } catch (rpcError) {
-        console.warn("Failed to get block via API, falling back to blockchain.info:", rpcError);
-      }
-      
-      // Fallback to blockchain.info
-      const response = await fetch(`https://blockchain.info/rawblock/${blockHash}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
+      return await chainstackService.getBlockByHash(blockHash);
     } catch (error) {
-      console.error(`Failed to get block data for hash ${blockHash}:`, error);
+      console.error(`Failed to get block data for hash ${blockHash} after retries:`, error);
       return null;
     }
   }
