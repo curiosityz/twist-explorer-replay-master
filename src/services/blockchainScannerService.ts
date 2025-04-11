@@ -142,6 +142,7 @@ export class BlockchainScannerService {
       this._updateStatus();
 
       try {
+        console.log(`Processing block at height ${height}`);
         // Get block hash for this height
         const blockHash = await this.getBlockHashByHeight(height);
         if (!blockHash) {
@@ -162,6 +163,7 @@ export class BlockchainScannerService {
         this.consecutiveErrorCount = 0;
 
         // Get full block data
+        console.log(`Getting full block data for hash ${blockHash}`);
         const blockData = await this.getBlockByHash(blockHash);
         if (!blockData || !blockData.tx || !Array.isArray(blockData.tx)) {
           console.warn(`Invalid block data for block ${height}, skipping...`);
@@ -170,6 +172,14 @@ export class BlockchainScannerService {
 
         // Process all transactions in the block
         console.log(`Processing block ${height} with ${blockData.tx.length} transactions`);
+        
+        // Display a notification about scanning block
+        if (height % 3 === 0) {  // Show notification every few blocks
+          toast.info(`Scanning block ${height}`, {
+            description: `Found ${blockData.tx.length} transactions to analyze`,
+            duration: 2000
+          });
+        }
         
         // Process transactions in smaller batches to avoid overwhelming the browser
         const batchSize = 5;
@@ -202,59 +212,120 @@ export class BlockchainScannerService {
    * @param blockData Full block data for context
    */
   private async processTransactionBatch(txids: string[], blockData: any): Promise<void> {
+    console.log(`Processing batch of ${txids.length} transactions`);
     // Store transactions in the database
     const result = await processTransactions(txids);
     this.processedCount += result.successCount;
 
+    // Show info on how many transactions are being processed
+    if (this.processedCount % 20 === 0) {
+      toast.info(`Processing transactions`, { 
+        description: `Processed ${this.processedCount} transactions so far`
+      });
+    }
+
     // Enhanced: Analyze each transaction for vulnerabilities
     for (const txid of txids) {
       try {
-        // First, try to extract SegWit data directly from block data
-        // This helps us identify potential vulnerable transactions without fetching each one
-        const tx = blockData.tx.find((t: any) => t.txid === txid);
-        if (tx && tx.vin && Array.isArray(tx.vin)) {
-          // Look for witness data in inputs
+        // Check if transaction object exists in the blockData
+        const tx = blockData.tx.find((t: any) => t.txid === txid || t.hash === txid);
+        if (!tx) {
+          console.warn(`Transaction ${txid} not found in block data`);
+          continue;
+        }
+
+        console.log(`Checking transaction ${txid} for witness data...`);
+        
+        // Check if this transaction has inputs with witness data
+        if (tx.vin && Array.isArray(tx.vin)) {
+          let potentialVulnerability = false;
+          
+          // Check each input for witness data
           for (const input of tx.vin) {
-            if (input.txinwitness && Array.isArray(input.txinwitness)) {
-              // Attempt to extract data from witness
+            // Look for witness data under various field names used by different APIs
+            const witnessData = input.txinwitness || input.witness || input.scriptWitness;
+            
+            if (witnessData && Array.isArray(witnessData) && witnessData.length > 0) {
+              console.log(`Found witness data in input for transaction ${txid}, analyzing...`);
+              
+              // Try to extract data from witness
               try {
-                const extractedData = extractSegWitData(input.txinwitness);
-                if (extractedData && !extractedData.publicKey.isOnCurve) {
-                  console.log(`Potential vulnerability found in transaction ${txid} - analyzing further`);
+                // Extract cryptographic data from witness
+                const extractedData = extractSegWitData(witnessData);
+                
+                if (extractedData && extractedData.publicKey) {
+                  console.log("Successfully extracted cryptographic data:", {
+                    publicKeyX: extractedData.publicKey.x.substring(0, 10) + "...",
+                    isOnCurve: extractedData.publicKey.isOnCurve || "unknown"
+                  });
                   
-                  // Perform full analysis on promising transactions
-                  const analysisResult = await analyzeTransaction(txid);
-                  
-                  if (analysisResult && analysisResult.vulnerabilityType !== 'none') {
-                    this.vulnerableCount++;
+                  // Check if public key is not on curve (potential vulnerability)
+                  if (extractedData.publicKey && !extractedData.publicKey.isOnCurve) {
+                    potentialVulnerability = true;
+                    console.log(`Potential vulnerability found in transaction ${txid} - public key not on curve!`);
                     
-                    console.log(`Confirmed vulnerable transaction: ${txid}`);
-                    toast.success("Vulnerability found!", {
-                      description: `TXID: ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)}`
+                    toast.info("Potential vulnerability detected!", {
+                      description: `Transaction ${txid.substring(0, 8)}... has public key not on curve`
                     });
                     
-                    // Since these are high-value findings, analyze one at a time
-                    // to give the user a chance to explore each one
-                    if (this.vulnerableCount % 3 === 1) {
-                      toast.info("Scan paused briefly to let you review findings", {
-                        description: "Continuing in 5 seconds...",
-                        duration: 5000
+                    // Perform full analysis on this transaction
+                    toast.loading(`Analyzing potentially vulnerable transaction...`, {
+                      id: `analyzing-${txid}`
+                    });
+                    
+                    const analysisResult = await analyzeTransaction(txid);
+                    toast.dismiss(`analyzing-${txid}`);
+                    
+                    if (analysisResult && analysisResult.vulnerabilityType !== 'none') {
+                      this.vulnerableCount++;
+                      
+                      console.log(`VULNERABILITY CONFIRMED: ${txid} - ${analysisResult.vulnerabilityType}`);
+                      toast.success("Vulnerability confirmed!", {
+                        description: `TXID: ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)}`
                       });
                       
-                      // Small pause to allow user to see the result
-                      await new Promise(resolve => setTimeout(resolve, 5000));
+                      // Pause briefly for each vulnerability to allow user to see the notification
+                      if (this.vulnerableCount % 3 === 0) {
+                        toast.info("Scan paused briefly to review findings", {
+                          description: "Continuing in 5 seconds..."
+                        });
+                        
+                        await new Promise(resolve => setTimeout(resolve, 5000));
+                      }
+                    } else {
+                      console.log(`False positive: Transaction ${txid} is not vulnerable`);
                     }
+                    
+                    break; // Break after analyzing one input with potential vulnerability
                   }
                 }
               } catch (extractError) {
-                // Just log and continue
                 console.error(`Error extracting SegWit data from ${txid}:`, extractError);
               }
             }
           }
+          
+          // If no potential vulnerability was found in the previous check, do a more thorough analysis 
+          // on a small percentage of transactions as random sampling
+          if (!potentialVulnerability && Math.random() < 0.05) { // 5% chance
+            console.log(`Random sampling: Analyzing transaction ${txid}`);
+            try {
+              const analysisResult = await analyzeTransaction(txid);
+              
+              if (analysisResult && analysisResult.vulnerabilityType !== 'none') {
+                this.vulnerableCount++;
+                console.log(`Random check found vulnerability in ${txid}!`);
+                
+                toast.success("Random check found vulnerability!", {
+                  description: `TXID: ${txid.substring(0, 8)}...${txid.substring(txid.length - 8)}`
+                });
+              }
+            } catch (error) {
+              console.error(`Error in random analysis of transaction ${txid}:`, error);
+            }
+          }
         }
       } catch (error) {
-        // Just log errors and continue
         console.error(`Error analyzing transaction ${txid}:`, error);
       }
     }

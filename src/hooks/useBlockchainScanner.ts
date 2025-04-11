@@ -27,6 +27,11 @@ export const useBlockchainScanner = () => {
   // Update chainstack service when node config changes
   useEffect(() => {
     if (nodeConfig && nodeConfig.connected) {
+      console.log("Setting up custom ChainStack service with:", {
+        rpcUrl: nodeConfig.rpcUrl,
+        hasApiKey: !!nodeConfig.apiKey
+      });
+      
       const customChainstack = initializeChainStack({
         rpcUrl: nodeConfig.rpcUrl,
         apiKey: nodeConfig.apiKey
@@ -63,15 +68,17 @@ export const useBlockchainScanner = () => {
     
     const intervalId = setInterval(() => {
       const updatedStatus = blockchainScannerService.getStatus();
-      setScanStatus(updatedStatus);
       
       // Add toast notification when vulnerabilities are found
       if (updatedStatus.vulnerableCount > scanStatus.vulnerableCount) {
         const newVulnerabilities = updatedStatus.vulnerableCount - scanStatus.vulnerableCount;
-        toast.info(`${newVulnerabilities} new vulnerable transaction${newVulnerabilities > 1 ? 's' : ''} found!`, {
-          description: "Check the transactions page for details"
+        toast.success(`${newVulnerabilities} new vulnerable transaction${newVulnerabilities > 1 ? 's' : ''} found!`, {
+          description: "Check the transactions page for details",
+          duration: 5000
         });
       }
+      
+      setScanStatus(updatedStatus);
     }, 1000);
     
     return () => clearInterval(intervalId);
@@ -90,6 +97,9 @@ export const useBlockchainScanner = () => {
       // Set default custom range values (a small window for testing)
       setCustomStartBlock(Math.max(blockHeight - 5, 0));
       setCustomEndBlock(blockHeight);
+      
+      console.log(`Latest block height: ${blockHeight}`);
+      toast.info(`Latest block height: ${blockHeight}`);
     } catch (error) {
       console.error('Failed to fetch latest block height:', error);
       toast.error('Failed to fetch latest block height');
@@ -121,6 +131,12 @@ export const useBlockchainScanner = () => {
       );
       if (!confirmed) return;
     }
+    
+    console.log(`Starting scan from block ${startBlock} to ${endBlock}`);
+    toast.info("Starting blockchain scan", {
+      description: `Scanning for vulnerable transactions in blocks ${startBlock}-${endBlock}`,
+      duration: 5000
+    });
     
     blockchainScannerService.startScanning(
       startBlock, 

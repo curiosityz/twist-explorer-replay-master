@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useBlockchainScanner } from '@/hooks/useBlockchainScanner';
 import { Progress } from '@/components/ui/progress';
-import { RefreshCw, Play, StopCircle, AlertTriangle } from 'lucide-react';
+import { RefreshCw, Play, StopCircle, AlertTriangle, Shield } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ConnectionPanel from './ConnectionPanel';
@@ -46,7 +46,7 @@ const BlockchainScanner: React.FC = () => {
             <div>
               <CardTitle className="text-crypto-foreground">Blockchain Vulnerability Scanner</CardTitle>
               <CardDescription className="text-crypto-foreground/70">
-                Scan the blockchain for vulnerable transactions
+                Scan the blockchain for vulnerable cryptographic transactions
               </CardDescription>
             </div>
             <Badge 
@@ -104,7 +104,7 @@ const BlockchainScanner: React.FC = () => {
                     disabled={customStartBlock <= 0 || customEndBlock <= 0 || !nodeConfig?.connected}
                   >
                     <Play className="mr-2 h-4 w-4" />
-                    Start Scan
+                    Start Cryptographic Scan
                   </Button>
                 ) : (
                   <Button 
@@ -121,7 +121,7 @@ const BlockchainScanner: React.FC = () => {
                 {!nodeConfig?.connected ? 'Connect to node first' : 
                   scanStatus.isScanning ? 
                   `Scanning block ${scanStatus.currentBlock.toLocaleString()} of ${scanStatus.endBlock.toLocaleString()}` : 
-                  'Scanner ready'
+                  'Crypto scanner ready'
                 }
               </div>
             </div>
@@ -150,8 +150,12 @@ const BlockchainScanner: React.FC = () => {
               <div className="text-sm font-medium mb-1">Transactions Processed</div>
               <div className="text-xl font-mono">{scanStatus.processedCount.toLocaleString()}</div>
             </div>
-            <div className="bg-crypto-background border border-crypto-border rounded p-3">
-              <div className="text-sm font-medium mb-1">Vulnerabilities Found</div>
+            <div className="bg-crypto-background border border-crypto-border rounded p-3 relative overflow-hidden">
+              <div className={`absolute inset-0 bg-amber-500/10 ${scanStatus.vulnerableCount > 0 ? 'opacity-100' : 'opacity-0'} transition-opacity`}></div>
+              <div className="flex justify-between items-center mb-1">
+                <div className="text-sm font-medium">Vulnerabilities Found</div>
+                {scanStatus.vulnerableCount > 0 && <Shield className="h-4 w-4 text-amber-500" />}
+              </div>
               <div className="text-xl font-mono text-amber-500">{scanStatus.vulnerableCount.toLocaleString()}</div>
             </div>
           </div>
@@ -159,7 +163,7 @@ const BlockchainScanner: React.FC = () => {
         {!scanStatus.isScanning && (
           <CardFooter className="text-xs text-crypto-foreground/60 border-t border-crypto-border pt-4">
             <AlertTriangle className="h-4 w-4 mr-2 text-amber-500" />
-            Warning: Scanning large block ranges may consume significant resources and take time.
+            Note: Cryptographic scanning analyzes SegWit transaction signatures for twisted curve vulnerabilities.
           </CardFooter>
         )}
       </Card>
