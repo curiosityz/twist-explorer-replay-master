@@ -221,7 +221,7 @@ function modPow(a: bigint, b: bigint, n: bigint): bigint {
   let x = a;
   
   // Examine each bit of the exponent b
-  while (b > 0) {
+  while (b > BigInt(0)) {
     // If the rightmost bit of b is 1, multiply result by x
     if (b % BigInt(2) === BigInt(1)) {
       result = (result * x) % n;
@@ -236,3 +236,4 @@ function modPow(a: bigint, b: bigint, n: bigint): bigint {
   
   return result;
 }
+
