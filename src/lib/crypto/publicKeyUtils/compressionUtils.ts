@@ -1,3 +1,4 @@
+
 /**
  * Public Key Compression Utilities
  */
@@ -42,7 +43,7 @@ export const compressPublicKey = (publicKeyX: string, publicKeyY: string): strin
  * @param compressedKey Compressed public key as a hex string
  * @returns Object containing X and Y coordinates of the decompressed public key
  */
-export const decompressPublicKey = (compressedKey: string): { x: string, y: string } | null => {
+export const decompressPublicKey = (compressedKey: string): { x: string, y: string, isOnCurve: boolean } | null => {
   if (compressedKey.length !== 66 || (!compressedKey.startsWith('02') && !compressedKey.startsWith('03'))) {
     console.error("Invalid compressed public key format");
     return null;
@@ -76,7 +77,8 @@ export const decompressPublicKey = (compressedKey: string): { x: string, y: stri
   
   return {
     x: xHex,
-    y: y.toString(16).padStart(64, '0')
+    y: y.toString(16).padStart(64, '0'),
+    isOnCurve: true
   };
 };
 
@@ -96,15 +98,15 @@ function tonelliShanks(n: bigint, p: bigint): bigint | null {
   }
   
   let Q = p - BigInt(1);
-  let S = 0;
+  let S = BigInt(0);
   while (Q % BigInt(2) === BigInt(0)) {
-    Q /= BigInt(2);
-    S += 1;
+    Q = Q / BigInt(2);
+    S = S + BigInt(1);
   }
   
   let z = BigInt(2);
   while (modPow(z, (p - BigInt(1)) / BigInt(2), p) !== p - BigInt(1)) {
-    z += 1;
+    z = z + BigInt(1);
   }
   
   let M = S;
@@ -112,21 +114,28 @@ function tonelliShanks(n: bigint, p: bigint): bigint | null {
   let t = modPow(n, Q, p);
   let R = modPow(n, (Q + BigInt(1)) / BigInt(2), p);
   
-  while (t !== BigInt(1)) {
-    let i = BigInt(1);
-    let tmp = t;
-    while (tmp !== BigInt(1) && i < M) {
-      tmp = modPow(tmp, BigInt(2), p);
-      i += 1;
+  while (true) {
+    if (t === BigInt(1)) {
+      return R;
     }
     
-    let b = modPow(c, BigInt(2) ** (M - i - BigInt(1)), p);
+    let i = BigInt(1);
+    let tmp = t;
+    
+    while (tmp !== BigInt(1) && i < M) {
+      tmp = modPow(tmp, BigInt(2), p);
+      i = i + BigInt(1);
+    }
+    
+    if (i === M) {
+      return null; // No square root exists
+    }
+    
+    let b = modPow(c, modPow(BigInt(2), M - i - BigInt(1), p - BigInt(1)), p);
     
     M = i;
     c = modPow(b, BigInt(2), p);
     t = (t * c) % p;
     R = (R * b) % p;
   }
-  
-  return R;
 }
