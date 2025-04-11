@@ -1,13 +1,14 @@
 /**
  * ChainStack API service for blockchain interactions
+ * Prioritizes direct ChainStack RPC calls over other APIs
  */
 
 import { UTXO, TxInput, TxOutput } from '@/lib/walletUtils';
 import { toast } from 'sonner';
 import { safeFetch, shouldUseProxy } from './corsProxyService';
 
-// Default RPC endpoint for Bitcoin (this should be overridden by user configuration)
-const DEFAULT_RPC_ENDPOINT = 'https://blockchain.info';
+// Replace DEFAULT_RPC_ENDPOINT with Chainstack endpoint if user has configured one
+const DEFAULT_RPC_ENDPOINT = 'https://rpc.chainstack.com/api/v1/bitcoin';
 
 interface ChainStackConfig {
   rpcUrl: string;
@@ -21,6 +22,7 @@ export class ChainStackService {
   private apiKey: string | undefined;
   private proxyUrl: string | undefined;
   private useCorsProxy: boolean;
+  private fallbackEnabled: boolean = true;
   
   constructor(config?: ChainStackConfig) {
     this.rpcUrl = config?.rpcUrl || DEFAULT_RPC_ENDPOINT;
@@ -74,7 +76,6 @@ export class ChainStackService {
       }
       
       const data = await response.json();
-      console.log(`RPC response:`, data);
       
       if (data.error) {
         throw new Error(`RPC error: ${data.error.message || JSON.stringify(data.error)}`);
@@ -84,13 +85,90 @@ export class ChainStackService {
     } catch (error: any) {
       console.error(`ChainStack RPC error (${method}):`, error);
       
-      // For getblockhash and getblock methods, try fallbacks to blockchain.info API
-      if (method === 'getblockhash' && params.length > 0) {
-        return this.fallbackGetBlockHashByHeight(params[0]);
-      } else if (method === 'getblock' && params.length > 0) {
-        return this.fallbackGetBlockByHash(params[0]);
+      // Only use fallbacks if enabled
+      if (this.fallbackEnabled) {
+        // For getblockhash and getblock methods, try fallbacks
+        if (method === 'getblockhash' && params.length > 0) {
+          return this.fallbackGetBlockHashByHeight(params[0]);
+        } else if (method === 'getblock' && params.length > 0) {
+          return this.fallbackGetBlockByHash(params[0]);
+        } else if (method === 'getrawtransaction' && params.length > 0) {
+          return this.fallbackGetTransaction(params[0]);
+        }
       }
       
+      throw error;
+    }
+  }
+
+  /**
+   * Disable fallback to other APIs (use only Chainstack)
+   */
+  public disableFallback(): void {
+    this.fallbackEnabled = false;
+    console.log("Fallback to other APIs disabled - using only Chainstack");
+  }
+
+  /**
+   * Enable fallback to other APIs
+   */
+  public enableFallback(): void {
+    this.fallbackEnabled = true;
+    console.log("Fallback to other APIs enabled");
+  }
+  
+  /**
+   * Fallback implementation for getrawtransaction using blockchain.info API
+   */
+  private async fallbackGetTransaction(txid: string): Promise<any> {
+    try {
+      console.warn("Failed to get transaction via RPC, falling back to blockchain.info:", txid);
+      
+      // Use a CORS proxy for blockchain.info requests
+      const url = `https://blockchain.info/rawtx/${txid}?format=json`;
+      const data = await this.fetchData(url);
+      
+      if (!data) {
+        throw new Error(`Transaction not found: ${txid}`);
+      }
+      
+      // Convert blockchain.info format to a format more similar to bitcoind RPC
+      return {
+        txid: data.hash,
+        version: data.ver,
+        locktime: data.lock_time,
+        size: data.size,
+        hex: data.hex || '', // blockchain.info may not provide hex
+        vin: data.inputs.map((input: any) => ({
+          txid: input.prev_out?.hash,
+          vout: input.prev_out?.n,
+          scriptSig: {
+            asm: '',
+            hex: input.script
+          },
+          sequence: input.sequence,
+          // Handle witness data properly in the conversion
+          witness: input.witness,
+          // Ensure witness data is in a consistent format for our extraction code
+          txinwitness: input.witness ? 
+            (Array.isArray(input.witness) ? input.witness : [input.witness]) : 
+            undefined
+        })),
+        vout: data.out.map((output: any, index: number) => ({
+          value: output.value / 100000000, // satoshi to BTC
+          n: index,
+          scriptPubKey: {
+            asm: '',
+            hex: output.script,
+            type: output.type || 'unknown',
+            addresses: output.addr ? [output.addr] : undefined
+          }
+        })),
+        blocktime: data.time,
+        confirmations: data.block_height ? 1 : 0 // simplified
+      };
+    } catch (error) {
+      console.error(`Fallback getTransaction failed:`, error);
       throw error;
     }
   }
@@ -100,7 +178,7 @@ export class ChainStackService {
    */
   private async fallbackGetBlockHashByHeight(height: number): Promise<string> {
     try {
-      const url = `${this.rpcUrl === DEFAULT_RPC_ENDPOINT ? this.rpcUrl : 'https://blockchain.info'}/block-height/${height}?format=json`;
+      const url = `https://blockchain.info/block-height/${height}?format=json`;
       console.log(`Using fallback blockchain.info API: ${url}`);
       
       const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
@@ -126,7 +204,7 @@ export class ChainStackService {
    */
   private async fallbackGetBlockByHash(blockHash: string): Promise<any> {
     try {
-      const url = `${this.rpcUrl === DEFAULT_RPC_ENDPOINT ? this.rpcUrl : 'https://blockchain.info'}/rawblock/${blockHash}`;
+      const url = `https://blockchain.info/rawblock/${blockHash}`;
       console.log(`Using fallback blockchain.info API: ${url}`);
       
       const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
@@ -136,7 +214,41 @@ export class ChainStackService {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      return await response.json();
+      const data = await response.json();
+      
+      // Convert blockchain.info format to bitcoind-like format
+      return {
+        hash: data.hash,
+        height: data.height,
+        version: data.ver,
+        time: data.time,
+        previousblockhash: data.prev_block,
+        tx: data.tx.map((tx: any) => {
+          // If this is a full tx object, convert it
+          if (typeof tx === 'object') {
+            return {
+              txid: tx.hash,
+              vin: tx.inputs.map((input: any) => ({
+                txid: input.prev_out?.hash,
+                vout: input.prev_out?.n,
+                scriptSig: { hex: input.script },
+                witness: input.witness,
+                txinwitness: input.witness ? 
+                  (Array.isArray(input.witness) ? input.witness : [input.witness]) : 
+                  undefined
+              })),
+              vout: tx.out.map((output: any, idx: number) => ({
+                value: output.value / 100000000,
+                n: idx,
+                scriptPubKey: { hex: output.script }
+              }))
+            };
+          } else {
+            // If it's just a txid
+            return tx;
+          }
+        })
+      };
     } catch (error) {
       console.error(`Fallback getblock failed:`, error);
       throw error;
@@ -347,61 +459,28 @@ export class ChainStackService {
   }
   
   /**
-   * Gets transaction details using RPC, falling back to blockchain.info API
+   * Gets transaction details using RPC, optimized to use Chainstack first
    * @param txid Transaction ID
    * @returns Transaction details
    */
   async getTransaction(txid: string): Promise<any> {
     try {
-      // Try direct RPC call first
+      // Always try direct Chainstack RPC call first
+      console.log(`Getting transaction data for: ${txid}`);
       try {
         const txData = await this.rpcCall('getrawtransaction', [txid, true]);
         return txData;
       } catch (rpcError) {
+        // If fallback is disabled, don't try other APIs
+        if (!this.fallbackEnabled) {
+          throw rpcError;
+        }
+        
         console.warn("Failed to get transaction via RPC, falling back to blockchain.info:", rpcError);
       }
       
       // Fallback to blockchain.info API with CORS handling
-      const url = `https://blockchain.info/rawtx/${txid}?format=json`;
-      const data = await this.fetchData(url);
-      
-      if (!data) {
-        throw new Error(`Transaction not found: ${txid}`);
-      }
-      
-      // Convert blockchain.info format to a format more similar to bitcoind RPC
-      const transformedData = {
-        txid: data.hash,
-        version: data.ver,
-        locktime: data.lock_time,
-        size: data.size,
-        hex: '', // blockchain.info doesn't provide hex directly
-        vin: data.inputs.map((input: any) => ({
-          txid: input.prev_out?.hash,
-          vout: input.prev_out?.n,
-          scriptSig: {
-            asm: '',
-            hex: input.script
-          },
-          sequence: input.sequence,
-          witness: input.witness,
-          txinwitness: input.witness ? [input.witness] : undefined
-        })),
-        vout: data.out.map((output: any, index: number) => ({
-          value: output.value / 100000000, // satoshi to BTC
-          n: index,
-          scriptPubKey: {
-            asm: '',
-            hex: output.script,
-            type: output.type || 'unknown',
-            addresses: output.addr ? [output.addr] : undefined
-          }
-        })),
-        blocktime: data.time,
-        confirmations: data.block_height ? 1 : 0 // simplified
-      };
-      
-      return transformedData;
+      return await this.fallbackGetTransaction(txid);
     } catch (error) {
       console.error(`Failed to get transaction details for ${txid}:`, error);
       throw error;
@@ -409,7 +488,7 @@ export class ChainStackService {
   }
 
   /**
-   * Gets block hash by height using blockchain API
+   * Gets block hash by height, optimized to use Chainstack first
    * @param height Block height
    * @returns Block hash or null if not found
    */
@@ -421,26 +500,16 @@ export class ChainStackService {
         const blockHash = await this.rpcCall('getblockhash', [height]);
         return blockHash;
       } catch (rpcError) {
+        // If fallback is disabled, don't try other APIs
+        if (!this.fallbackEnabled) {
+          throw rpcError;
+        }
+        
         console.warn("Failed to get block hash via RPC, falling back to blockchain.info:", rpcError);
       }
       
       // Fallback to blockchain.info
-      const url = `https://blockchain.info/block-height/${height}?format=json`;
-      console.log(`Falling back to blockchain.info API: ${url}`);
-      
-      const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
-      const response = await fetchFunction(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      const data = await response.json();
-      if (data?.blocks && data.blocks.length > 0) {
-        return data.blocks[0].hash;
-      }
-      
-      return null;
+      return await this.fallbackGetBlockHashByHeight(height);
     } catch (error) {
       console.error(`Failed to get block hash for height ${height}:`, error);
       return null;
@@ -448,7 +517,7 @@ export class ChainStackService {
   }
 
   /**
-   * Gets full block data by hash using blockchain API
+   * Gets full block data by hash, optimized to use Chainstack first
    * @param blockHash Block hash
    * @returns Block data or null if not found
    */
@@ -460,21 +529,16 @@ export class ChainStackService {
         const blockData = await this.rpcCall('getblock', [blockHash, 2]);
         return blockData;
       } catch (rpcError) {
+        // If fallback is disabled, don't try other APIs
+        if (!this.fallbackEnabled) {
+          throw rpcError;
+        }
+        
         console.warn("Failed to get block via RPC, falling back to blockchain.info:", rpcError);
       }
       
       // Fallback to blockchain.info
-      const url = `https://blockchain.info/rawblock/${blockHash}`;
-      console.log(`Falling back to blockchain.info API: ${url}`);
-      
-      const fetchFunction = this.useCorsProxy ? safeFetch : fetch;
-      const response = await fetchFunction(url);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
-      return await response.json();
+      return await this.fallbackGetBlockByHash(blockHash);
     } catch (error) {
       console.error(`Failed to get block data for hash ${blockHash}:`, error);
       return null;
