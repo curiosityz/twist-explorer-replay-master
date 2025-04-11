@@ -32,6 +32,7 @@ export const useBlockchainScanner = () => {
         hasApiKey: !!nodeConfig.apiKey
       });
       
+      // Create a new custom ChainStack service with the node configuration
       const customChainstack = initializeChainStack({
         rpcUrl: nodeConfig.rpcUrl,
         apiKey: nodeConfig.apiKey
@@ -52,15 +53,17 @@ export const useBlockchainScanner = () => {
       fetchLatestBlockHeight(customChainstack);
       
       toast.success(`Connected to ${nodeConfig.name}`, {
-        description: `Using node at block height ${nodeConfig.lastSyncBlock || 'unknown'}`
+        description: `Using node at ${nodeConfig.rpcUrl}`
       });
     }
   }, [nodeConfig]);
   
   // Fetch the latest block height when component mounts
   useEffect(() => {
-    fetchLatestBlockHeight();
-  }, []);
+    if (nodeConfig?.connected) {
+      fetchLatestBlockHeight();
+    }
+  }, [nodeConfig?.connected]);
   
   // Update the status periodically when scanning is active
   useEffect(() => {
@@ -84,14 +87,21 @@ export const useBlockchainScanner = () => {
     return () => clearInterval(intervalId);
   }, [scanStatus.isScanning, scanStatus.vulnerableCount]);
   
-  const fetchLatestBlockHeight = async (chainService = chainstackService) => {
-    if (!nodeConfig?.connected && chainService === chainstackService) {
-      return; // Don't fetch if not connected to a node, unless using a custom service
+  const fetchLatestBlockHeight = async (chainService = nodeConfig?.connected ? undefined : chainstackService) => {
+    if (!nodeConfig?.connected && !chainService) {
+      console.log("No connected node or chain service provided");
+      return; 
     }
+    
+    const serviceToUse = chainService || initializeChainStack({
+      rpcUrl: nodeConfig!.rpcUrl,
+      apiKey: nodeConfig!.apiKey
+    });
     
     setIsLoadingLatest(true);
     try {
-      const blockHeight = await chainService.getBlockHeight();
+      console.log(`Fetching latest block height from ${serviceToUse.rpcUrl || 'default endpoint'}`);
+      const blockHeight = await serviceToUse.getBlockHeight();
       setLatestBlock(blockHeight);
       
       // Set default custom range values (a small window for testing)
@@ -102,7 +112,9 @@ export const useBlockchainScanner = () => {
       toast.info(`Latest block height: ${blockHeight}`);
     } catch (error) {
       console.error('Failed to fetch latest block height:', error);
-      toast.error('Failed to fetch latest block height');
+      toast.error('Failed to fetch latest block height', {
+        description: error instanceof Error ? error.message : 'Unknown error'
+      });
     } finally {
       setIsLoadingLatest(false);
     }

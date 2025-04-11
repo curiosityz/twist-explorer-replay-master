@@ -6,7 +6,7 @@ import { UTXO, TxInput, TxOutput } from '@/lib/walletUtils';
 import { toast } from 'sonner';
 
 // Default RPC endpoint for Bitcoin (this should be overridden by user configuration)
-const DEFAULT_RPC_ENDPOINT = 'https://blockchain.info/rawblock/';
+const DEFAULT_RPC_ENDPOINT = 'https://blockchain.info';
 
 interface ChainStackConfig {
   rpcUrl: string;
@@ -24,6 +24,11 @@ export class ChainStackService {
     this.rpcUrl = config?.rpcUrl || DEFAULT_RPC_ENDPOINT;
     this.apiKey = config?.apiKey;
     this.proxyUrl = config?.proxyUrl;
+    
+    // Remove any trailing slashes for consistency
+    this.rpcUrl = this.rpcUrl.replace(/\/$/, '');
+    
+    console.log(`ChainStack service initialized with URL: ${this.rpcUrl}`);
   }
   
   /**
@@ -43,7 +48,7 @@ export class ChainStackService {
     }
     
     try {
-      console.log(`Making RPC call: ${method} with params:`, params);
+      console.log(`Making RPC call to ${this.rpcUrl}: ${method} with params:`, params);
       
       // Direct RPC call to the node
       const response = await fetch(this.rpcUrl, {
@@ -90,7 +95,7 @@ export class ChainStackService {
    */
   private async fallbackGetBlockHashByHeight(height: number): Promise<string> {
     try {
-      const url = `https://blockchain.info/block-height/${height}?format=json`;
+      const url = `${this.rpcUrl === DEFAULT_RPC_ENDPOINT ? this.rpcUrl : 'https://blockchain.info'}/block-height/${height}?format=json`;
       console.log(`Using fallback blockchain.info API: ${url}`);
       
       const response = await fetch(url);
@@ -114,7 +119,7 @@ export class ChainStackService {
    */
   private async fallbackGetBlockByHash(blockHash: string): Promise<any> {
     try {
-      const url = `https://blockchain.info/rawblock/${blockHash}`;
+      const url = `${this.rpcUrl === DEFAULT_RPC_ENDPOINT ? this.rpcUrl : 'https://blockchain.info'}/rawblock/${blockHash}`;
       console.log(`Using fallback blockchain.info API: ${url}`);
       
       const response = await fetch(url);
@@ -402,16 +407,23 @@ export class ChainStackService {
     try {
       // Try direct RPC call
       try {
+        console.log(`Getting block hash at height ${height} from ${this.rpcUrl}`);
         const blockHash = await this.rpcCall('getblockhash', [height]);
         return blockHash;
       } catch (rpcError) {
         console.warn("Failed to get block hash via RPC, falling back to blockchain.info:", rpcError);
       }
       
-      // Fallback to blockchain.info with CORS handling
+      // Fallback to blockchain.info
       const url = `https://blockchain.info/block-height/${height}?format=json`;
-      const data = await this.fetchData(url);
+      console.log(`Falling back to blockchain.info API: ${url}`);
       
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
       if (data?.blocks && data.blocks.length > 0) {
         return data.blocks[0].hash;
       }
@@ -432,15 +444,23 @@ export class ChainStackService {
     try {
       // Try direct RPC call
       try {
+        console.log(`Getting block data for hash ${blockHash} from ${this.rpcUrl}`);
         const blockData = await this.rpcCall('getblock', [blockHash, 2]);
         return blockData;
       } catch (rpcError) {
         console.warn("Failed to get block via RPC, falling back to blockchain.info:", rpcError);
       }
       
-      // Fallback to blockchain.info with CORS handling
+      // Fallback to blockchain.info
       const url = `https://blockchain.info/rawblock/${blockHash}`;
-      return await this.fetchData(url);
+      console.log(`Falling back to blockchain.info API: ${url}`);
+      
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      return await response.json();
     } catch (error) {
       console.error(`Failed to get block data for hash ${blockHash}:`, error);
       return null;
