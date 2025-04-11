@@ -29,8 +29,7 @@ export const useBlockchainScanner = () => {
     if (nodeConfig && nodeConfig.connected) {
       const customChainstack = initializeChainStack({
         rpcUrl: nodeConfig.rpcUrl,
-        apiKey: nodeConfig.apiKey,
-        useCorsProxy: true
+        apiKey: nodeConfig.apiKey
       });
       
       // Update start and end blocks based on last sync block if available

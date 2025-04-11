@@ -8,9 +8,6 @@ import { toast } from 'sonner';
 // Default RPC endpoint for Bitcoin (updated to use a CORS-friendly endpoint)
 const DEFAULT_RPC_ENDPOINT = 'https://blockchain.info/rawblock/';
 
-// CORS proxy configuration
-const CORS_PROXY_URL = 'https://corsproxy.io/?';
-
 interface ChainStackConfig {
   rpcUrl: string;
   apiKey?: string;
@@ -22,17 +19,15 @@ export class ChainStackService {
   private rpcUrl: string;
   private apiKey: string | undefined;
   private proxyUrl: string | undefined;
-  private useCorsProxy: boolean;
   
   constructor(config?: ChainStackConfig) {
     this.rpcUrl = config?.rpcUrl || DEFAULT_RPC_ENDPOINT;
     this.apiKey = config?.apiKey;
     this.proxyUrl = config?.proxyUrl;
-    this.useCorsProxy = config?.useCorsProxy !== undefined ? config.useCorsProxy : true;
   }
   
   /**
-   * Makes an RPC call to the blockchain node, handling CORS issues
+   * Makes an RPC call to the blockchain node
    * @param method RPC method name
    * @param params Parameters for the RPC call
    * @returns Response from the node
@@ -70,14 +65,8 @@ export class ChainStackService {
         return data;
       }
       
-      // Apply CORS proxy if enabled
-      let apiUrl = this.rpcUrl;
-      if (this.useCorsProxy) {
-        apiUrl = `${CORS_PROXY_URL}${encodeURIComponent(this.rpcUrl)}`;
-      }
-      
       // Direct RPC call to the node
-      const response = await fetch(apiUrl, {
+      const response = await fetch(this.rpcUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -103,44 +92,19 @@ export class ChainStackService {
       
       return data.result;
     } catch (error: any) {
-      // Check for CORS errors
-      const errorMessage = error.message || 'Unknown error';
-      const isCorsError = errorMessage.includes('CORS') || 
-                         (error.name === 'TypeError' && errorMessage.includes('Failed to fetch'));
-      
-      if (isCorsError) {
-        console.error(`CORS error in RPC call (${method}):`, error);
-        
-        // If we weren't using the CORS proxy but got a CORS error, try with the proxy
-        if (!this.useCorsProxy) {
-          console.log(`Retrying with CORS proxy...`);
-          this.useCorsProxy = true;
-          return this.rpcCall(method, params);
-        }
-        
-        throw new Error(`CORS policy prevents direct connection. Try using a CORS proxy or provide CORS headers on your endpoint.`);
-      } else {
-        console.error(`ChainStack RPC error (${method}):`, error);
-        throw error;
-      }
+      console.error(`ChainStack RPC error (${method}):`, error);
+      throw error;
     }
   }
   
   /**
-   * Helper method to make a GET request using CORS proxy if needed
+   * Helper method to make a GET request
    * @param url URL to fetch
    * @returns Response data
    */
-  private async fetchWithCorsHandling(url: string): Promise<any> {
-    try {
-      let fetchUrl = url;
-      
-      if (this.useCorsProxy) {
-        fetchUrl = `${CORS_PROXY_URL}${encodeURIComponent(url)}`;
-        console.log(`Using CORS proxy for fetch: ${fetchUrl}`);
-      }
-      
-      const response = await fetch(fetchUrl);
+  private async fetchData(url: string): Promise<any> {
+    try {      
+      const response = await fetch(url);
       
       if (!response.ok) {
         if (response.status === 404) {
@@ -151,14 +115,6 @@ export class ChainStackService {
       
       return await response.json();
     } catch (error: any) {
-      // If CORS error and not already using proxy, retry with proxy
-      if (!this.useCorsProxy && 
-          (error.message?.includes('CORS') || error.name === 'TypeError' && error.message?.includes('Failed to fetch'))) {
-        console.log(`CORS error, retrying with proxy: ${url}`);
-        this.useCorsProxy = true;
-        return this.fetchWithCorsHandling(url);
-      }
-      
       throw error;
     }
   }
@@ -360,7 +316,7 @@ export class ChainStackService {
       
       // Fallback to blockchain.info API with CORS handling
       const url = `https://blockchain.info/rawtx/${txid}?format=json`;
-      const data = await this.fetchWithCorsHandling(url);
+      const data = await this.fetchData(url);
       
       if (!data) {
         throw new Error(`Transaction not found: ${txid}`);
@@ -422,7 +378,7 @@ export class ChainStackService {
       
       // Fallback to blockchain.info with CORS handling
       const url = `https://blockchain.info/block-height/${height}?format=json`;
-      const data = await this.fetchWithCorsHandling(url);
+      const data = await this.fetchData(url);
       
       if (data?.blocks && data.blocks.length > 0) {
         return data.blocks[0].hash;
@@ -452,7 +408,7 @@ export class ChainStackService {
       
       // Fallback to blockchain.info with CORS handling
       const url = `https://blockchain.info/rawblock/${blockHash}`;
-      return await this.fetchWithCorsHandling(url);
+      return await this.fetchData(url);
     } catch (error) {
       console.error(`Failed to get block data for hash ${blockHash}:`, error);
       return null;

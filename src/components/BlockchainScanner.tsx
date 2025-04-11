@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useBlockchainScanner } from '@/hooks/useBlockchainScanner';
 import { Progress } from '@/components/ui/progress';
-import { RefreshCw, Play, StopCircle, AlertTriangle, Info } from 'lucide-react';
+import { RefreshCw, Play, StopCircle, AlertTriangle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import ConnectionPanel from './ConnectionPanel';
@@ -27,10 +27,6 @@ const BlockchainScanner: React.FC = () => {
   } = useBlockchainScanner();
 
   const handleStartScan = () => {
-    // Show a toast to inform about CORS proxy
-    toast.info("Using CORS proxy for blockchain API requests", {
-      description: "This helps avoid cross-origin errors when scanning the blockchain."
-    });
     startScan(customStartBlock, customEndBlock);
   };
 
@@ -157,15 +153,6 @@ const BlockchainScanner: React.FC = () => {
             <div className="bg-crypto-background border border-crypto-border rounded p-3">
               <div className="text-sm font-medium mb-1">Vulnerabilities Found</div>
               <div className="text-xl font-mono text-amber-500">{scanStatus.vulnerableCount.toLocaleString()}</div>
-            </div>
-          </div>
-
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-300">
-            <div className="flex items-start gap-2">
-              <Info className="h-4 w-4 mt-0.5" />
-              <div>
-                <p>Using CORS proxy to access blockchain data. This may slow down scanning but helps avoid cross-origin errors.</p>
-              </div>
             </div>
           </div>
         </CardContent>
